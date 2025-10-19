@@ -115,7 +115,7 @@ class SVGAgent(BaseAgent):
             request.theme.dict(),
             actual_template  # Pass actual template name for specific replacements
         )
-        
+
         # Log SVG content size before theming
         logger.info(f"SVG content size before theming: {len(svg_content)} bytes")
 

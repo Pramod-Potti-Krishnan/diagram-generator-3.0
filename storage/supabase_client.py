@@ -136,7 +136,7 @@ class DiagramStorage:
         Raises:
             Exception: If upload fails
         """
-        
+
         # Log incoming SVG content size
         logger.info(f"upload_diagram called with SVG content size: {len(svg_content) if svg_content else 0} bytes")
 
