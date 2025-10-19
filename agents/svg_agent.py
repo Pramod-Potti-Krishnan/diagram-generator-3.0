@@ -116,6 +116,9 @@ class SVGAgent(BaseAgent):
             actual_template  # Pass actual template name for specific replacements
         )
         
+        # Log SVG content size before theming
+        logger.info(f"SVG content size before theming: {len(svg_content)} bytes")
+
         # Apply theme
         print(f"DEBUG: useSmartTheming = {request.theme.useSmartTheming}")
         if request.theme.useSmartTheming:
@@ -153,7 +156,11 @@ class SVGAgent(BaseAgent):
         else:
             # Use basic theme replacement
             svg_content = self.apply_theme(svg_content, request.theme.dict())
-        
+
+        # Log final SVG content size
+        logger.info(f"SVG content size after theming: {len(svg_content)} bytes")
+        logger.info(f"SVG content preview (first 200 chars): {svg_content[:200]}")
+
         return {
             # Old format (backward compatibility)
             "content": svg_content,

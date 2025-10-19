@@ -137,6 +137,9 @@ class DiagramStorage:
             Exception: If upload fails
         """
         
+        # Log incoming SVG content size
+        logger.info(f"upload_diagram called with SVG content size: {len(svg_content) if svg_content else 0} bytes")
+
         # Return empty string if Supabase is not configured
         if not self.enabled:
             logger.debug("Supabase storage disabled - returning empty URL")
@@ -158,12 +161,18 @@ class DiagramStorage:
             if metadata:
                 file_options["x-metadata"] = str(metadata)
             
+            # Log before upload
+            encoded_content = svg_content.encode('utf-8')
+            logger.info(f"Uploading to Supabase: {file_name}, encoded size: {len(encoded_content)} bytes")
+
             # Upload to storage
             response = self.client.storage.from_(self.bucket_name).upload(
                 file_name,
-                svg_content.encode('utf-8'),
+                encoded_content,
                 file_options
             )
+
+            logger.info(f"Supabase upload response: {response}")
             
             # Get public URL
             if self.is_public:
