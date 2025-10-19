@@ -54,7 +54,7 @@ class DiagramRequest(BaseModel):
     method: str = Field(default=None, description="Force specific generation method")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "content": "Step 1: Plan\nStep 2: Execute\nStep 3: Review",
                 "diagram_type": "cycle_3_step",
