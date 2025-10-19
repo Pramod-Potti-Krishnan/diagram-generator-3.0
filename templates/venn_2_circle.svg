@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 2-Circle Venn Diagram Template -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Left Circle -->
+  <circle id="left_circle_fill" cx="320" cy="300" r="150" 
+          fill="#3b82f6" fill-opacity="0.3" stroke="#2563eb" stroke-width="3" filter="url(#shadow)"/>
+  
+  <!-- Right Circle -->
+  <circle id="right_circle_fill" cx="480" cy="300" r="150" 
+          fill="#10b981" fill-opacity="0.3" stroke="#059669" stroke-width="3" filter="url(#shadow)"/>
+  
+  <!-- Text for left circle (exclusive area) -->
+  <text id="left_circle_text" x="250" y="300" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    Set A
+  </text>
+  
+  <!-- Text for overlap area -->
+  <text id="overlap_text" x="400" y="300" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    A ∩ B
+  </text>
+  
+  <!-- Text for right circle (exclusive area) -->
+  <text id="right_circle_text" x="550" y="300" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    Set B
+  </text>
+  
+  <!-- Title -->
+  <text id="venn_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    Venn Diagram
+  </text>
+</svg>

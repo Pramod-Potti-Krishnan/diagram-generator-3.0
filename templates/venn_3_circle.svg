@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 3-Circle Venn Diagram Template -->
+  <defs>
+    <!-- Semi-transparent fills for overlapping circles -->
+    <radialGradient id="circle1_gradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#2563eb;stop-opacity:0.4" />
+    </radialGradient>
+    
+    <radialGradient id="circle2_gradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#ef4444;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#dc2626;stop-opacity:0.4" />
+    </radialGradient>
+    
+    <radialGradient id="circle3_gradient" cx="50%" cy="50%">
+      <stop offset="0%" style="stop-color:#22c55e;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:0.4" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Three overlapping circles forming Venn diagram -->
+  <!-- Circle 1 (Top-Left) - Blue -->
+  <circle id="circle_1_fill" cx="340" cy="280" r="120" 
+          fill="url(#circle1_gradient)" stroke="#2563eb" stroke-width="2"/>
+  
+  <!-- Circle 2 (Top-Right) - Red -->
+  <circle id="circle_2_fill" cx="460" cy="280" r="120" 
+          fill="url(#circle2_gradient)" stroke="#dc2626" stroke-width="2"/>
+  
+  <!-- Circle 3 (Bottom) - Green - moved 40px down -->
+  <circle id="circle_3_fill" cx="400" cy="400" r="120" 
+          fill="url(#circle3_gradient)" stroke="#16a34a" stroke-width="2"/>
+  
+  <!-- Text labels for each circle -->
+  <text id="circle_1_text" x="290" y="230" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Set A
+  </text>
+  
+  <text id="circle_2_text" x="510" y="230" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Set B
+  </text>
+  
+  <text id="circle_3_text" x="400" y="480" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Set C
+  </text>
+  
+  <!-- Center intersection label -->
+  <text id="intersection_text" x="400" y="320" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    A∩B∩C
+  </text>
+  
+  <!-- Title -->
+  <text id="venn_title" x="400" y="100" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Venn Diagram
+  </text>
+  <text x="400" y="125" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    3-Set Relationship
+  </text>
+</svg>

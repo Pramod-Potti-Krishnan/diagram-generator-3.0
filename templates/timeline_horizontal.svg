@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Horizontal Timeline Template -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Main timeline line -->
+  <line x1="100" y1="300" x2="700" y2="300" stroke="#94a3b8" stroke-width="3"/>
+  
+  <!-- Arrow at end -->
+  <path d="M 700 300 L 690 295 M 700 300 L 690 305" stroke="#94a3b8" stroke-width="3" fill="none"/>
+  
+  <!-- Milestone 1 -->
+  <circle id="milestone_1_fill" cx="150" cy="300" r="20" fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_1_date" x="150" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q1 2024
+  </text>
+  <text id="milestone_1_text" x="150" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Project Start
+  </text>
+  
+  <!-- Milestone 2 -->
+  <circle id="milestone_2_fill" cx="250" cy="300" r="20" fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_2_date" x="250" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q2 2024
+  </text>
+  <text id="milestone_2_text" x="250" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Phase 1
+  </text>
+  
+  <!-- Milestone 3 -->
+  <circle id="milestone_3_fill" cx="350" cy="300" r="20" fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_3_date" x="350" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q3 2024
+  </text>
+  <text id="milestone_3_text" x="350" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Phase 2
+  </text>
+  
+  <!-- Milestone 4 -->
+  <circle id="milestone_4_fill" cx="450" cy="300" r="20" fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_4_date" x="450" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q4 2024
+  </text>
+  <text id="milestone_4_text" x="450" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Beta Launch
+  </text>
+  
+  <!-- Milestone 5 -->
+  <circle id="milestone_5_fill" cx="550" cy="300" r="20" fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_5_date" x="550" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q1 2025
+  </text>
+  <text id="milestone_5_text" x="550" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Full Launch
+  </text>
+  
+  <!-- Milestone 6 -->
+  <circle id="milestone_6_fill" cx="650" cy="300" r="20" fill="#10b981" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <text id="milestone_6_date" x="650" y="260" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="600" fill="#64748b">
+    Q2 2025
+  </text>
+  <text id="milestone_6_text" x="650" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#1e293b">
+    Scale
+  </text>
+  
+  <!-- Title -->
+  <text id="timeline_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    Project Timeline
+  </text>
+</svg>

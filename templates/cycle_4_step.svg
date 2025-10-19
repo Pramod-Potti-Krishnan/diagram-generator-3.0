@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 4-Step Cycle Template - Circular Path with Overlaid Boxes -->
+  <defs>
+    <!-- Gradients for each step -->
+    <linearGradient id="step1_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="step2_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fb923c;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ea580c;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="step3_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#86efac;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22c55e;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="step4_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#c084fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#9333ea;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+    
+    <!-- Small arrow marker for entry points -->
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L0,8 L8,4 z" fill="#475569"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#fafafa"/>
+  
+  <!-- Main circular path -->
+  <circle cx="400" cy="300" r="150" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="none"/>
+  
+  <!-- Arrows at center of arcs, tangential to circle, clockwise direction -->
+  <!-- Arrow between Step 4 and Step 1 (45° - top-left) - rotated 25° CCW total, moved 5px down -->
+  <path d="M 290,195 L 314,177" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Arrow between Step 1 and Step 2 (45° - top-right) - rotated 10° CW total -->
+  <path d="M 490,180 L 510,195" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Arrow between Step 2 and Step 3 (45° - bottom-right) - rotated 30° CCW total, moved 5px up -->
+  <path d="M 510,405 L 485,423" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Arrow between Step 3 and Step 4 (45° - bottom-left) - rotated 15° CW total -->
+  <path d="M 310,420 L 290,403" fill="none" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Step 1 - Top (overlaid on circle) -->
+  <rect id="step_1_fill" x="330" y="120" width="140" height="60" rx="8" 
+        fill="url(#step1_gradient)" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_1_text" x="400" y="155" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Plan
+  </text>
+  
+  <!-- Step 2 - Right (overlaid on circle) -->
+  <rect id="step_2_fill" x="480" y="270" width="140" height="60" rx="8" 
+        fill="url(#step2_gradient)" stroke="#ea580c" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_2_text" x="550" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Execute
+  </text>
+  
+  <!-- Step 3 - Bottom (overlaid on circle) -->
+  <rect id="step_3_fill" x="330" y="420" width="140" height="60" rx="8" 
+        fill="url(#step3_gradient)" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_3_text" x="400" y="455" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Review
+  </text>
+  
+  <!-- Step 4 - Left (overlaid on circle) -->
+  <rect id="step_4_fill" x="180" y="270" width="140" height="60" rx="8" 
+        fill="url(#step4_gradient)" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_4_text" x="250" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Improve
+  </text>
+  
+  <!-- Main Title -->
+  <text id="cycle_title" x="400" y="50" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    4-Step Process Cycle
+  </text>
+  <text x="400" y="75" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    Iterative Workflow
+  </text>
+</svg>

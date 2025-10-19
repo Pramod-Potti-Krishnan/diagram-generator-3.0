@@ -1,0 +1,183 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Enhanced Hub & Spoke Template with 6 Nodes -->
+  <defs>
+    <!-- Gradients for richer visual appearance -->
+    <radialGradient id="hub_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#475569;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node1_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node2_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node3_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node4_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node5_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#f87171;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ef4444;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node6_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#f9a8d4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Enhanced shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.2"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Glow effect for hub -->
+    <filter id="hub_glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Smaller arrow markers (40% of original size) -->
+    <marker id="arrow" markerWidth="4" markerHeight="4" refX="3.2" refY="1.2" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,2.4 L3.6,1.2 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  
+  <!-- Background - plain white -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  
+  <!-- 
+    Updated positioning:
+    - Entire diagram moved down by 40px
+    - Hub center now at (400, 340)
+    - All nodes shifted down accordingly
+  -->
+  
+  <!-- Corrected Spokes with adjusted positions -->
+  
+  <!-- Spoke to Node 1 (Top) - at (400, 160) -->
+  <line x1="400" y1="267" x2="400" y2="217" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 2 (Top Right) - at (544, 244) -->
+  <line x1="449" y1="296" x2="492" y2="272" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 3 (Bottom Right) - at (544, 436) -->
+  <line x1="449" y1="384" x2="492" y2="408" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 4 (Bottom) - at (400, 520) -->
+  <line x1="400" y1="413" x2="400" y2="463" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 5 (Bottom Left) - at (256, 436) -->
+  <line x1="351" y1="384" x2="308" y2="408" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 6 (Top Left) - at (256, 244) -->
+  <line x1="351" y1="296" x2="308" y2="272" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Node 1 (Top) -->
+  <circle id="spoke_1_fill" cx="400" cy="160" r="57" 
+          fill="url(#node1_gradient)" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_1_text" x="400" y="160" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="400" dy="-6">Node 1</tspan>
+    <tspan x="400" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 2 (Top Right) -->
+  <circle id="spoke_2_fill" cx="544" cy="244" r="57" 
+          fill="url(#node2_gradient)" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_2_text" x="544" y="244" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="544" dy="-6">Node 2</tspan>
+    <tspan x="544" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 3 (Bottom Right) -->
+  <circle id="spoke_3_fill" cx="544" cy="436" r="57" 
+          fill="url(#node3_gradient)" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_3_text" x="544" y="436" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="544" dy="-6">Node 3</tspan>
+    <tspan x="544" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 4 (Bottom) -->
+  <circle id="spoke_4_fill" cx="400" cy="520" r="57" 
+          fill="url(#node4_gradient)" stroke="#d97706" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_4_text" x="400" y="520" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="400" dy="-6">Node 4</tspan>
+    <tspan x="400" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 5 (Bottom Left) -->
+  <circle id="spoke_5_fill" cx="256" cy="436" r="57" 
+          fill="url(#node5_gradient)" stroke="#dc2626" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_5_text" x="256" y="436" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="256" dy="-6">Node 5</tspan>
+    <tspan x="256" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 6 (Top Left) -->
+  <circle id="spoke_6_fill" cx="256" cy="244" r="57" 
+          fill="url(#node6_gradient)" stroke="#db2777" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_6_text" x="256" y="244" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="256" dy="-6">Node 6</tspan>
+    <tspan x="256" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Central Hub (moved down) -->
+  <circle cx="400" cy="340" r="79" fill="#ffffff" opacity="0.2" filter="url(#hub_glow)"/>
+  <circle id="hub_fill" cx="400" cy="340" r="73" 
+          fill="url(#hub_gradient)" stroke="#0f172a" stroke-width="3" filter="url(#shadow)"/>
+  <text id="hub_text" x="400" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14.4" font-weight="700" fill="#ffffff">
+    <tspan x="400" dy="-7">Central</tspan>
+    <tspan x="400" dy="18">Hub</tspan>
+  </text>
+  
+  <!-- Title with subtle styling -->
+  <text id="hub_title" x="400" y="40" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Hub &amp; Spoke Model
+  </text>
+  <text x="400" y="65" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    Centralized Network Architecture
+  </text>
+</svg>

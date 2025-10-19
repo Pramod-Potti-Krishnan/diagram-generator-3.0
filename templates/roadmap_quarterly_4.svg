@@ -1,0 +1,166 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Quarterly Roadmap Template (4 Quarters) -->
+  <defs>
+    <!-- Gradients for quarters -->
+    <linearGradient id="q1_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dbeafe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#93c5fd;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="q2_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d1fae5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#86efac;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="q3_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fed7aa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fb923c;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="q4_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fca5a5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f87171;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.1"/>
+    </filter>
+    
+    <!-- Arrow marker -->
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <path d="M0,0 L0,10 L9,5 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#fafafa"/>
+  
+  <!-- Timeline Arrow -->
+  <line x1="100" y1="450" x2="700" y2="450" 
+        stroke="#94a3b8" stroke-width="2" marker-end="url(#arrow)"/>
+  
+  <!-- Q1 -->
+  <rect id="q1_fill" x="120" y="200" width="140" height="180" rx="8" 
+        fill="url(#q1_gradient)" stroke="#60a5fa" stroke-width="2" filter="url(#shadow)"/>
+  <text id="q1_title" x="190" y="235" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Q1
+  </text>
+  <text id="q1_milestone_1" x="190" y="270" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Launch MVP
+  </text>
+  <text id="q1_milestone_2" x="190" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • User Research
+  </text>
+  <text id="q1_milestone_3" x="190" y="320" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Core Features
+  </text>
+  
+  <!-- Q1 Timeline Marker -->
+  <circle cx="190" cy="450" r="6" fill="#60a5fa" stroke="#3b82f6" stroke-width="2"/>
+  <line x1="190" y1="380" x2="190" y2="444" stroke="#60a5fa" stroke-width="1.5" stroke-dasharray="3,3"/>
+  
+  <!-- Q2 -->
+  <rect id="q2_fill" x="280" y="200" width="140" height="180" rx="8" 
+        fill="url(#q2_gradient)" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+  <text id="q2_title" x="350" y="235" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Q2
+  </text>
+  <text id="q2_milestone_1" x="350" y="270" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Scale Product
+  </text>
+  <text id="q2_milestone_2" x="350" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Marketing Push
+  </text>
+  <text id="q2_milestone_3" x="350" y="320" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Partnerships
+  </text>
+  
+  <!-- Q2 Timeline Marker -->
+  <circle cx="350" cy="450" r="6" fill="#22c55e" stroke="#16a34a" stroke-width="2"/>
+  <line x1="350" y1="380" x2="350" y2="444" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="3,3"/>
+  
+  <!-- Q3 -->
+  <rect id="q3_fill" x="440" y="200" width="140" height="180" rx="8" 
+        fill="url(#q3_gradient)" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+  <text id="q3_title" x="510" y="235" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Q3
+  </text>
+  <text id="q3_milestone_1" x="510" y="270" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • New Features
+  </text>
+  <text id="q3_milestone_2" x="510" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • International
+  </text>
+  <text id="q3_milestone_3" x="510" y="320" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Optimization
+  </text>
+  
+  <!-- Q3 Timeline Marker -->
+  <circle cx="510" cy="450" r="6" fill="#f97316" stroke="#ea580c" stroke-width="2"/>
+  <line x1="510" y1="380" x2="510" y2="444" stroke="#f97316" stroke-width="1.5" stroke-dasharray="3,3"/>
+  
+  <!-- Q4 -->
+  <rect id="q4_fill" x="600" y="200" width="140" height="180" rx="8" 
+        fill="url(#q4_gradient)" stroke="#ef4444" stroke-width="2" filter="url(#shadow)"/>
+  <text id="q4_title" x="670" y="235" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e293b">
+    Q4
+  </text>
+  <text id="q4_milestone_1" x="670" y="270" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Revenue Goals
+  </text>
+  <text id="q4_milestone_2" x="670" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Next Year Plan
+  </text>
+  <text id="q4_milestone_3" x="670" y="320" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#475569">
+    • Team Growth
+  </text>
+  
+  <!-- Q4 Timeline Marker -->
+  <circle cx="670" cy="450" r="6" fill="#ef4444" stroke="#dc2626" stroke-width="2"/>
+  <line x1="670" y1="380" x2="670" y2="444" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3,3"/>
+  
+  <!-- Timeline Labels -->
+  <text x="190" y="480" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#64748b">
+    Jan-Mar
+  </text>
+  <text x="350" y="480" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#64748b">
+    Apr-Jun
+  </text>
+  <text x="510" y="480" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#64748b">
+    Jul-Sep
+  </text>
+  <text x="670" y="480" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#64748b">
+    Oct-Dec
+  </text>
+  
+  <!-- Title -->
+  <text id="roadmap_title" x="400" y="100" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Product Roadmap
+  </text>
+  <text x="400" y="125" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    Quarterly Milestones 2024
+  </text>
+</svg>

@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 2x2 Matrix Template -->
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Grid Lines -->
+  <line x1="150" y1="300" x2="650" y2="300" stroke="#e2e8f0" stroke-width="2"/>
+  <line x1="400" y1="150" x2="400" y2="450" stroke="#e2e8f0" stroke-width="2"/>
+  
+  <!-- Axis Arrows -->
+  <path d="M 150 300 L 650 300 L 640 295 M 650 300 L 640 305" 
+        stroke="#64748b" stroke-width="2" fill="none"/>
+  <path d="M 400 450 L 400 150 L 395 160 M 400 150 L 405 160" 
+        stroke="#64748b" stroke-width="2" fill="none"/>
+  
+  <!-- Quadrant 1 (Top Right) -->
+  <rect id="q1_fill" x="410" y="160" width="230" height="130" 
+        fill="#dbeafe" stroke="#60a5fa" stroke-width="1" rx="8"/>
+  <text id="quadrant_1" x="525" y="225" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    High / High
+  </text>
+  
+  <!-- Quadrant 2 (Top Left) -->
+  <rect id="q2_fill" x="160" y="160" width="230" height="130" 
+        fill="#fef3c7" stroke="#fbbf24" stroke-width="1" rx="8"/>
+  <text id="quadrant_2" x="275" y="225" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    Low / High
+  </text>
+  
+  <!-- Quadrant 3 (Bottom Left) -->
+  <rect id="q3_fill" x="160" y="310" width="230" height="130" 
+        fill="#fee2e2" stroke="#f87171" stroke-width="1" rx="8"/>
+  <text id="quadrant_3" x="275" y="375" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    Low / Low
+  </text>
+  
+  <!-- Quadrant 4 (Bottom Right) -->
+  <rect id="q4_fill" x="410" y="310" width="230" height="130" 
+        fill="#dcfce7" stroke="#86efac" stroke-width="1" rx="8"/>
+  <text id="quadrant_4" x="525" y="375" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="500" fill="#1e293b">
+    High / Low
+  </text>
+  
+  <!-- Axis Labels -->
+  <text id="x_label" x="400" y="490" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b">
+    X Axis Label
+  </text>
+  <text id="y_label" x="100" y="300" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b"
+        transform="rotate(-90 100 300)">
+    Y Axis Label
+  </text>
+  
+  <!-- Title -->
+  <text id="matrix_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    2x2 Matrix
+  </text>
+</svg>

@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 5-Cell Honeycomb Template with Edge-Sharing Layout -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- 
+    Honeycomb geometry with edge-sharing:
+    - Radius R = 57.5 (matching honeycomb_7)
+    - Gap = 4px between hexagons
+    - Center at (400, 300)
+    - Pointy-top orientation (vertex at top)
+    - Layout: 
+      - Cell 2 (top) shares edges with Core and Cell 5
+      - Cell 4 (bottom) shares edges with Core and Cell 3
+      - Creating a connected 5-hexagon cluster
+  -->
+  
+  <!-- Hexagon 1 (Core/Center) -->
+  <path id="hex_1_fill" d="M 400.000 242.500 L 449.796 271.250 L 449.796 328.750 L 400.000 357.500 L 350.204 328.750 L 350.204 271.250 Z" 
+        fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_1_text" x="400" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffffff">
+    Core
+  </text>
+  
+  <!-- Hexagon 2 (Northwest) - shares edge with Core and Cell 5 -->
+  <path id="hex_2_fill" d="M 348.204 152.786 L 398.000 181.536 L 398.000 239.036 L 348.204 267.786 L 298.407 239.036 L 298.407 181.536 Z" 
+        fill="#10b981" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_2_text" x="348.204" y="215.286" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 2
+  </text>
+  
+  <!-- Hexagon 3 (East/Right) -->
+  <path id="hex_3_fill" d="M 503.593 242.500 L 553.389 271.250 L 553.389 328.750 L 503.593 357.500 L 453.796 328.750 L 453.796 271.250 Z" 
+        fill="#8b5cf6" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_3_text" x="503.593" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 3
+  </text>
+  
+  <!-- Hexagon 4 (Southeast) - shares edge with Core and Cell 3 -->
+  <path id="hex_4_fill" d="M 451.796 332.214 L 501.593 360.964 L 501.593 418.464 L 451.796 447.214 L 402.000 418.464 L 402.000 360.964 Z" 
+        fill="#f59e0b" stroke="#d97706" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_4_text" x="451.796" y="394.714" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 4
+  </text>
+  
+  <!-- Hexagon 5 (West/Left) -->
+  <path id="hex_5_fill" d="M 296.407 242.500 L 346.204 271.250 L 346.204 328.750 L 296.407 357.500 L 246.611 328.750 L 246.611 271.250 Z" 
+        fill="#ef4444" stroke="#dc2626" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_5_text" x="296.407" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 5
+  </text>
+  
+  <!-- Title -->
+  <text id="honeycomb_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    Honeycomb Structure
+  </text>
+</svg>

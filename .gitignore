@@ -30,8 +30,9 @@ htmlcov/
 # Logs
 *.log
 
-# Diagram outputs (generated files)
+# Diagram outputs (generated files - but keep templates)
 *.svg
+!templates/*.svg
 *.png
 test_results/
 railway_outputs/

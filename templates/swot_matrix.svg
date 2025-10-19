@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- SWOT Matrix Template -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Grid lines -->
+  <line x1="400" y1="150" x2="400" y2="500" stroke="#cbd5e1" stroke-width="2"/>
+  <line x1="150" y1="325" x2="650" y2="325" stroke="#cbd5e1" stroke-width="2"/>
+  
+  <!-- Strengths (Top Left) -->
+  <rect id="strengths_fill" x="160" y="160" width="230" height="155" 
+        fill="#dcfce7" stroke="#86efac" stroke-width="2" rx="8" filter="url(#shadow)"/>
+  <text id="strengths_label" x="275" y="185" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#166534">
+    STRENGTHS
+  </text>
+  <text id="strengths_text" x="275" y="240" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#1e293b">
+    Internal Advantages
+  </text>
+  
+  <!-- Weaknesses (Top Right) -->
+  <rect id="weaknesses_fill" x="410" y="160" width="230" height="155" 
+        fill="#fee2e2" stroke="#fca5a5" stroke-width="2" rx="8" filter="url(#shadow)"/>
+  <text id="weaknesses_label" x="525" y="185" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#991b1b">
+    WEAKNESSES
+  </text>
+  <text id="weaknesses_text" x="525" y="240" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#1e293b">
+    Internal Limitations
+  </text>
+  
+  <!-- Opportunities (Bottom Left) -->
+  <rect id="opportunities_fill" x="160" y="335" width="230" height="155" 
+        fill="#dbeafe" stroke="#93c5fd" stroke-width="2" rx="8" filter="url(#shadow)"/>
+  <text id="opportunities_label" x="275" y="360" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#1e3a8a">
+    OPPORTUNITIES
+  </text>
+  <text id="opportunities_text" x="275" y="415" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#1e293b">
+    External Possibilities
+  </text>
+  
+  <!-- Threats (Bottom Right) -->
+  <rect id="threats_fill" x="410" y="335" width="230" height="155" 
+        fill="#fef3c7" stroke="#fcd34d" stroke-width="2" rx="8" filter="url(#shadow)"/>
+  <text id="threats_label" x="525" y="360" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#92400e">
+    THREATS
+  </text>
+  <text id="threats_text" x="525" y="415" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#1e293b">
+    External Risks
+  </text>
+  
+  <!-- Axis Labels -->
+  <text x="100" y="240" text-anchor="middle" transform="rotate(-90 100 240)"
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b">
+    INTERNAL
+  </text>
+  <text x="100" y="415" text-anchor="middle" transform="rotate(-90 100 415)"
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b">
+    EXTERNAL
+  </text>
+  <text x="275" y="130" text-anchor="middle"
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b">
+    HELPFUL
+  </text>
+  <text x="525" y="130" text-anchor="middle"
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#64748b">
+    HARMFUL
+  </text>
+  
+  <!-- Title -->
+  <text id="swot_title" x="400" y="60" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    SWOT Analysis
+  </text>
+</svg>

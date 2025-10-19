@@ -1,0 +1,145 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Enhanced Hub & Spoke Template with 4 Nodes -->
+  <defs>
+    <!-- Gradients for richer visual appearance -->
+    <radialGradient id="hub_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#475569;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node1_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#34d399;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node2_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node3_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </radialGradient>
+    
+    <radialGradient id="node4_gradient" cx="50%" cy="30%">
+      <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+    </radialGradient>
+    
+    <!-- Enhanced shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.2"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Glow effect for hub -->
+    <filter id="hub_glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Smaller arrow markers (40% of original size) -->
+    <marker id="arrow" markerWidth="4" markerHeight="4" refX="3.2" refY="1.2" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,2.4 L3.6,1.2 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  
+  <!-- Background - plain white -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  
+  <!-- 
+    Updated positioning:
+    - Entire diagram moved down by 40px
+    - Hub center now at (400, 340)
+    - All nodes shifted down accordingly
+  -->
+  
+  <!-- Corrected Spokes with adjusted positions -->
+  
+  <!-- Spoke to Node 1 (Top) - at (400, 144) -->
+  <line x1="400" y1="267" x2="400" y2="205" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 2 (Right) - at (576, 340) -->
+  <line x1="473" y1="340" x2="515" y2="340" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 3 (Bottom) - at (400, 536) -->
+  <line x1="400" y1="413" x2="400" y2="475" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Spoke to Node 4 (Left) - at (224, 340) -->
+  <line x1="327" y1="340" x2="285" y2="340" 
+        stroke="#64748b" stroke-width="2.5" stroke-dasharray="6,4" 
+        stroke-linecap="round" opacity="0.7" marker-end="url(#arrow)"/>
+  
+  <!-- Node 1 (Top) -->
+  <circle id="spoke_1_fill" cx="400" cy="144" r="61" 
+          fill="url(#node1_gradient)" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_1_text" x="400" y="144" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="400" dy="-6">Node 1</tspan>
+    <tspan x="400" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 2 (Right) -->
+  <circle id="spoke_2_fill" cx="576" cy="340" r="61" 
+          fill="url(#node2_gradient)" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_2_text" x="576" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="576" dy="-6">Node 2</tspan>
+    <tspan x="576" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 3 (Bottom) -->
+  <circle id="spoke_3_fill" cx="400" cy="536" r="61" 
+          fill="url(#node3_gradient)" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_3_text" x="400" y="536" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="400" dy="-6">Node 3</tspan>
+    <tspan x="400" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Node 4 (Left) -->
+  <circle id="spoke_4_fill" cx="224" cy="340" r="61" 
+          fill="url(#node4_gradient)" stroke="#d97706" stroke-width="2" filter="url(#shadow)"/>
+  <text id="spoke_4_text" x="224" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ffffff">
+    <tspan x="224" dy="-6">Node 4</tspan>
+    <tspan x="224" dy="16">Line 2</tspan>
+  </text>
+  
+  <!-- Central Hub (moved down) -->
+  <circle cx="400" cy="340" r="79" fill="#ffffff" opacity="0.2" filter="url(#hub_glow)"/>
+  <circle id="hub_fill" cx="400" cy="340" r="73" 
+          fill="url(#hub_gradient)" stroke="#0f172a" stroke-width="3" filter="url(#shadow)"/>
+  <text id="hub_text" x="400" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14.4" font-weight="700" fill="#ffffff">
+    <tspan x="400" dy="-7">Central</tspan>
+    <tspan x="400" dy="18">Hub</tspan>
+  </text>
+  
+  <!-- Title with subtle styling -->
+  <text id="hub_title" x="400" y="40" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Hub &amp; Spoke Model
+  </text>
+  <text x="400" y="65" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    Centralized Network Architecture
+  </text>
+</svg>

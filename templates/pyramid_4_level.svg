@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 750" width="1000" height="750">
+  <!-- 4-Level Pyramid Template - Consistent Angles with Gaps -->
+  <defs>
+    <!-- Gradients for each level -->
+    <linearGradient id="level1_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fef3c7;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fde68a;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="level2_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#fed7aa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#fb923c;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="level3_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#d1fae5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#86efac;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="level4_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dbeafe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#93c5fd;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1000" height="750" fill="#ffffff"/>
+  
+  <!-- 
+    Pyramid geometry for 4 levels with consistent slopes:
+    - Apex: (500, 188)
+    - Base: from (250, 569) to (750, 569) - 500px wide
+    - Total height: 381px
+    - Slope ratio: 250/381 = 0.656
+    - 6px gaps between levels
+    
+    Level heights (excluding gaps):
+    - Level 1: 90px (y=188 to y=278)
+    - Level 2: 90px (y=284 to y=374)
+    - Level 3: 92px (y=380 to y=472)
+    - Level 4: 91px (y=478 to y=569)
+  -->
+  
+  <!-- Level 4 (Bottom) - from y=478 to y=569 (height: 91px) -->
+  <path id="level_4_fill" d="M 250 569 L 750 569 L 690 478 L 310 478 Z" 
+        fill="url(#level4_gradient)" stroke="#60a5fa" stroke-width="2" filter="url(#shadow)"/>
+  <text id="level_4_text" x="500" y="535" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#1e293b">
+    Foundation
+  </text>
+  
+  <!-- Level 3 - from y=380 to y=472 (height: 92px) -->
+  <path id="level_3_fill" d="M 314 472 L 686 472 L 626 380 L 374 380 Z" 
+        fill="url(#level3_gradient)" stroke="#22c55e" stroke-width="2" filter="url(#shadow)"/>
+  <text id="level_3_text" x="500" y="435" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#1e293b">
+    Development
+  </text>
+  
+  <!-- Level 2 - from y=284 to y=374 (height: 90px) -->
+  <path id="level_2_fill" d="M 378 374 L 622 374 L 563 284 L 437 284 Z" 
+        fill="url(#level2_gradient)" stroke="#ea580c" stroke-width="2" filter="url(#shadow)"/>
+  <text id="level_2_text" x="500" y="340" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#1e293b">
+    Strategy
+  </text>
+  
+  <!-- Level 1 (Top) - triangle from apex to y=278 (height: 90px) -->
+  <path id="level_1_fill" d="M 441 278 L 559 278 L 500 188 Z" 
+        fill="url(#level1_gradient)" stroke="#fbbf24" stroke-width="2" filter="url(#shadow)"/>
+  <text id="level_1_text" x="500" y="250" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#1e293b">
+    Vision
+  </text>
+  
+  <!-- Title -->
+  <text id="pyramid_title" x="500" y="100" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Pyramid Hierarchy
+  </text>
+  <text x="500" y="125" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    4-Level Structure
+  </text>
+</svg>

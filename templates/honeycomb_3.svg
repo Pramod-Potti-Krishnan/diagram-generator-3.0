@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 3-Cell Honeycomb Template in C-Shape -->
+  <defs>
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- 
+    Honeycomb geometry in C-shape:
+    - Radius R = 57.5 (matching honeycomb_7)
+    - Gap = 4px between hexagons
+    - Center at (400, 300)
+    - Pointy-top orientation (vertex at top)
+    - C-shape: Cell 2 at northwest, Core at center-left, Cell 3 at southwest
+  -->
+  
+  <!-- Hexagon 1 (Core - Center/Middle of C) -->
+  <path id="hex_1_fill" d="M 400.000 242.500 L 449.796 271.250 L 449.796 328.750 L 400.000 357.500 L 350.204 328.750 L 350.204 271.250 Z" 
+        fill="#3b82f6" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_1_text" x="400" y="305" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffffff">
+    Core
+  </text>
+  
+  <!-- Hexagon 2 (Northwest - Top of C) -->
+  <path id="hex_2_fill" d="M 348.204 152.786 L 398.000 181.536 L 398.000 239.036 L 348.204 267.786 L 298.407 239.036 L 298.407 181.536 Z" 
+        fill="#10b981" stroke="#059669" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_2_text" x="348.204" y="215.286" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 2
+  </text>
+  
+  <!-- Hexagon 3 (Southwest - Bottom of C) -->
+  <path id="hex_3_fill" d="M 348.204 332.214 L 398.000 360.964 L 398.000 418.464 L 348.204 447.214 L 298.407 418.464 L 298.407 360.964 Z" 
+        fill="#8b5cf6" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="hex_3_text" x="348.204" y="394.714" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="500" fill="#ffffff">
+    Cell 3
+  </text>
+  
+  <!-- Title -->
+  <text id="honeycomb_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="24" font-weight="600" fill="#1e293b">
+    Honeycomb Structure
+  </text>
+</svg>

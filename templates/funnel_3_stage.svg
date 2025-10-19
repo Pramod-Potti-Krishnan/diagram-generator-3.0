@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 3-Stage Funnel Template -->
+  <defs>
+    <!-- Gradients for each stage -->
+    <linearGradient id="stage1_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="stage2_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#93c5fd;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#60a5fa;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="stage3_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#dbeafe;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#bfdbfe;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#ffffff"/>
+  
+  <!-- Stage 1 (Top - Widest) -->
+  <path id="stage_1_fill" d="M 150 150 L 650 150 L 550 270 L 250 270 Z" 
+        fill="url(#stage1_gradient)" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="stage_1_text" x="400" y="210" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#ffffff">
+    Awareness
+  </text>
+  
+  <!-- Stage 2 (Middle) -->
+  <path id="stage_2_fill" d="M 250 270 L 550 270 L 450 390 L 350 390 Z" 
+        fill="url(#stage2_gradient)" stroke="#60a5fa" stroke-width="2" filter="url(#shadow)"/>
+  <text id="stage_2_text" x="400" y="330" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#ffffff">
+    Consideration
+  </text>
+  
+  <!-- Stage 3 (Bottom - Narrowest) -->
+  <path id="stage_3_fill" d="M 350 390 L 450 390 L 425 490 L 375 490 Z" 
+        fill="url(#stage3_gradient)" stroke="#93c5fd" stroke-width="2" filter="url(#shadow)"/>
+  <text id="stage_3_text" x="400" y="440" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="18" font-weight="500" fill="#1e293b">
+    Conversion
+  </text>
+  
+  <!-- Title -->
+  <text id="funnel_title" x="400" y="80" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Sales Funnel
+  </text>
+  <text x="400" y="105" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    3-Stage Conversion Process
+  </text>
+</svg>

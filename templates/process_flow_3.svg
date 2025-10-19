@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- 3-Step Process Flow Template -->
+  <defs>
+    <!-- Gradients for boxes -->
+    <linearGradient id="box1_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#60a5fa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="box2_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="box3_gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#86efac;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22c55e;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Shadow filter -->
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
+      <feOffset dx="0" dy="2" result="offsetblur"/>
+      <feFlood flood-color="#000000" flood-opacity="0.15"/>
+      <feComposite in2="offsetblur" operator="in"/>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Arrow marker -->
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#64748b"/>
+    </marker>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="800" height="600" fill="#fafafa"/>
+  
+  <!-- Process Step 1 -->
+  <rect id="step_1_fill" x="100" y="250" width="150" height="100" rx="8" 
+        fill="url(#box1_gradient)" stroke="#2563eb" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_1_text" x="175" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Input
+  </text>
+  <text x="175" y="315" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#e0e7ff">
+    Step 1
+  </text>
+  
+  <!-- Arrow 1 to 2 -->
+  <line id="arrow_1" x1="250" y1="300" x2="325" y2="300" 
+        stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  
+  <!-- Process Step 2 -->
+  <rect id="step_2_fill" x="325" y="250" width="150" height="100" rx="8" 
+        fill="url(#box2_gradient)" stroke="#7c3aed" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_2_text" x="400" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Process
+  </text>
+  <text x="400" y="315" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#e9d5ff">
+    Step 2
+  </text>
+  
+  <!-- Arrow 2 to 3 -->
+  <line id="arrow_2" x1="475" y1="300" x2="550" y2="300" 
+        stroke="#64748b" stroke-width="2.5" marker-end="url(#arrow)"/>
+  
+  <!-- Process Step 3 -->
+  <rect id="step_3_fill" x="550" y="250" width="150" height="100" rx="8" 
+        fill="url(#box3_gradient)" stroke="#16a34a" stroke-width="2" filter="url(#shadow)"/>
+  <text id="step_3_text" x="625" y="295" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="16" font-weight="600" fill="#ffffff">
+    Output
+  </text>
+  <text x="625" y="315" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="13" font-weight="400" fill="#dcfce7">
+    Step 3
+  </text>
+  
+  <!-- Title -->
+  <text id="process_title" x="400" y="150" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="26" font-weight="600" fill="#1e293b">
+    Process Flow
+  </text>
+  <text x="400" y="175" text-anchor="middle" 
+        font-family="Inter, sans-serif" font-size="14" font-weight="400" fill="#64748b">
+    3-Step Sequential Process
+  </text>
+</svg>
