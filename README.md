@@ -4,12 +4,22 @@ A REST API microservice for generating diagrams using SVG templates, Mermaid, an
 
 ## 🌐 Production URL
 
-**Live API**: `https://diagram-v30-production.up.railway.app` (to be deployed)
+**Live API**: `https://web-production-e0ad0.up.railway.app`
 
 Test it now:
 ```bash
-curl https://diagram-v30-production.up.railway.app/health
+curl https://web-production-e0ad0.up.railway.app/health
 ```
+
+### Production Test Results ✅
+
+All systems operational! Successfully tested on Railway:
+- ✅ **3-Step Cycle Diagram** - Generated in 1.67s with perfect quality (1.0)
+- ✅ **Flowchart** - AI-powered Mermaid generation in 5.64s (Gemini 2.5 Flash)
+- ✅ **4-Level Pyramid** - Generated in 1.15s with perfect quality (1.0)
+- ✅ **Venn Diagram** - Generated in 1.14s with perfect quality (1.0)
+
+**View Live Examples**: Open `railway_test_results.html` in your browser to see all generated diagrams.
 
 ## Features
 
@@ -61,8 +71,8 @@ The service will start on `http://localhost:8080`
 import requests
 import time
 
-# Submit diagram generation request to production
-response = requests.post("http://localhost:8080/generate", json={
+# Submit diagram generation request to production Railway API
+response = requests.post("https://web-production-e0ad0.up.railway.app/generate", json={
     "content": "Step 1: Plan\nStep 2: Execute\nStep 3: Review",
     "diagram_type": "cycle_3_step",
     "theme": {
@@ -77,7 +87,7 @@ print(f"Job created: {job_id}")
 
 # Poll for results
 while True:
-    status_response = requests.get(f"http://localhost:8080/status/{job_id}")
+    status_response = requests.get(f"https://web-production-e0ad0.up.railway.app/status/{job_id}")
     status = status_response.json()
 
     print(f"Status: {status['status']} - Progress: {status.get('progress', 0)}%")
@@ -336,7 +346,7 @@ from typing import Dict, Any, Optional
 class DiagramClient:
     """Client for Diagram Generator v3"""
 
-    def __init__(self, base_url: str = "http://localhost:8080"):
+    def __init__(self, base_url: str = "https://web-production-e0ad0.up.railway.app"):
         self.base_url = base_url.rstrip('/')
 
     def generate_diagram(
@@ -407,7 +417,7 @@ print(f"Diagram URL: {result['diagram_url']}")
 
 ```javascript
 class DiagramClient {
-    constructor(baseUrl = 'http://localhost:8080') {
+    constructor(baseUrl = 'https://web-production-e0ad0.up.railway.app') {
         this.baseUrl = baseUrl.replace(/\/$/, '');
     }
 
@@ -477,8 +487,8 @@ console.log('Diagram URL:', result.diagramUrl);
 ### cURL Examples
 
 ```bash
-# Submit diagram generation request
-curl -X POST http://localhost:8080/generate \
+# Submit diagram generation request to production
+curl -X POST https://web-production-e0ad0.up.railway.app/generate \
   -H "Content-Type: application/json" \
   -d '{
     "content": "Step 1: Plan\nStep 2: Execute\nStep 3: Review",
@@ -492,9 +502,12 @@ curl -X POST http://localhost:8080/generate \
 # Response: {"job_id": "550e8400-e29b-41d4-a716-446655440000", "status": "processing"}
 
 # Check job status
-curl http://localhost:8080/status/550e8400-e29b-41d4-a716-446655440000
+curl https://web-production-e0ad0.up.railway.app/status/550e8400-e29b-41d4-a716-446655440000
 
 # Health check
+curl https://web-production-e0ad0.up.railway.app/health
+
+# For local development (use localhost)
 curl http://localhost:8080/health
 ```
 
@@ -513,19 +526,28 @@ curl http://localhost:8080/health
 
 ## Deployment
 
-### Railway Deployment
+### Railway Deployment ✅ Currently Deployed
 
-1. Push to GitHub
-2. Create new Railway project
-3. Add environment variables:
+**Production URL**: `https://web-production-e0ad0.up.railway.app`
+
+The service is already deployed and running on Railway. For a new deployment:
+
+1. Push to GitHub: `https://github.com/Pramod-Potti-Krishnan/diagram-generator-3.0`
+2. Connect Railway to your GitHub repository
+3. Railway auto-detects configuration from `railway.toml` and `Procfile`
+4. Add environment variables in Railway dashboard:
    ```
    GOOGLE_API_KEY=your-key
    SUPABASE_URL=https://your-project.supabase.co
    SUPABASE_ANON_KEY=your-anon-key
    SUPABASE_BUCKET=diagram-charts
-   API_PORT=$PORT
+   ENV=production
    ```
-4. Deploy
+5. Railway automatically deploys on push to main branch
+
+**Note**: Railway automatically sets `PORT` - do not set it manually.
+
+For detailed deployment instructions, see `RAILWAY_DEPLOY.md`.
 
 ### Docker Deployment
 
