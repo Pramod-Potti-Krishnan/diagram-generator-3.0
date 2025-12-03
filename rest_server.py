@@ -16,6 +16,8 @@ from job_manager import JobManager
 from dependencies import DiagramDependencies
 from agent import process_diagram_direct
 from core.conductor import DiagramConductor
+from routers import layout_service_router
+from routers.layout_service_router import set_dependencies as set_layout_dependencies
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Layout Service router
+app.include_router(layout_service_router)
 
 # Initialize global managers
 job_manager = JobManager(cleanup_hours=getattr(settings, 'job_cleanup_hours', 1))
@@ -119,6 +124,10 @@ async def startup_event():
     conductor = DiagramConductor(settings)
     await conductor.initialize()
 
+    # Set dependencies for Layout Service router
+    set_layout_dependencies(job_manager, conductor)
+    logger.info("Layout Service router dependencies initialized")
+
     logger.info(f"REST API ready on port {getattr(settings, 'api_port', 8080)}")
 
 
@@ -147,7 +156,13 @@ async def root():
             "generate": "POST /generate",
             "status": "GET /status/{job_id}",
             "health": "GET /health",
-            "stats": "GET /stats"
+            "stats": "GET /stats",
+            "layout_service": {
+                "generate": "POST /api/ai/diagram/generate",
+                "status": "GET /api/ai/diagram/status/{job_id}",
+                "types": "GET /api/ai/diagram/types",
+                "health": "GET /api/ai/diagram/health"
+            }
         },
         "supported_diagram_types": {
             "svg_templates": [
@@ -166,6 +181,10 @@ async def root():
             ],
             "python_charts": [
                 "pie", "bar", "line", "scatter", "network", "sankey"
+            ],
+            "layout_service": [
+                "flowchart", "sequence", "class", "state", "er",
+                "gantt", "userjourney", "gitgraph", "mindmap", "pie", "timeline"
             ]
         }
     }

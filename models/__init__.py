@@ -19,7 +19,37 @@ from .request_models import (
     ColorScheme
 )
 
+from .layout_service_models import (
+    # Enums
+    LayoutDiagramType,
+    DiagramDirection,
+    MermaidTheme,
+    ComplexityLevel,
+    JobStatus,
+    # Request models
+    DiagramContext,
+    DiagramLayout,
+    GridConstraints,
+    DiagramOptions,
+    LayoutServiceDiagramRequest,
+    # Response models
+    RenderedContent,
+    DiagramStructure,
+    DiagramDimensions,
+    DiagramMetadata,
+    EditInfo,
+    SyntaxError,
+    DiagramError,
+    DiagramData,
+    LayoutServiceJobResponse,
+    LayoutServiceJobStatus,
+    LayoutServiceDiagramResponse,
+    SupportedTypesResponse,
+    TypeInfo
+)
+
 __all__ = [
+    # Existing exports
     "DiagramRequest",
     "DiagramSpec",
     "DiagramType",
@@ -28,5 +58,31 @@ __all__ = [
     "DiagramConstraints",
     "GenerationStrategy",
     "GenerationMethod",
-    "ColorScheme"
+    "ColorScheme",
+    # Layout Service enums
+    "LayoutDiagramType",
+    "DiagramDirection",
+    "MermaidTheme",
+    "ComplexityLevel",
+    "JobStatus",
+    # Layout Service request models
+    "DiagramContext",
+    "DiagramLayout",
+    "GridConstraints",
+    "DiagramOptions",
+    "LayoutServiceDiagramRequest",
+    # Layout Service response models
+    "RenderedContent",
+    "DiagramStructure",
+    "DiagramDimensions",
+    "DiagramMetadata",
+    "EditInfo",
+    "SyntaxError",
+    "DiagramError",
+    "DiagramData",
+    "LayoutServiceJobResponse",
+    "LayoutServiceJobStatus",
+    "LayoutServiceDiagramResponse",
+    "SupportedTypesResponse",
+    "TypeInfo"
 ]

@@ -849,21 +849,21 @@ MERMAID_PLAYBOOK = {
     group frontend(cloud)[Frontend]
     group backend(server)[Backend Services]
     group data(database)[Data Layer]
-    
+
     service cdn(internet)[CDN] in frontend
     service web(server)[React App] in frontend
-    
+
     service api(server)[API Gateway] in backend
     service auth(server)[Auth Service] in backend
     service app(server)[App Service] in backend
     service worker(server)[Worker Service] in backend
-    
+
     service postgres(database)[PostgreSQL] in data
     service redis(database)[Redis Cache] in data
     service s3(disk)[S3 Storage] in data
-    
+
     junction j1 in backend
-    
+
     cdn:B -- T:web
     web:B -- T:api
     api:B -- T:j1
@@ -873,6 +873,504 @@ MERMAID_PLAYBOOK = {
     app:B -- T:postgres
     app:R -- L:redis
     worker:B -- T:s3"""
+            }
+        },
+
+        # ============== SEQUENCE DIAGRAM ==============
+        "sequence": {
+            "name": "Sequence Diagram",
+            "category": "interaction",
+            "mermaid_type": "sequenceDiagram",
+            "when_to_use": [
+                "API call flows and request/response patterns",
+                "System interaction sequences",
+                "Message passing between components",
+                "Authentication and authorization flows",
+                "Microservice communication patterns",
+                "Protocol documentation"
+            ],
+            "syntax_patterns": {
+                "diagram_start": "sequenceDiagram",
+                "participant_definition": {
+                    "basic": "participant <id>",
+                    "with_alias": "participant <id> as <Alias>",
+                    "actor": "actor <id> as <Alias>"
+                },
+                "message_types": {
+                    "solid_arrow": "<from>->><to>: <message>",
+                    "dotted_arrow": "<from>-->><to>: <message>",
+                    "solid_line": "<from>-><to>: <message>",
+                    "dotted_line": "<from>--><to>: <message>",
+                    "solid_cross": "<from>-x<to>: <message>",
+                    "dotted_cross": "<from>--x<to>: <message>",
+                    "solid_open": "<from>-)<to>: <message>",
+                    "dotted_open": "<from>--)<to>: <message>"
+                },
+                "activation": {
+                    "activate": "activate <participant>",
+                    "deactivate": "deactivate <participant>",
+                    "shorthand": "<from>->>+<to>: <message>",
+                    "deactivate_shorthand": "<from>->>-<to>: <message>"
+                },
+                "grouping": {
+                    "loop": "loop <label>\n    <content>\nend",
+                    "alt": "alt <condition>\n    <content>\nelse <condition>\n    <content>\nend",
+                    "opt": "opt <condition>\n    <content>\nend",
+                    "par": "par <label>\n    <content>\nand <label>\n    <content>\nend",
+                    "critical": "critical <label>\n    <content>\nend",
+                    "break": "break <condition>\n    <content>\nend"
+                },
+                "notes": {
+                    "right_of": "Note right of <participant>: <text>",
+                    "left_of": "Note left of <participant>: <text>",
+                    "over": "Note over <participant1>,<participant2>: <text>"
+                },
+                "rect": "rect rgb(200, 220, 255)\n    <content>\nend"
+            },
+            "construction_rules": [
+                "1. Start with: sequenceDiagram",
+                "2. Define participants first for control over ordering",
+                "3. Use descriptive aliases: participant A as API Gateway",
+                "4. Messages flow left to right in definition order",
+                "5. Use ->> for synchronous calls, -->> for async",
+                "6. Activate participants during processing: activate/deactivate",
+                "7. Group related messages: loop, alt, opt, par",
+                "8. Add notes for clarification: Note right of X: text",
+                "9. Use rect for highlighting regions",
+                "10. Keep participant names short, use aliases for display"
+            ],
+            "escape_rules": {
+                "special_chars": "Avoid colons in message text",
+                "multiline_notes": "Use <br/> for line breaks in notes",
+                "participant_names": "Use alphanumeric, no spaces",
+                "reserved_words": ["participant", "actor", "loop", "alt", "opt", "par", "Note", "end"]
+            },
+            "examples": {
+                "basic": """sequenceDiagram
+    participant A as Alice
+    participant B as Bob
+    A->>B: Hello Bob
+    B-->>A: Hi Alice
+    A->>B: How are you?
+    B-->>A: Good!""",
+                "with_activation": """sequenceDiagram
+    participant C as Client
+    participant S as Server
+    participant DB as Database
+    C->>+S: Request
+    S->>+DB: Query
+    DB-->>-S: Results
+    S-->>-C: Response""",
+                "complete": """sequenceDiagram
+    participant U as User
+    participant F as Frontend
+    participant A as API Gateway
+    participant Auth as Auth Service
+    participant DB as Database
+
+    U->>F: Login Request
+    F->>A: POST /auth/login
+    A->>Auth: Validate credentials
+    Auth->>DB: Query user
+    DB-->>Auth: User data
+
+    alt Valid credentials
+        Auth-->>A: JWT token
+        A-->>F: 200 OK + token
+        F-->>U: Login success
+    else Invalid credentials
+        Auth-->>A: Error
+        A-->>F: 401 Unauthorized
+        F-->>U: Login failed
+    end"""
+            }
+        },
+
+        # ============== STATE DIAGRAM ==============
+        "state": {
+            "name": "State Diagram",
+            "category": "behavioral",
+            "mermaid_type": "stateDiagram-v2",
+            "when_to_use": [
+                "State machine visualization",
+                "Object lifecycle modeling",
+                "Workflow status transitions",
+                "UI state management",
+                "Protocol states",
+                "Business process states"
+            ],
+            "syntax_patterns": {
+                "diagram_start": "stateDiagram-v2",
+                "state_definition": {
+                    "simple": "<stateName>",
+                    "with_description": "state \"<Description>\" as <stateName>",
+                    "with_note": "<stateName> : <description>"
+                },
+                "transitions": {
+                    "basic": "<from> --> <to>",
+                    "with_label": "<from> --> <to> : <event>",
+                    "with_guard": "<from> --> <to> : <event> [<guard>]"
+                },
+                "special_states": {
+                    "start": "[*] --> <firstState>",
+                    "end": "<lastState> --> [*]",
+                    "fork": "state <forkId> <<fork>>",
+                    "join": "state <joinId> <<join>>",
+                    "choice": "state <choiceId> <<choice>>"
+                },
+                "composite_state": "state <parentState> {\n    <childStates>\n}",
+                "concurrent_states": "state <parentState> {\n    <region1>\n    --\n    <region2>\n}",
+                "note": "note right of <state> : <text>",
+                "direction": "direction LR"
+            },
+            "construction_rules": [
+                "1. Start with: stateDiagram-v2",
+                "2. Begin with [*] --> FirstState",
+                "3. End with FinalState --> [*]",
+                "4. Use descriptive state names",
+                "5. Add transition labels: State1 --> State2 : event",
+                "6. Use composite states for hierarchy",
+                "7. Fork/Join for parallel execution",
+                "8. Choice for conditional branching",
+                "9. Add notes for complex states",
+                "10. Keep state names concise but meaningful"
+            ],
+            "escape_rules": {
+                "state_names": "Use alphanumeric, underscores allowed",
+                "descriptions": "Use quotes for multi-word descriptions",
+                "special_chars": "Avoid special chars in state names",
+                "reserved_words": ["state", "note", "direction", "fork", "join", "choice"]
+            },
+            "examples": {
+                "basic": """stateDiagram-v2
+    [*] --> Still
+    Still --> [*]
+    Still --> Moving
+    Moving --> Still
+    Moving --> Crash
+    Crash --> [*]""",
+                "with_labels": """stateDiagram-v2
+    [*] --> Idle
+    Idle --> Processing : start
+    Processing --> Success : complete
+    Processing --> Failed : error
+    Success --> Idle : reset
+    Failed --> Idle : retry
+    Success --> [*]
+    Failed --> [*]""",
+                "complete": """stateDiagram-v2
+    [*] --> Draft
+
+    state Draft {
+        [*] --> Editing
+        Editing --> Previewing : preview
+        Previewing --> Editing : edit
+    }
+
+    Draft --> InReview : submit
+
+    state InReview {
+        [*] --> Pending
+        Pending --> Approved : approve
+        Pending --> Rejected : reject
+    }
+
+    InReview --> Draft : revision_needed
+    InReview --> Published : publish
+    Published --> Archived : archive
+    Archived --> [*]
+
+    note right of Draft : Author workspace
+    note right of InReview : Editor review"""
+            }
+        },
+
+        # ============== GIT GRAPH ==============
+        "gitgraph": {
+            "name": "Git Graph",
+            "category": "version_control",
+            "mermaid_type": "gitGraph",
+            "when_to_use": [
+                "Git branching strategy visualization",
+                "Release workflow documentation",
+                "Feature branch patterns",
+                "Merge and rebase explanations",
+                "Git history representation",
+                "DevOps workflow documentation"
+            ],
+            "syntax_patterns": {
+                "diagram_start": "gitGraph",
+                "commit": {
+                    "basic": "commit",
+                    "with_id": "commit id: \"<id>\"",
+                    "with_message": "commit id: \"<id>\" tag: \"<tag>\"",
+                    "with_type": "commit type: HIGHLIGHT"
+                },
+                "branch_operations": {
+                    "create": "branch <branchName>",
+                    "checkout": "checkout <branchName>",
+                    "merge": "merge <branchName>",
+                    "merge_with_tag": "merge <branchName> tag: \"<tag>\""
+                },
+                "cherry_pick": "cherry-pick id: \"<commitId>\"",
+                "commit_types": ["NORMAL", "HIGHLIGHT", "REVERSE"],
+                "options": "%%{init: {'theme': 'base', 'gitGraph': {'showCommitLabel': true}}}%%"
+            },
+            "construction_rules": [
+                "1. Start with: gitGraph",
+                "2. Initial commits are on main branch",
+                "3. Create branches: branch feature-x",
+                "4. Switch branches: checkout feature-x",
+                "5. Make commits: commit or commit id: \"abc123\"",
+                "6. Merge back: checkout main, merge feature-x",
+                "7. Use tags for releases: commit tag: \"v1.0\"",
+                "8. Highlight important commits: commit type: HIGHLIGHT",
+                "9. Cherry-pick specific commits if needed",
+                "10. Order matters - commits appear chronologically"
+            ],
+            "escape_rules": {
+                "branch_names": "Use alphanumeric, hyphens, underscores",
+                "commit_ids": "Keep short, use quotes",
+                "tags": "Use semantic versioning format",
+                "reserved_words": ["commit", "branch", "checkout", "merge", "cherry-pick"]
+            },
+            "examples": {
+                "basic": """gitGraph
+    commit
+    commit
+    branch develop
+    checkout develop
+    commit
+    commit
+    checkout main
+    merge develop
+    commit""",
+                "with_tags": """gitGraph
+    commit id: "init"
+    commit id: "feat1"
+    branch develop
+    commit id: "dev1"
+    checkout main
+    merge develop tag: "v1.0"
+    commit id: "hotfix"
+    checkout develop
+    commit id: "dev2"
+    checkout main
+    merge develop tag: "v1.1" """,
+                "complete": """gitGraph
+    commit id: "initial" tag: "v0.1"
+
+    branch develop
+    checkout develop
+    commit id: "setup"
+
+    branch feature/auth
+    checkout feature/auth
+    commit id: "auth-1"
+    commit id: "auth-2"
+
+    checkout develop
+    merge feature/auth
+
+    branch feature/api
+    checkout feature/api
+    commit id: "api-1"
+    commit id: "api-2"
+
+    checkout develop
+    merge feature/api
+    commit id: "integration"
+
+    checkout main
+    merge develop tag: "v1.0"
+
+    branch hotfix
+    checkout hotfix
+    commit id: "fix-1" type: HIGHLIGHT
+
+    checkout main
+    merge hotfix tag: "v1.0.1"
+
+    checkout develop
+    merge hotfix"""
+            }
+        },
+
+        # ============== MINDMAP ==============
+        "mindmap": {
+            "name": "Mind Map",
+            "category": "conceptual",
+            "mermaid_type": "mindmap",
+            "when_to_use": [
+                "Brainstorming sessions",
+                "Concept mapping",
+                "Knowledge organization",
+                "Project planning overview",
+                "Idea exploration",
+                "Hierarchical topic breakdown"
+            ],
+            "syntax_patterns": {
+                "diagram_start": "mindmap",
+                "root_node": {
+                    "basic": "root((<Central Topic>))",
+                    "square": "root[<Topic>]",
+                    "rounded": "root(<Topic>)",
+                    "circle": "root((<Topic>))",
+                    "bang": "root))<Topic>((",
+                    "cloud": "root)<Topic>(",
+                    "hexagon": "root{{<Topic>}}"
+                },
+                "child_nodes": {
+                    "level_1": "    <Topic>",
+                    "level_2": "        <Subtopic>",
+                    "level_3": "            <Detail>"
+                },
+                "node_shapes": {
+                    "default": "<text>",
+                    "square": "[<text>]",
+                    "rounded": "(<text>)",
+                    "circle": "((<text>))",
+                    "bang": "))<text>((",
+                    "cloud": ")<text>(",
+                    "hexagon": "{{<text>}}"
+                },
+                "icons": "::icon(fa fa-<icon>)"
+            },
+            "construction_rules": [
+                "1. Start with: mindmap",
+                "2. Define root: root((<Central Topic>))",
+                "3. Indent children with spaces (consistent indentation)",
+                "4. Each indentation level = one branch deeper",
+                "5. Use 4 spaces per level for clarity",
+                "6. Apply shapes for emphasis: [square], (rounded), ((circle))",
+                "7. Keep node text concise",
+                "8. Balance branches for readability",
+                "9. Group related concepts together",
+                "10. Limit depth to 3-4 levels for clarity"
+            ],
+            "escape_rules": {
+                "node_text": "Avoid parentheses and brackets in text",
+                "indentation": "Use consistent spacing (spaces, not tabs)",
+                "special_chars": "Avoid special characters in node text",
+                "reserved_words": ["mindmap", "root"]
+            },
+            "examples": {
+                "basic": """mindmap
+    root((Project))
+        Planning
+            Requirements
+            Timeline
+        Development
+            Frontend
+            Backend
+        Testing
+            Unit Tests
+            Integration""",
+                "with_shapes": """mindmap
+    root((Central Idea))
+        [Category A]
+            Point 1
+            Point 2
+        (Category B)
+            Detail 1
+            Detail 2
+        {{Category C}}
+            Item 1
+            Item 2""",
+                "complete": """mindmap
+    root((Software Architecture))
+        Frontend
+            React
+                Components
+                State Management
+                Routing
+            Styling
+                Tailwind CSS
+                Design System
+            Performance
+                Code Splitting
+                Lazy Loading
+        Backend
+            API Design
+                REST Endpoints
+                GraphQL Schema
+            Database
+                PostgreSQL
+                Redis Cache
+            Security
+                Authentication
+                Authorization
+        DevOps
+            CI/CD
+                GitHub Actions
+                Automated Tests
+            Infrastructure
+                Docker
+                Kubernetes
+            Monitoring
+                Logging
+                Metrics"""
+            }
+        },
+
+        # ============== PIE CHART ==============
+        "pie": {
+            "name": "Pie Chart",
+            "category": "data_visualization",
+            "mermaid_type": "pie",
+            "when_to_use": [
+                "Percentage distribution",
+                "Market share visualization",
+                "Budget allocation",
+                "Survey results",
+                "Composition breakdown",
+                "Simple proportional data"
+            ],
+            "syntax_patterns": {
+                "diagram_start": "pie",
+                "with_data_labels": "pie showData",
+                "title": "title <Chart Title>",
+                "slice": "\"<Label>\" : <value>",
+                "complete_structure": "pie showData\n    title <Title>\n    \"<Label1>\" : <value1>\n    \"<Label2>\" : <value2>"
+            },
+            "construction_rules": [
+                "1. Start with: pie or pie showData",
+                "2. Add title: title My Chart Title",
+                "3. Define slices: \"Label\" : value",
+                "4. Values are numeric (integers or decimals)",
+                "5. Use showData to display percentages",
+                "6. Labels must be in double quotes",
+                "7. Keep to 3-8 slices for readability",
+                "8. Use meaningful labels",
+                "9. Values don't need to sum to 100",
+                "10. Order affects slice arrangement"
+            ],
+            "escape_rules": {
+                "labels": "Use double quotes, avoid special chars inside",
+                "values": "Use numbers only, decimals allowed",
+                "title": "Keep concise, avoid special characters",
+                "reserved_words": ["pie", "showData", "title"]
+            },
+            "examples": {
+                "basic": """pie
+    title Browser Market Share
+    "Chrome" : 65
+    "Firefox" : 15
+    "Safari" : 12
+    "Edge" : 8""",
+                "with_data": """pie showData
+    title Project Time Allocation
+    "Development" : 45
+    "Testing" : 25
+    "Documentation" : 15
+    "Meetings" : 15""",
+                "complete": """pie showData
+    title Q4 Budget Allocation
+    "Engineering" : 40
+    "Marketing" : 25
+    "Operations" : 20
+    "Sales" : 10
+    "Support" : 5"""
             }
         }
     }
