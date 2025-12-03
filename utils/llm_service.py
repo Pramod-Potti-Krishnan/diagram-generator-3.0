@@ -9,6 +9,9 @@ Supports two authentication methods:
 2. GOOGLE_APPLICATION_CREDENTIALS environment variable (file path)
 
 Based on Illustrator v1.0 LLM service pattern for consistency across services.
+
+NOTE: This module uses lazy imports for Vertex AI dependencies to avoid
+import errors when packages are not installed.
 """
 
 import json
@@ -16,10 +19,39 @@ import os
 import logging
 import tempfile
 from typing import Dict, Any, Optional
-from google.cloud import aiplatform
-from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 logger = logging.getLogger(__name__)
+
+# Lazy imports for Vertex AI - only loaded when actually needed
+_aiplatform = None
+_GenerativeModel = None
+_GenerationConfig = None
+VERTEX_AI_AVAILABLE = False
+
+
+def _lazy_import_vertex_ai():
+    """Lazily import Vertex AI dependencies only when needed."""
+    global _aiplatform, _GenerativeModel, _GenerationConfig, VERTEX_AI_AVAILABLE
+
+    if _aiplatform is not None:
+        return VERTEX_AI_AVAILABLE
+
+    try:
+        from google.cloud import aiplatform as _ap
+        from vertexai.generative_models import GenerativeModel as _GM, GenerationConfig as _GC
+
+        _aiplatform = _ap
+        _GenerativeModel = _GM
+        _GenerationConfig = _GC
+        VERTEX_AI_AVAILABLE = True
+        logger.info("Vertex AI packages loaded successfully")
+        return True
+
+    except ImportError as e:
+        logger.warning(f"Vertex AI packages not available: {e}")
+        logger.warning("Install with: pip install google-cloud-aiplatform vertexai")
+        VERTEX_AI_AVAILABLE = False
+        return False
 
 # Track temporary credentials file for cleanup
 _temp_credentials_file: Optional[str] = None
@@ -112,6 +144,13 @@ class VertexAIService:
             GCP_CREDENTIALS_JSON: Service account JSON pasted directly (option 1)
             GOOGLE_APPLICATION_CREDENTIALS: Path to credentials file (option 2)
         """
+        # Lazy import Vertex AI packages
+        if not _lazy_import_vertex_ai():
+            raise ImportError(
+                "Vertex AI packages not installed. "
+                "Install with: pip install google-cloud-aiplatform vertexai"
+            )
+
         # Set up GCP credentials from environment variables
         _setup_gcp_credentials()
 
@@ -131,10 +170,10 @@ class VertexAIService:
             raise ValueError("LLM_DIAGRAM environment variable must be set")
 
         # Initialize Vertex AI
-        aiplatform.init(project=self.project_id, location=self.location)
+        _aiplatform.init(project=self.project_id, location=self.location)
 
         # Create generative model
-        self.model = GenerativeModel(self.model_name)
+        self.model = _GenerativeModel(self.model_name)
 
         logger.info(
             f"Initialized VertexAIService: "
@@ -163,7 +202,7 @@ class VertexAIService:
             Dict with generated content or error
         """
         try:
-            generation_config = GenerationConfig(
+            generation_config = _GenerationConfig(
                 temperature=temperature,
                 max_output_tokens=max_tokens,
                 response_mime_type="application/json" if response_format == "json" else "text/plain"
