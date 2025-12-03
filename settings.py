@@ -1,5 +1,13 @@
 """
 Configuration management for Diagram Generator v3.
+
+Supports two LLM authentication modes:
+1. Vertex AI with GCP Service Accounts (RECOMMENDED)
+   - Set GCP_PROJECT_ID, GEMINI_LOCATION, LLM_DIAGRAM
+   - Use GCP_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS
+
+2. Google AI API Key (LEGACY - for backward compatibility)
+   - Set GOOGLE_API_KEY
 """
 
 import os
@@ -15,11 +23,51 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
 
-    # Google AI Configuration (for semantic routing)
+    # ==================== GCP / VERTEX AI CONFIGURATION (RECOMMENDED) ====================
+
+    # GCP Project ID (required for Vertex AI)
+    gcp_project_id: Optional[str] = Field(
+        default=None,
+        alias="GCP_PROJECT_ID",
+        description="GCP project ID for Vertex AI"
+    )
+
+    # Vertex AI Location/Region
+    gemini_location: str = Field(
+        default="us-central1",
+        alias="GEMINI_LOCATION",
+        description="GCP region for Vertex AI (default: us-central1)"
+    )
+
+    # LLM Model for diagram generation
+    llm_diagram: str = Field(
+        default="gemini-2.0-flash-exp",
+        alias="LLM_DIAGRAM",
+        description="Gemini model for diagram generation"
+    )
+
+    # Optional: Separate model for Mermaid generation
+    llm_diagram_mermaid: Optional[str] = Field(
+        default=None,
+        alias="LLM_DIAGRAM_MERMAID",
+        description="Gemini model specifically for Mermaid diagrams (defaults to LLM_DIAGRAM)"
+    )
+
+    # GCP Credentials JSON (for cloud deployments)
+    # Paste entire service account JSON as single-line string
+    gcp_credentials_json: Optional[str] = Field(
+        default=None,
+        alias="GCP_CREDENTIALS_JSON",
+        description="Service account JSON pasted directly (for cloud deployments)"
+    )
+
+    # ==================== LEGACY API KEY CONFIGURATION ====================
+
+    # Google AI Configuration (legacy - for backward compatibility)
     google_api_key: Optional[str] = Field(
         default=None,
         alias="GOOGLE_API_KEY",
-        description="Google AI API key for semantic routing"
+        description="Google AI API key (legacy - use Vertex AI instead)"
     )
 
     # Supabase Configuration (for diagram storage)

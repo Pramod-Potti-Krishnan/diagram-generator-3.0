@@ -3,6 +3,10 @@ Mermaid Agent V2 - PydanticAI Implementation
 
 Simple, direct implementation using PydanticAI for Mermaid diagram generation.
 No fallbacks - fails cleanly when LLM generation doesn't work.
+
+Supports two authentication modes:
+1. Vertex AI with GCP Service Accounts (RECOMMENDED)
+2. Google AI API Key (legacy fallback)
 """
 
 import os
@@ -10,15 +14,22 @@ import json
 from typing import Dict, Any, List, Optional, Union
 from pydantic import BaseModel, Field
 import asyncio
-import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
+# Conditional import for legacy API key mode
+try:
+    import google.generativeai as genai
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
+    genai = None
+
 from models import DiagramRequest
 from models.response_models import (
-    OutputType, MermaidContent, SVGContent, 
+    OutputType, MermaidContent, SVGContent,
     RenderingInfo, DiagramResponseV2
 )
 from .base_agent import BaseAgent
@@ -47,10 +58,10 @@ class MermaidOutput(BaseModel):
 class MermaidAgent(BaseAgent):
     """
     PydanticAI-based Mermaid diagram agent.
-    Uses gemini-2.5-flash for high-quality generation.
+    Uses Gemini for high-quality generation via Vertex AI or API key.
     No fallbacks - returns errors when generation fails.
     """
-    
+
     def __init__(self, settings):
         super().__init__(settings)
         self.settings = settings
@@ -64,28 +75,62 @@ class MermaidAgent(BaseAgent):
             # Also support actual Mermaid syntax names
             "erDiagram", "journey", "quadrantChart"
         ]
-        
-        # Initialize Gemini if API key is available
-        if settings.google_api_key:
-            try:
-                # Use centralized Gemini configuration
-                from config import configure_gemini
-                
-                # Log the API key being used (for debugging)
-                logger.info(f"Configuring MermaidAgent with API key: {settings.google_api_key[:20]}...")
-                
-                if configure_gemini(settings.google_api_key):
-                    self.model = genai.GenerativeModel('gemini-2.5-flash')
-                    self.enabled = True
-                    logger.info("✅ MermaidAgent initialized with gemini-2.5-flash")
-                else:
-                    raise ValueError("Failed to configure Gemini API")
-            except Exception as e:
-                logger.error(f"Failed to initialize Gemini: {e}")
-                self.model = None
-                self.enabled = False
+
+        # Track which auth mode we're using
+        self._use_vertex_ai = False
+        self._vertex_service = None
+        self.model = None
+        self.enabled = False
+
+        # Initialize LLM service - try Vertex AI first (preferred)
+        if os.getenv("GCP_PROJECT_ID"):
+            self._initialize_vertex_ai()
+        elif settings.google_api_key:
+            self._initialize_api_key(settings.google_api_key)
         else:
-            logger.warning("No Google API key - MermaidAgent disabled")
+            logger.warning("No LLM authentication configured - MermaidAgent disabled")
+
+    def _initialize_vertex_ai(self):
+        """Initialize using Vertex AI with service account"""
+        try:
+            from utils.llm_service import get_mermaid_llm_service
+
+            self._vertex_service = get_mermaid_llm_service()
+            self._use_vertex_ai = True
+            self.enabled = True
+
+            logger.info(f"✅ MermaidAgent initialized with Vertex AI: "
+                       f"project={self._vertex_service.project_id}, "
+                       f"model={self._vertex_service.model_name}")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Vertex AI: {e}")
+            self._use_vertex_ai = False
+            self.enabled = False
+
+    def _initialize_api_key(self, api_key: str):
+        """Initialize using legacy API key"""
+        if not GENAI_AVAILABLE:
+            logger.error("google-generativeai package not available for API key auth")
+            return
+
+        try:
+            # Use centralized Gemini configuration
+            from config import configure_gemini
+
+            # Log partial key for debugging
+            logger.info(f"Configuring MermaidAgent with API key: {api_key[:20]}...")
+
+            if configure_gemini(api_key):
+                self.model = genai.GenerativeModel('gemini-2.5-flash')
+                self._use_vertex_ai = False
+                self.enabled = True
+                logger.info("✅ MermaidAgent initialized with API key (gemini-2.5-flash)")
+            else:
+                raise ValueError("Failed to configure Gemini API")
+
+        except Exception as e:
+            logger.error(f"Failed to initialize with API key: {e}")
             self.model = None
             self.enabled = False
     
@@ -106,18 +151,20 @@ class MermaidAgent(BaseAgent):
         """
         
         logger.info(f"MermaidAgent.generate called for {request.diagram_type}")
-        logger.info(f"  enabled={self.enabled}, model={self.model is not None}")
-        
+        logger.info(f"  enabled={self.enabled}, vertex_ai={self._use_vertex_ai}, model={self.model is not None}")
+
         # Validate request
         self.validate_request(request)
-        
+
         # Extract data points for compatibility
         data_points = self.extract_data_points(request)
-        
-        # Check if model is available
-        if not self.enabled or not self.model:
-            # Return error in expected format
+
+        # Check if LLM service is available
+        if not self.enabled:
             raise ValueError("Mermaid generation not available - LLM service is not configured")
+
+        if not self._use_vertex_ai and not self.model:
+            raise ValueError("Mermaid generation not available - No LLM model initialized")
         
         try:
             # Build context from playbook
@@ -131,21 +178,37 @@ class MermaidAgent(BaseAgent):
                 playbook_context
             )
             
-            logger.info(f"🚀 Generating {request.diagram_type} with Gemini")
-            
-            # Use optimized Gemini service
-            from utils.gemini_service import optimized_generate
-            
-            # Generate with caching for similar requests
-            cache_key = f"{request.diagram_type}_{hash(request.content[:100] if request.content else '')}"
-            response_text = await optimized_generate(
-                prompt + "\n\nReturn a JSON object with: mermaid_code, confidence (0-1), entities_extracted (list), relationships_count (int), diagram_type_confirmed",
-                model_type='flash',
-                cache_key=cache_key
-            )
-            
+            logger.info(f"🚀 Generating {request.diagram_type} with {'Vertex AI' if self._use_vertex_ai else 'API key'}")
+
+            # Generate with appropriate service
+            json_instruction = "\n\nReturn a JSON object with: mermaid_code, confidence (0-1), entities_extracted (list), relationships_count (int), diagram_type_confirmed"
+            full_prompt = prompt + json_instruction
+
+            if self._use_vertex_ai and self._vertex_service:
+                # Use Vertex AI service
+                result = await self._vertex_service.generate_mermaid(
+                    prompt=prompt,
+                    diagram_type=request.diagram_type,
+                    temperature=0.7
+                )
+                if result.get("success"):
+                    response_text = json.dumps(result.get("content", {}))
+                else:
+                    raise ValueError(result.get("error", "Vertex AI generation failed"))
+            else:
+                # Use optimized Gemini service (API key mode)
+                from utils.gemini_service import optimized_generate
+
+                # Generate with caching for similar requests
+                cache_key = f"{request.diagram_type}_{hash(request.content[:100] if request.content else '')}"
+                response_text = await optimized_generate(
+                    full_prompt,
+                    model_type='flash',
+                    cache_key=cache_key
+                )
+
             if not response_text:
-                raise ValueError("Gemini generation failed")
+                raise ValueError("LLM generation failed - no response")
             
             # Parse the response
             import json
@@ -386,7 +449,8 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
                 "relationships_count": relationships,
                 "llm_attempted": True,
                 "llm_used": True,
-                "llm_model": "gemini-2.5-flash",
+                "llm_model": self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash",
+                "auth_mode": "vertex_ai" if self._use_vertex_ai else "api_key",
                 "server_rendered": True,
                 "cache_hit": False
             }
@@ -436,7 +500,8 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
                 "relationships_count": relationships,
                 "llm_attempted": True,
                 "llm_used": True,
-                "llm_model": "gemini-2.5-flash",
+                "llm_model": self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash",
+                "auth_mode": "vertex_ai" if self._use_vertex_ai else "api_key",
                 "server_rendered": False,
                 "cache_hit": False
             }

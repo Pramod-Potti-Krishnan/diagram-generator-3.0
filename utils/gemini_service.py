@@ -2,67 +2,142 @@
 Optimized Gemini Service for Efficient API Usage
 
 Centralizes Gemini model management and optimizes API calls.
+Supports both Vertex AI (recommended) and legacy API key authentication.
 """
 
 import asyncio
+import os
 from typing import Dict, Any, Optional
-import google.generativeai as genai
 from functools import lru_cache
 import time
 
 from utils.logger import setup_logger
-from config import configure_gemini, is_gemini_configured
+from config import configure_gemini, is_gemini_configured, is_using_vertex_ai
 
 logger = setup_logger(__name__)
+
+# Conditional imports based on auth mode
+try:
+    import google.generativeai as genai
+    GENAI_AVAILABLE = True
+except ImportError:
+    GENAI_AVAILABLE = False
+    genai = None
 
 
 class GeminiService:
     """
     Singleton service for optimized Gemini API usage.
-    
+
     Features:
     - Shared model instances
+    - Supports both Vertex AI and API key auth
     - Request batching
     - Caching of common patterns
     - Rate limiting
     - Optimized prompts
     """
-    
+
     _instance = None
     _models: Dict[str, Any] = {}
     _last_request_time: Dict[str, float] = {}
     MIN_REQUEST_INTERVAL = 0.1  # Minimum 100ms between requests per model
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False
         return cls._instance
-    
+
     def __init__(self):
         if self._initialized:
             return
-        
+
         self._initialized = True
         self._models = {}
         self._last_request_time = {}
         self._prompt_cache = {}
-        
-    def initialize(self, api_key: str) -> bool:
-        """Initialize Gemini with API key"""
+        self._vertex_service = None
+        self._use_vertex_ai = False
+
+    def initialize(self, api_key: Optional[str] = None) -> bool:
+        """
+        Initialize Gemini service.
+
+        Automatically detects auth mode:
+        - If GCP_PROJECT_ID is set, uses Vertex AI
+        - Otherwise falls back to API key
+
+        Args:
+            api_key: Optional API key (only used for legacy mode)
+
+        Returns:
+            True if initialization successful
+        """
         try:
-            if configure_gemini(api_key):
+            # Try Vertex AI first (preferred)
+            if os.getenv("GCP_PROJECT_ID"):
+                return self._initialize_vertex_ai()
+
+            # Fall back to API key
+            if api_key or os.getenv("GOOGLE_API_KEY"):
+                return self._initialize_api_key(api_key)
+
+            logger.warning("No authentication configured for GeminiService")
+            return False
+
+        except Exception as e:
+            logger.error(f"Failed to initialize GeminiService: {e}")
+            return False
+
+    def _initialize_vertex_ai(self) -> bool:
+        """Initialize using Vertex AI service accounts"""
+        try:
+            from utils.llm_service import get_vertex_service
+
+            self._vertex_service = get_vertex_service()
+            self._use_vertex_ai = True
+
+            logger.info(f"GeminiService initialized with Vertex AI: "
+                       f"project={self._vertex_service.project_id}, "
+                       f"model={self._vertex_service.model_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to initialize Vertex AI: {e}")
+            return False
+
+    def _initialize_api_key(self, api_key: Optional[str] = None) -> bool:
+        """Initialize using legacy API key"""
+        if not GENAI_AVAILABLE:
+            logger.error("google-generativeai package not available")
+            return False
+
+        key = api_key or os.getenv("GOOGLE_API_KEY")
+        if not key:
+            return False
+
+        try:
+            if configure_gemini(key):
                 # Pre-load commonly used models
                 self._models['flash'] = genai.GenerativeModel('gemini-2.5-flash')
                 self._models['flash-lite'] = genai.GenerativeModel('gemini-2.0-flash-lite')
-                logger.info("GeminiService initialized with models")
+                self._use_vertex_ai = False
+                logger.info("GeminiService initialized with API key")
                 return True
         except Exception as e:
-            logger.error(f"Failed to initialize GeminiService: {e}")
+            logger.error(f"Failed to initialize with API key: {e}")
         return False
-    
+
     def get_model(self, model_name: str = 'flash') -> Optional[Any]:
-        """Get or create a model instance"""
+        """Get or create a model instance (only for API key mode)"""
+        if self._use_vertex_ai:
+            # For Vertex AI, return the service itself
+            return self._vertex_service
+
+        if not GENAI_AVAILABLE:
+            return None
+
         if model_name not in self._models:
             try:
                 if model_name == 'flash':
@@ -86,51 +161,60 @@ class GeminiService:
     ) -> Optional[str]:
         """
         Generate content with optimizations.
-        
+
+        Supports both Vertex AI and API key modes.
+
         Args:
             prompt: The prompt to send
             model_name: Model to use ('flash' or 'flash-lite')
             cache_key: Optional cache key for response caching
             use_cache: Whether to use response caching
-            
+
         Returns:
             Generated text or None on error
         """
-        
+
         # Check cache first
         if use_cache and cache_key and cache_key in self._prompt_cache:
             logger.debug(f"Cache hit for {cache_key}")
             return self._prompt_cache[cache_key]
-        
-        # Get model
-        model = self.get_model(model_name)
-        if not model:
-            return None
-        
+
         # Rate limiting
         await self._rate_limit(model_name)
-        
+
         try:
-            # Generate content
-            response = await asyncio.to_thread(
-                model.generate_content,
-                prompt
-            )
-            
-            result = response.text
-            
+            # Use Vertex AI if configured
+            if self._use_vertex_ai and self._vertex_service:
+                result_text = await self._vertex_service.generate_text(
+                    prompt=prompt,
+                    temperature=0.7,
+                    max_tokens=4096
+                )
+            else:
+                # Legacy API key mode
+                model = self.get_model(model_name)
+                if not model:
+                    return None
+
+                # Generate content
+                response = await asyncio.to_thread(
+                    model.generate_content,
+                    prompt
+                )
+                result_text = response.text
+
             # Cache if requested
-            if use_cache and cache_key:
-                self._prompt_cache[cache_key] = result
+            if use_cache and cache_key and result_text:
+                self._prompt_cache[cache_key] = result_text
                 # Limit cache size
                 if len(self._prompt_cache) > 100:
                     # Remove oldest entries
                     keys = list(self._prompt_cache.keys())[:50]
                     for k in keys:
                         del self._prompt_cache[k]
-            
-            return result
-            
+
+            return result_text
+
         except Exception as e:
             logger.error(f"Gemini generation failed: {e}")
             return None
