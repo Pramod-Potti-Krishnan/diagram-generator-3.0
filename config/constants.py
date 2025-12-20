@@ -230,3 +230,65 @@ COMPLEXITY_MULTIPLIERS: Dict[str, float] = {
     "moderate": 0.75,   # Three-quarters of max nodes
     "detailed": 1.0     # Full max nodes
 }
+
+
+# ============== DIRECTOR COORDINATION ==============
+# Used by Director Agent for service coordination (SERVICE_CAPABILITIES_SPEC.md)
+
+# Diagram type signals for content matching
+DIAGRAM_TYPE_SIGNALS: Dict[str, Dict[str, Any]] = {
+    "flowchart": {
+        "best_for": ["process", "workflow", "decision tree", "steps"],
+        "keywords": ["flow", "process", "steps", "if/then", "decision", "workflow", "procedure", "algorithm"],
+        "ideal_topic_count": {"min": 3, "max": 10}
+    },
+    "erDiagram": {
+        "best_for": ["data models", "relationships", "database schema", "entities"],
+        "keywords": ["entity", "relationship", "database", "model", "schema", "table", "foreign key", "primary key"],
+        "ideal_topic_count": {"min": 2, "max": 8}
+    },
+    "journey": {
+        "best_for": ["user journey", "customer experience", "satisfaction"],
+        "keywords": ["journey", "experience", "user", "customer", "satisfaction", "touchpoint", "persona"],
+        "ideal_topic_count": {"min": 3, "max": 7}
+    },
+    "gantt": {
+        "best_for": ["project timeline", "scheduling", "milestones"],
+        "keywords": ["timeline", "project", "schedule", "gantt", "milestones", "deadline", "phase", "task", "duration"],
+        "ideal_topic_count": {"min": 3, "max": 15}
+    },
+    "quadrantChart": {
+        "best_for": ["priority matrix", "risk assessment", "positioning"],
+        "keywords": ["quadrant", "matrix", "priority", "risk", "assessment", "high/low", "impact", "effort"],
+        "ideal_topic_count": {"min": 4, "max": 12}
+    },
+    "timeline": {
+        "best_for": ["historical events", "milestones", "chronology"],
+        "keywords": ["timeline", "history", "events", "milestones", "year", "date", "chronological"],
+        "ideal_topic_count": {"min": 3, "max": 10}
+    },
+    "kanban": {
+        "best_for": ["task management", "workflow status", "board"],
+        "keywords": ["kanban", "board", "tasks", "todo", "progress", "status", "backlog", "doing", "done"],
+        "ideal_topic_count": {"min": 3, "max": 12}
+    }
+}
+
+# Content signals for diagram service - tells Director what this service handles
+DIAGRAM_CONTENT_SIGNALS: Dict[str, Any] = {
+    "handles_well": [
+        "processes", "workflows", "decision_trees", "system_architecture",
+        "relationships", "sequences", "timelines", "project_schedules",
+        "user_journeys", "data_models", "task_boards"
+    ],
+    "handles_poorly": [
+        "pure_data", "bullet_lists", "comparisons_without_flow",
+        "numerical_charts", "pie_charts", "bar_graphs", "scatter_plots"
+    ],
+    "keywords": [
+        "flow", "process", "workflow", "architecture", "components",
+        "sequence", "interaction", "diagram", "entity", "relationship",
+        "timeline", "gantt", "schedule", "journey", "kanban", "board",
+        "steps", "decision", "database", "schema"
+    ]
+}

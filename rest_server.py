@@ -16,7 +16,7 @@ from job_manager import JobManager
 from dependencies import DiagramDependencies
 from agent import process_diagram_direct
 from core.conductor import DiagramConductor
-from routers import layout_service_router
+from routers import layout_service_router, director_router
 from routers.layout_service_router import set_dependencies as set_layout_dependencies
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Director Coordination router (root level - no prefix)
+app.include_router(director_router)
 
 # Include Layout Service router
 app.include_router(layout_service_router)
@@ -157,6 +160,11 @@ async def root():
             "status": "GET /status/{job_id}",
             "health": "GET /health",
             "stats": "GET /stats",
+            "director_coordination": {
+                "capabilities": "GET /capabilities",
+                "can_handle": "POST /can-handle",
+                "recommend_diagram": "POST /recommend-diagram"
+            },
             "layout_service": {
                 "generate": "POST /api/ai/diagram/generate",
                 "status": "GET /api/ai/diagram/status/{job_id}",

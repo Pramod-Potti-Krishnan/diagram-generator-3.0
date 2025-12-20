@@ -73,12 +73,18 @@ async def process_diagram_direct(
         generation_method = generation_result.get("generation_method", "unknown")
         metadata = generation_result.get("metadata", {})
 
-        # Step 4: Return success result
+        # Step 4: Extract SVG content for inline delivery
+        svg_content = generation_result.get("content", "")
+        mermaid_code = metadata.get("mermaid_code", "")
+
         await deps.send_progress_update("completed", 100, "Diagram generation complete")
 
         return {
             "success": True,
             "diagram_url": diagram_url,
+            "svg_content": svg_content,           # Inline SVG content (preferred)
+            "diagram_html": svg_content,          # Alias for Layout Service compatibility
+            "mermaid_code": mermaid_code,         # Source code for debugging
             "diagram_type": diagram_type,
             "generation_method": generation_method,
             "metadata": {

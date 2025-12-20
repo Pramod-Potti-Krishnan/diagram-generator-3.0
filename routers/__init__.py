@@ -5,5 +5,6 @@ Contains API routers for different service integrations.
 """
 
 from .layout_service_router import router as layout_service_router
+from .director_router import router as director_router
 
-__all__ = ["layout_service_router"]
+__all__ = ["layout_service_router", "director_router"]
