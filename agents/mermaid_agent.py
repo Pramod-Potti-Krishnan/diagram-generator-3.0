@@ -226,24 +226,31 @@ class MermaidAgent(BaseAgent):
             logger.info(f"✅ Generated {request.diagram_type} with confidence {output.confidence:.2f}")
             logger.debug(f"  Entities: {len(output.entities_extracted)}, Relationships: {output.relationships_count}")
             
-            # Attempt server-side rendering
+            # Attempt server-side rendering via Kroki
             svg_content = None
             render_success = False
             render_error = None
-            
+
             if self.server_side_rendering:
+                logger.info(f"🔄 Attempting server-side rendering via Kroki for {request.diagram_type}...")
+                logger.debug(f"   Mermaid code length: {len(output.mermaid_code)} chars")
                 try:
                     svg_content = await render_mermaid_to_svg(
                         output.mermaid_code,
                         request.theme.dict(),
-                        fallback_to_placeholder=False
+                        fallback_to_placeholder=False,
+                        wrap_in_container=True
                     )
-                    if svg_content and svg_content.startswith("<svg"):
-                        logger.info("✅ Rendered to SVG on server")
+                    if svg_content and ("<svg" in svg_content or "<div" in svg_content):
+                        logger.info(f"✅ Rendered to SVG on server: {len(svg_content)} chars")
                         render_success = True
+                    else:
+                        logger.warning(f"⚠️ Unexpected SVG content format: {svg_content[:100] if svg_content else 'None'}...")
                 except Exception as e:
-                    logger.warning(f"SVG rendering failed: {e}")
+                    logger.error(f"❌ SVG rendering failed for {request.diagram_type}: {type(e).__name__}: {e}")
                     render_error = str(e)
+            else:
+                logger.info("⏭️ Server-side rendering disabled, using client-side fallback")
             
             # Build V2 response with clear content type
             if render_success and svg_content:

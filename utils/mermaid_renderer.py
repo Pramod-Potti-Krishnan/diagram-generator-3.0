@@ -22,7 +22,8 @@ class MermaidRenderer:
     """Renders Mermaid diagrams to SVG format using Kroki API"""
 
     def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
+        # Don't create persistent client - create fresh one per request
+        # This avoids connection pooling issues on Railway
         logger.info("MermaidRenderer initialized with Kroki API")
 
     async def render_to_svg(
@@ -75,28 +76,36 @@ class MermaidRenderer:
         last_error = None
         for attempt_name, code in attempts:
             try:
-                response = await self.client.post(
-                    KROKI_URL,
-                    content=code,
-                    headers={"Content-Type": "text/plain"}
-                )
+                # Create fresh client for each request to avoid connection pooling issues
+                async with httpx.AsyncClient(timeout=45.0, verify=True) as client:
+                    logger.info(f"Attempting Kroki render ({attempt_name}): {len(code)} chars")
 
-                if response.status_code == 200:
-                    svg_content = response.text
-                    logger.info(f"Kroki rendered Mermaid successfully ({attempt_name}): {len(svg_content)} chars")
-                    return svg_content
-                else:
-                    last_error = f"Kroki API returned {response.status_code}: {response.text[:200]}"
-                    logger.warning(f"Kroki {attempt_name} attempt failed: {last_error}")
+                    response = await client.post(
+                        KROKI_URL,
+                        content=code,
+                        headers={"Content-Type": "text/plain"}
+                    )
+
+                    if response.status_code == 200:
+                        svg_content = response.text
+                        logger.info(f"✅ Kroki rendered Mermaid successfully ({attempt_name}): {len(svg_content)} chars")
+                        return svg_content
+                    else:
+                        last_error = f"Kroki API returned {response.status_code}: {response.text[:200]}"
+                        logger.warning(f"Kroki {attempt_name} attempt failed: {last_error}")
 
             except httpx.TimeoutException as e:
-                last_error = f"Kroki API timeout: {e}"
-                logger.warning(f"Kroki {attempt_name} attempt timed out")
+                last_error = f"Kroki API timeout after 45s: {e}"
+                logger.error(f"❌ Kroki {attempt_name} attempt timed out: {e}")
+            except httpx.ConnectError as e:
+                last_error = f"Kroki API connection error: {e}"
+                logger.error(f"❌ Kroki {attempt_name} connection failed: {e}")
             except Exception as e:
-                last_error = str(e)
-                logger.warning(f"Kroki {attempt_name} attempt error: {e}")
+                last_error = f"Kroki API error: {type(e).__name__}: {str(e)}"
+                logger.error(f"❌ Kroki {attempt_name} attempt error: {type(e).__name__}: {e}")
 
         # All attempts failed
+        logger.error(f"❌ All Kroki rendering attempts failed. Last error: {last_error}")
         raise Exception(f"All Kroki rendering attempts failed. Last error: {last_error}")
 
     def create_placeholder_svg(
@@ -161,8 +170,8 @@ class MermaidRenderer:
         return svg_template
 
     async def close(self):
-        """Close the HTTP client"""
-        await self.client.aclose()
+        """Close the HTTP client (no-op since we use per-request clients)"""
+        pass
 
 
 # Singleton instance
