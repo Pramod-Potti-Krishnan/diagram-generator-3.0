@@ -177,10 +177,55 @@ async def get_mermaid_renderer() -> MermaidRenderer:
     return _renderer_instance
 
 
+def wrap_svg_in_container(svg_content: str) -> str:
+    """
+    Wrap SVG in an HTML container div for proper scaling in Layout Service.
+
+    The container provides:
+    - Padding: 40px top, 20px sides, 20px bottom
+    - Flexbox centering for the SVG
+    - Responsive scaling to fit available space
+
+    Args:
+        svg_content: The raw SVG string
+
+    Returns:
+        HTML string with SVG wrapped in a styled container
+    """
+    # Extract SVG and ensure it has proper sizing attributes
+    # Remove any fixed width/height from SVG and use viewBox for scaling
+    import re
+
+    # Make SVG scale to container while preserving aspect ratio
+    svg_modified = svg_content
+
+    # Add preserveAspectRatio if not present
+    if 'preserveAspectRatio' not in svg_modified:
+        svg_modified = svg_modified.replace('<svg ', '<svg preserveAspectRatio="xMidYMid meet" ', 1)
+
+    # Create the HTML wrapper
+    html_wrapper = f'''<div class="mermaid-container" style="
+    width: calc(100% - 40px);
+    height: calc(100% - 60px);
+    padding: 40px 20px 20px 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-sizing: border-box;
+">
+    <div style="max-width: 100%; max-height: 100%; overflow: hidden;">
+        {svg_modified}
+    </div>
+</div>'''
+
+    return html_wrapper
+
+
 async def render_mermaid_to_svg(
     mermaid_code: str,
     theme: Optional[Dict[str, Any]] = None,
-    fallback_to_placeholder: bool = True
+    fallback_to_placeholder: bool = True,
+    wrap_in_container: bool = True
 ) -> str:
     """
     Convenience function to render Mermaid to SVG
@@ -189,9 +234,10 @@ async def render_mermaid_to_svg(
         mermaid_code: Mermaid diagram code
         theme: Theme configuration
         fallback_to_placeholder: If True, return placeholder on error
+        wrap_in_container: If True, wrap SVG in HTML container for scaling
 
     Returns:
-        SVG string (rendered or placeholder)
+        SVG string (rendered or placeholder), optionally wrapped in HTML container
     """
 
     renderer = await get_mermaid_renderer()
@@ -200,16 +246,23 @@ async def render_mermaid_to_svg(
         # Render with Kroki API
         svg = await renderer.render_to_svg(mermaid_code, theme)
         logger.info("Mermaid diagram rendered successfully via Kroki")
+
+        # Optionally wrap in container for proper scaling
+        if wrap_in_container:
+            return wrap_svg_in_container(svg)
         return svg
     except Exception as e:
         logger.error(f"Failed to render Mermaid diagram: {e}")
 
         if fallback_to_placeholder:
             # Return placeholder SVG with embedded Mermaid code
-            return renderer.create_placeholder_svg(
+            placeholder = renderer.create_placeholder_svg(
                 mermaid_code,
                 theme,
                 error_message=f"Server-side rendering failed: {str(e)}"
             )
+            if wrap_in_container:
+                return wrap_svg_in_container(placeholder)
+            return placeholder
         else:
             raise

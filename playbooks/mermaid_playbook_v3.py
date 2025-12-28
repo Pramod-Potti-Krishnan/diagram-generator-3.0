@@ -35,59 +35,79 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "Process flows with decision points, multiple node shapes, and subgraphs",
             "best_for": ["workflows", "algorithms", "decision trees", "system architecture"],
             "official_doc": "https://mermaid.js.org/syntax/flowchart.html",
-            
+
             "complete_example": """flowchart TD
-    %% Different node shapes
-    Start([Start Process])
-    Input[/Input Data/]
-    Process[Process Data]
-    Decision{Valid Data?}
-    Database[(Database)]
-    SubProcess[[Subprocess]]
-    Result[/Output Result/]
-    End([End Process])
-    
-    %% Connections
-    Start --> Input
+    %% Multi-directional layout using subgraphs
+    %% TD for main flow, LR within subgraphs for parallel processes
+
+    subgraph Input["Input Phase"]
+        direction LR
+        A([Start]) --> B[Receive Data]
+        B --> C[Validate]
+    end
+
+    subgraph Process["Processing"]
+        direction LR
+        D[Transform] --> E[Enrich]
+        E --> F[Store]
+    end
+
+    subgraph Output["Output Phase"]
+        direction LR
+        G[Format] --> H[Send]
+        H --> I([Complete])
+    end
+
     Input --> Process
-    Process --> Decision
-    Decision -->|Yes| Database
-    Decision -->|No| Error[Display Error]
-    Database --> SubProcess
-    SubProcess --> Result
-    Error -.-> Input
-    Result ==> End
-    
-    classDef errorStyle fill:#ff6b6b,stroke:#c92a2a,stroke-width:2px
-    classDef successStyle fill:#51cf66,stroke:#37b24d,stroke-width:2px
-    class Error errorStyle
-    class Result,End successStyle""",
-            
+    Process --> Output
+
+    C -->|Invalid| J[Error Handler]
+    J -.-> A
+
+    %% Semantic color classes
+    classDef critical fill:#ff6b6b,stroke:#c92a2a,color:#fff
+    classDef success fill:#51cf66,stroke:#37b24d,color:#fff
+    classDef warning fill:#ffd43b,stroke:#fab005,color:#333
+    classDef default fill:#8B5CF6,stroke:#A78BFA,color:#fff
+
+    class J critical
+    class I success
+    class C warning""",
+
             "key_syntax": {
                 "directions": ["TD (top-down)", "LR (left-right)", "BT (bottom-top)", "RL (right-left)"],
+                "subgraph_direction": "Use 'direction LR' inside subgraph for horizontal flow",
                 "node_shapes": {
                     "rectangle": "id[Text]",
                     "rounded": "id(Text)",
-                    "stadium": "id([Text])",
-                    "subroutine": "id[[Text]]",
-                    "cylinder": "id[(Text)]",
-                    "circle": "id((Text))",
-                    "rhombus": "id{Text}",
-                    "hexagon": "id{{Text}}",
-                    "parallelogram": "id[/Text/]",
-                    "parallelogram_alt": "id[\\Text\\]",
-                    "trapezoid": "id[/Text\\]",
-                    "trapezoid_alt": "id[\\Text/]"
+                    "stadium": "id([Text]) - for Start/End",
+                    "cylinder": "id[(Text)] - for Database",
+                    "rhombus": "id{Text} - for Decision"
                 },
                 "arrows": {
                     "standard": "-->",
-                    "open": "---",
-                    "dotted": "-.-",
+                    "dotted": "-.->",
                     "thick": "==>",
-                    "with_label": "-->|label|",
-                    "multidirectional": "<-->"
+                    "with_label": "-->|label|"
+                },
+                "color_classes": {
+                    "critical": "fill:#ff6b6b - for errors/high priority",
+                    "success": "fill:#51cf66 - for completion/positive",
+                    "warning": "fill:#ffd43b - for caution/decision points"
                 }
-            }
+            },
+
+            "generation_rules": [
+                "Use multi-directional layouts with subgraphs",
+                "Main flow should be TD (top-down) between subgraphs",
+                "Use 'direction LR' inside subgraphs for horizontal flow",
+                "Group related steps into named subgraphs (3-4 nodes each)",
+                "Use stadium shape id([Text]) for Start/End nodes",
+                "Use rhombus id{Text} for decision points",
+                "Apply semantic colors: critical (red), success (green), warning (yellow)",
+                "Keep node labels short (max 15 chars)",
+                "Use dotted arrows for error/retry flows"
+            ]
         },
         
         # ============== 2. ENTITY RELATIONSHIP DIAGRAM ==============
@@ -96,68 +116,54 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "Database entity relationships with cardinality and attributes",
             "best_for": ["database design", "data modeling", "system architecture"],
             "official_doc": "https://mermaid.js.org/syntax/entityRelationshipDiagram.html",
-            
+
             "complete_example": """erDiagram
-    %% Complete ER diagram example from official documentation
-    %% Shows all relationship types and attribute definitions
-    
-    %% Entity definitions with attributes
+    %% CRITICAL: Use simple type names ONLY: int, string, date, boolean, decimal
+    %% Do NOT use SQL types like VARCHAR, DATETIME, etc.
+
     CUSTOMER {
-        int customer_id PK
-        string first_name
-        string last_name
+        int id PK
+        string name
         string email UK
-        date registration_date
-        boolean is_active
+        date created_at
+        boolean active
     }
-    
+
     ORDER {
-        int order_id PK
-        date order_date
-        decimal total_amount
-        string status
+        int id PK
         int customer_id FK
+        decimal total
+        string status
+        date order_date
     }
-    
+
     PRODUCT {
-        int product_id PK
-        string product_name
+        int id PK
+        string name
         decimal price
-        int stock_quantity
-        string category
+        int stock
     }
-    
+
     ORDER_ITEM {
-        int order_item_id PK
+        int id PK
         int order_id FK
         int product_id FK
         int quantity
-        decimal unit_price
+        decimal price
     }
-    
-    ADDRESS {
-        int address_id PK
-        string street
-        string city
-        string country
-        string postal_code
-        int customer_id FK
-    }
-    
-    %% Relationships with cardinality
+
     CUSTOMER ||--o{ ORDER : places
-    %% One customer can place zero or many orders
-    
     ORDER ||--|{ ORDER_ITEM : contains
-    %% One order must contain one or many items
-    
-    PRODUCT ||--o{ ORDER_ITEM : "is ordered in"
-    %% One product can be in zero or many order items
-    
-    CUSTOMER ||--o{ ADDRESS : has
-    %% One customer can have zero or many addresses""",
-            
+    PRODUCT ||--o{ ORDER_ITEM : includes""",
+
             "key_syntax": {
+                "simple_types": {
+                    "int": "Integer numbers",
+                    "string": "Text values (NOT varchar)",
+                    "date": "Date values (NOT datetime)",
+                    "boolean": "True/false values",
+                    "decimal": "Decimal numbers"
+                },
                 "cardinality_left": {
                     "|o": "Zero or one",
                     "||": "Exactly one",
@@ -175,8 +181,18 @@ MERMAID_PLAYBOOK_V3 = {
                     "FK": "Foreign Key",
                     "UK": "Unique Key"
                 },
-                "relationship_format": "ENTITY1 <cardinality> ENTITY2 : relationship_label"
-            }
+                "relationship_format": "ENTITY1 <cardinality> ENTITY2 : label"
+            },
+
+            "generation_rules": [
+                "Use ONLY simple types: int, string, date, boolean, decimal",
+                "Do NOT use SQL types like VARCHAR, DATETIME, BIGINT, TEXT",
+                "Keep attribute names short (max 15 chars)",
+                "Use snake_case for attribute names",
+                "Include 3-6 entities with 3-6 attributes each",
+                "Show relationships with clear cardinality",
+                "Relationship labels should be single words when possible"
+            ]
         },
         
         # ============== 3. USER JOURNEY ==============
@@ -185,57 +201,58 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "User journey mapping with satisfaction scores",
             "best_for": ["UX design", "customer experience", "service design", "process improvement"],
             "official_doc": "https://mermaid.js.org/syntax/userJourney.html",
-            
+
+            # CRITICAL: Satisfaction scores MUST be 0-5, NOT 0-10!
             "complete_example": """journey
-    %% User journey with satisfaction scores (0-5)
-    %% Based on official Mermaid documentation
-    
-    title Customer Online Shopping Experience
-    
+    %% CRITICAL: Satisfaction scores are 0-5 scale ONLY (not 0-10)
+    %% 5=excellent, 4=good, 3=neutral, 2=poor, 1=bad, 0=terrible
+
     section Discovery
         Search for product: 5: Customer
-        Browse categories: 4: Customer, Marketing
+        Browse categories: 4: Customer
         Read reviews: 4: Customer
         Compare prices: 3: Customer
-        Check availability: 4: Customer, Inventory
-    
+
     section Purchase Decision
         Add to cart: 5: Customer
         Apply discount code: 2: Customer
-        Calculate shipping: 3: Customer, Logistics
-        Review total cost: 3: Customer
-    
-    section Checkout Process
+        Calculate shipping: 3: Customer
+        Review total: 4: Customer
+
+    section Checkout
         Enter shipping info: 3: Customer
-        Select payment method: 4: Customer
-        Confirm order: 4: Customer, Sales
-        Receive confirmation: 5: Customer, System
-    
+        Select payment: 4: Customer
+        Confirm order: 5: Customer
+
     section Fulfillment
         Order processing: 4: Warehouse
-        Shipping notification: 5: Customer, Logistics
-        Track package: 4: Customer
-        Receive delivery: 5: Customer, Delivery
-    
-    section Post-Purchase
-        Unbox product: 5: Customer
-        Product setup: 3: Customer, Support
-        Write review: 3: Customer
-        Recommend to friends: 4: Customer, Marketing""",
-            
+        Shipping notification: 5: Customer
+        Receive delivery: 5: Customer""",
+
             "key_syntax": {
                 "structure": "Task name: score: actor1, actor2, ...",
                 "scores": {
-                    "0": "Very negative experience",
-                    "1": "Negative experience",
-                    "2": "Negative-neutral experience",
-                    "3": "Neutral experience",
-                    "4": "Positive experience",
-                    "5": "Very positive experience"
+                    "5": "Excellent - Very positive experience (GREEN)",
+                    "4": "Good - Positive experience (LIGHT GREEN)",
+                    "3": "Neutral - Average experience (YELLOW)",
+                    "2": "Poor - Negative experience (ORANGE)",
+                    "1": "Bad - Very negative experience (RED)",
+                    "0": "Terrible - Worst possible experience (DARK RED)"
                 },
                 "sections": "Groups related tasks in journey phases",
-                "actors": "Comma-separated list of participants"
-            }
+                "actors": "Comma-separated list of participants",
+                "CRITICAL_RULE": "Scores MUST be integers 0-5 ONLY. Do NOT use 10 or any value above 5!"
+            },
+
+            "generation_rules": [
+                "CRITICAL: Satisfaction scores MUST be 0-5 (integers only)",
+                "NEVER use scores like 10, 7, 8 - maximum score is 5",
+                "Vary scores to show journey ups and downs (not all 5s)",
+                "Use score 5 for peak positive moments",
+                "Use score 2-3 for friction points or pain points",
+                "Each section should have 3-5 tasks",
+                "Do NOT include title - slide already has title"
+            ]
         },
         
         # ============== 4. GANTT CHART ==============
@@ -244,54 +261,64 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "Project timeline with tasks, dependencies, and milestones",
             "best_for": ["project planning", "timeline visualization", "resource scheduling"],
             "official_doc": "https://mermaid.js.org/syntax/gantt.html",
-            
+
             "complete_example": """gantt
-    %% Complete Gantt chart based on official documentation
-    %% Shows various task types, dependencies, and formatting
-    
-    title Software Development Project Timeline
+    %% CRITICAL: Do NOT include title - slide already has title
+    %% Use axisFormat %b for month abbreviations (Jan, Feb, Mar)
     dateFormat YYYY-MM-DD
-    axisFormat %m/%d
-    excludes weekends 2024-12-25 2024-01-01
-    
-    section Planning Phase
-    Project kickoff           :done, kick, 2024-01-01, 1d
-    Requirements gathering     :active, req, after kick, 10d
-    Technical design          :des, after req, 14d
-    Design review             :milestone, dr, after des, 0d
-    
-    section Development Phase
-    Setup development env     :done, setup, 2024-01-15, 3d
-    Backend API development   :crit, back, after setup, 21d
-    Frontend development      :crit, front, after setup, 25d
-    Database implementation   :db, after back, 7d
-    Integration               :int, after front db, 10d
-    
-    section Testing Phase
-    Unit testing              :unit, after int, 7d
-    Integration testing       :test, after unit, 10d
-    User acceptance testing   :crit, uat, after test, 14d
-    Bug fixes                 :bug, after uat, 7d
-    
-    section Deployment
-    Staging deployment        :stage, after bug, 5d
-    Production prep           :prep, after stage, 3d
-    Go live                   :milestone, live, after prep, 1d
-    Post-launch support       :support, after live, 14d""",
-            
+    axisFormat %b
+    excludes weekends
+
+    section Planning
+    Project kickoff: done, kick, 2024-01-08, 3d
+    Requirements: active, req, after kick, 14d
+    Design: des, after req, 21d
+
+    section Development
+    Backend API: crit, back, after des, 28d
+    Frontend: crit, front, after des, 35d
+    Database: db, after back, 14d
+    Integration: int, after front db, 14d
+
+    section Testing
+    Unit tests: unit, after int, 7d
+    Integration tests: test, after unit, 14d
+    UAT: crit, uat, after test, 14d
+
+    section Launch
+    Staging: stage, after uat, 7d
+    Go live: milestone, live, after stage, 0d
+    Support: support, after live, 21d""",
+
             "key_syntax": {
                 "date_formats": ["YYYY-MM-DD", "DD/MM/YYYY", "DD.MM.YYYY"],
-                "task_format": "Task name :tag, id, start, duration",
-                "tags": {
-                    "done": "Completed task",
-                    "active": "Currently in progress",
-                    "crit": "Critical path task",
-                    "milestone": "Project milestone"
+                "axis_formats": {
+                    "%b": "Month abbreviation (Jan, Feb, Mar) - PREFERRED",
+                    "%m/%d": "Month/Day numbers (01/15)",
+                    "%d": "Day number only",
+                    "%Y": "Year only"
                 },
-                "dependencies": "after taskId",
-                "duration_units": ["d (days)", "w (weeks)", "h (hours)"],
-                "excludes": "Specify non-working days"
-            }
+                "task_format": "Task name: tag, id, start/after, duration",
+                "tags": {
+                    "done": "Completed task (gray)",
+                    "active": "Currently in progress (blue)",
+                    "crit": "Critical path task (red)",
+                    "milestone": "Project milestone (diamond, duration must be 0d)"
+                },
+                "dependencies": "after taskId (can chain multiple: after task1 task2)",
+                "duration_units": ["d (days)", "w (weeks)"]
+            },
+
+            "generation_rules": [
+                "Do NOT include title - slide already has title",
+                "ALWAYS use axisFormat %b for month abbreviations",
+                "Use realistic date ranges (weeks/months, not days)",
+                "Include 3-4 sections with 3-5 tasks each",
+                "Mark critical path tasks with 'crit' tag",
+                "Milestones MUST have duration 0d",
+                "Use 'after taskId' for dependencies",
+                "Status tags are ONLY: done, active, crit, milestone"
+            ]
         },
         
         # ============== 5. QUADRANT CHART ==============
@@ -300,58 +327,66 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "2x2 matrix for plotting items across two dimensions",
             "best_for": ["risk assessment", "priority matrix", "portfolio analysis", "SWOT analysis"],
             "official_doc": "https://mermaid.js.org/syntax/quadrantChart.html",
-            
+
             "complete_example": """quadrantChart
-    %% Quadrant chart based on official documentation
-    %% All coordinates must be between 0 and 1
-    
-    title Risk Assessment Matrix
+    %% CRITICAL: Each point MUST have UNIQUE coordinates
+    %% Spread points across the full 0.0-1.0 range
+    %% Minimum 0.1 difference between any two points
+
     x-axis Low Impact --> High Impact
     y-axis Low Probability --> High Probability
-    
-    quadrant-1 Critical Risks
-    quadrant-2 Major Risks
-    quadrant-3 Minor Risks
-    quadrant-4 Moderate Risks
-    
-    %% Plot points: [x-coordinate, y-coordinate]
-    %% x: 0 (low impact) to 1 (high impact)
-    %% y: 0 (low probability) to 1 (high probability)
-    
-    Data Breach: [0.9, 0.8]
-    System Downtime: [0.85, 0.7]
-    Key Person Loss: [0.7, 0.6]
-    Budget Overrun: [0.75, 0.65]
-    Scope Creep: [0.6, 0.7]
-    
-    Natural Disaster: [0.95, 0.2]
-    Technology Obsolescence: [0.8, 0.3]
-    Vendor Failure: [0.7, 0.25]
-    
-    Minor Delays: [0.2, 0.8]
-    Documentation Issues: [0.15, 0.7]
-    Team Conflicts: [0.25, 0.75]
-    
-    Hardware Failure: [0.3, 0.3]
-    Office Issues: [0.1, 0.2]
-    Training Gaps: [0.35, 0.4]""",
-            
+
+    quadrant-1 Critical
+    quadrant-2 Monitor
+    quadrant-3 Low Priority
+    quadrant-4 Mitigate
+
+    %% Quadrant 1 (top-right): High impact, High probability
+    Data Breach: [0.92, 0.88]
+    System Down: [0.78, 0.75]
+    Key Person: [0.65, 0.68]
+
+    %% Quadrant 2 (top-left): Low impact, High probability
+    Minor Delays: [0.22, 0.85]
+    Team Conflicts: [0.35, 0.72]
+    Doc Issues: [0.18, 0.65]
+
+    %% Quadrant 3 (bottom-left): Low impact, Low probability
+    Office Issues: [0.12, 0.18]
+    Training Gaps: [0.28, 0.32]
+    Hardware: [0.38, 0.25]
+
+    %% Quadrant 4 (bottom-right): High impact, Low probability
+    Natural Disaster: [0.88, 0.15]
+    Tech Obsolete: [0.72, 0.28]
+    Vendor Fail: [0.82, 0.38]""",
+
             "key_syntax": {
                 "structure": {
-                    "title": "Chart title",
                     "x-axis": "Left Label --> Right Label",
                     "y-axis": "Bottom Label --> Top Label",
-                    "quadrants": "quadrant-1 through quadrant-4",
+                    "quadrants": "quadrant-1 through quadrant-4 (short labels)",
                     "points": "Name: [x, y]"
                 },
-                "coordinates": "Values between 0 and 1",
+                "coordinates": "Values between 0.0 and 1.0",
                 "quadrant_order": {
-                    "quadrant-1": "Top-right",
-                    "quadrant-2": "Top-left",
-                    "quadrant-3": "Bottom-left",
-                    "quadrant-4": "Bottom-right"
+                    "quadrant-1": "Top-right (high x, high y)",
+                    "quadrant-2": "Top-left (low x, high y)",
+                    "quadrant-3": "Bottom-left (low x, low y)",
+                    "quadrant-4": "Bottom-right (high x, low y)"
                 }
-            }
+            },
+
+            "generation_rules": [
+                "Do NOT include title - slide already has title",
+                "CRITICAL: Every point MUST have UNIQUE coordinates",
+                "NO two points should have same x AND y values",
+                "Minimum 0.08 difference between any two x or y values",
+                "Spread points across ALL four quadrants (2-4 per quadrant)",
+                "Use short labels (max 15 chars) to avoid overlap",
+                "Quadrant labels should be 1-2 words max (e.g., 'Critical', 'Monitor')",
+                "Place 8-12 total points for good visual balance"
+            ]
         },
         
         # ============== 6. TIMELINE ==============
@@ -434,37 +469,61 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "Kanban board visualization with columns and cards",
             "best_for": ["task management", "sprint planning", "workflow visualization", "project tracking"],
             "official_doc": "https://mermaid.js.org/syntax/kanban.html",
-            
+
             "complete_example": """kanban
-    Todo[Backlog]
-        research[Research user requirements]
-        design[Create UI mockups]
-        planning[Sprint planning meeting]
+    Backlog[Backlog]
+        task1[User authentication]
+        task2[Payment gateway]
+        task3[Push notifications]
+        task4[Email templates]
+        task5[Search feature]
     InProgress[In Progress]
-        backend[Implement REST API]
-        frontend[Build React components]
+        task6[Dashboard redesign]
+        task7[API optimization]
+        task8[Database migration]
+        task9[Caching layer]
+        task10[Logging system]
     Review[Code Review]
-        auth[Authentication module]
+        task11[Auth module]
+        task12[Payment flow]
+        task13[Notification service]
+        task14[Export feature]
     Testing[QA Testing]
-        integration[Integration tests]
-    Done[Completed]
-        setup[Project setup]
-        cicd[CI/CD pipeline]""",
-            
+        task15[Integration tests]
+        task16[Load testing]
+        task17[Security audit]
+        task18[UAT scenarios]
+    Done[Done]
+        task19[Project setup]
+        task20[CI/CD pipeline]
+        task21[Documentation]
+        task22[Monitoring setup]
+        task23[Code review process]""",
+
             "key_syntax": {
                 "structure": {
                     "column": "columnId[Column Title]",
-                    "card": "cardId[Card Description]@{ metadata }",
-                    "metadata": "Key-value pairs in @{ ... }"
+                    "card": "taskId[Card Description]",
+                    "card_with_meta": "taskId[Description]@{ priority: 'High' }"
                 },
                 "metadata_keys": {
                     "assigned": "Person responsible",
-                    "priority": "Task priority level",
+                    "priority": "Task priority (Critical, High, Medium, Low)",
                     "ticket": "Ticket/issue number"
                 },
-                "priority_values": ["Critical", "High", "Medium", "Low"],
                 "layout": "Columns appear left to right as defined"
-            }
+            },
+
+            "generation_rules": [
+                "Use native kanban syntax, NOT flowchart with subgraphs",
+                "CRITICAL: Each column MUST have 4-5 cards minimum",
+                "Include 4-5 columns for a complete workflow view",
+                "Total cards should be 16-25 for visual balance",
+                "Use short card descriptions (max 20 chars)",
+                "Column titles should be 1-2 words",
+                "Cards should be indented under their column",
+                "Use sequential task IDs (task1, task2, etc.)"
+            ]
         }
     }
 }
