@@ -54,33 +54,29 @@ class UnifiedPlaybook:
             os.path.dirname(os.path.dirname(__file__)),
             settings.templates_dir
         )
-        
+
         # Cache available templates
         self.available_templates = self._scan_templates()
-        
-        # Initialize Gemini router if API key is available
-        if settings.google_api_key:
-            try:
-                # Use centralized Gemini configuration
-                from config import configure_gemini
-                
-                # Log the API key being used (for debugging)
-                logger.info(f"UnifiedPlaybook configuring Gemini with API key: {settings.google_api_key[:20] if settings.google_api_key else 'None'}...")
-                
-                if configure_gemini(settings.google_api_key):
-                    self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
-                    self.enabled = True
-                    logger.info("✅ UnifiedPlaybook initialized with gemini-2.0-flash-lite")
-                else:
-                    raise ValueError("Failed to configure Gemini API")
-            except Exception as e:
-                logger.error(f"Failed to initialize Gemini router: {e}")
-                self.model = None
+
+        # Initialize using centralized GeminiService (supports both Vertex AI and API key)
+        from utils.gemini_service import get_gemini_service
+        self.gemini_service = get_gemini_service()
+
+        # Try to initialize (prefers Vertex AI, falls back to API key)
+        try:
+            if self.gemini_service.initialize():
+                self.enabled = True
+                self.model = self.gemini_service  # Keep model reference for compatibility
+                logger.info("✅ UnifiedPlaybook initialized with GeminiService (Vertex AI or API key)")
+            else:
                 self.enabled = False
-        else:
-            logger.warning("No Google API key - UnifiedPlaybook disabled")
-            self.model = None
+                self.model = None
+                logger.warning("⚠️ UnifiedPlaybook: GeminiService not available, using direct routing only")
+        except Exception as e:
+            logger.error(f"Failed to initialize GeminiService: {e}")
             self.enabled = False
+            self.model = None
+            logger.warning("⚠️ UnifiedPlaybook: Using direct routing only (SVG templates will work)")
     
     def _scan_templates(self) -> List[str]:
         """Scan for available SVG templates"""
@@ -124,7 +120,20 @@ class UnifiedPlaybook:
                     estimated_time_ms=1000,
                     quality_estimate="high"
                 )
-        
+
+        # PRIORITY 1: Direct SVG template match - skip Gemini entirely
+        # This makes SVG generation work without any LLM calls
+        if request.diagram_type in self.available_templates:
+            logger.info(f"✅ Direct SVG template match: {request.diagram_type}")
+            return GenerationStrategy(
+                method=GenerationMethod.SVG_TEMPLATE,
+                confidence=1.0,
+                reasoning=f"Direct SVG template match for {request.diagram_type}",
+                fallback_chain=[GenerationMethod.MERMAID],
+                estimated_time_ms=200,
+                quality_estimate="high"
+            )
+
         # Check if model is available
         if not self.enabled or not self.model:
             logger.warning("Router not available - using SVG template as default")
@@ -204,15 +213,24 @@ class UnifiedPlaybook:
             
         except Exception as e:
             logger.error(f"❌ Routing failed: {e}")
-            
-            # Return error strategy - no fallback
+
+            # Smart default based on diagram type
+            if request.diagram_type in self.available_templates:
+                default_method = GenerationMethod.SVG_TEMPLATE
+                reasoning = f"[Fallback] Routing failed, using SVG template for {request.diagram_type}"
+                fallback = [GenerationMethod.MERMAID]
+            else:
+                default_method = GenerationMethod.MERMAID
+                reasoning = f"[Fallback] Routing failed, using Mermaid for {request.diagram_type}"
+                fallback = []
+
             return GenerationStrategy(
-                method=GenerationMethod.MERMAID,  # Default suggestion
-                confidence=0.0,
-                reasoning=f"[Error] Routing failed: {str(e)}",
-                fallback_chain=[],
-                estimated_time_ms=0,
-                quality_estimate="failed"
+                method=default_method,
+                confidence=0.5,
+                reasoning=reasoning,
+                fallback_chain=fallback,
+                estimated_time_ms=500,
+                quality_estimate="medium"
             )
     
     def _build_routing_context(self, request: DiagramRequest) -> str:
