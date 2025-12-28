@@ -106,7 +106,12 @@ MERMAID_PLAYBOOK_V3 = {
                 "Use rhombus id{Text} for decision points",
                 "Apply semantic colors: critical (red), success (green), warning (yellow)",
                 "Keep node labels short (max 15 chars)",
-                "Use dotted arrows for error/retry flows"
+                "Use dotted arrows for error/retry flows",
+                "CRITICAL: Never use 'end' as bare node text - use 'End' or 'Finish' instead",
+                "If you need 'end' in text, wrap in quotes: A[\"end process\"]",
+                "Reserved words: end, subgraph, graph, flowchart, direction",
+                "Avoid node IDs starting with 'o' or 'x' - they have special meaning",
+                "Always specify direction after flowchart keyword (TD, LR, etc.)"
             ]
         },
         
@@ -395,72 +400,62 @@ MERMAID_PLAYBOOK_V3 = {
             "description": "Chronological visualization of events",
             "best_for": ["historical events", "project milestones", "company history", "roadmaps"],
             "official_doc": "https://mermaid.js.org/syntax/timeline.html",
-            
+
             "complete_example": """timeline
-    %% Timeline diagram based on official documentation
-    %% Shows chronological events with optional sections
-    
-    title Company Evolution Timeline
-    
-    section Foundation Era
-        2018 Q1 : Company founded by 3 co-founders
-                : Seed funding of $500K secured
-        
-        2018 Q3 : First prototype developed
-                : Alpha testing with 10 users
-        
+    section Foundation
+        2018 Q1 : Company founded
+                : Seed funding secured
+        2018 Q3 : First prototype
+                : Alpha testing began
         2018 Q4 : Beta launch
-                : 100 early adopters onboarded
-    
-    section Growth Phase
-        2019 Q2 : Series A funding of $5M
-                : Team expanded to 25 people
-        
-        2019 Q4 : Reached 10,000 active users
-                : Launched mobile app
-        
-        2020 Q2 : COVID-19 remote work boom
-                : User base grew 300%
-        
-        2020 Q4 : First profitable quarter
-                : International expansion started
-    
-    section Scale Phase
-        2021 Q2 : Series B funding of $25M
-                : Opened European office
-        
-        2021 Q4 : 100,000 users milestone
-                : Enterprise plan launched
-        
+                : Early adopters
+
+    section Growth
+        2019 Q2 : Series A funding
+                : Team expanded
+        2019 Q4 : 10K users reached
+                : Mobile app launched
+        2020 Q2 : Remote work boom
+                : User growth 300%
+
+    section Scale
+        2021 Q2 : Series B funding
+                : European office
+        2021 Q4 : 100K users
+                : Enterprise launch
         2022 Q2 : Acquired competitor
-                : Integrated AI features
-        
-        2022 Q4 : Series C funding of $50M
-                : Valuation reached $500M
-    
+                : AI integration
+
     section Maturity
-        2023 Q2 : 1 million users
-                : IPO preparation began
-        
-        2023 Q4 : Revenue exceeded $100M
-                : Global presence in 50 countries
-        
-        2024 Q1 : IPO announcement
-                : Public trading commenced
-        
-        2024 Q2 : Market cap reached $2B
-                : Strategic acquisitions""",
-            
+        2023 Q2 : 1M users milestone
+                : IPO preparation
+        2023 Q4 : Revenue $100M
+                : Global presence
+        2024 Q1 : IPO completed
+                : Public trading""",
+
             "key_syntax": {
                 "structure": {
-                    "title": "Optional timeline title",
                     "sections": "Group events by era/phase",
                     "events": "time_period : event_description"
                 },
                 "multiple_events": "Use multiple : on separate lines for same period",
                 "time_formats": "Flexible - can use years, dates, or descriptive text",
                 "ordering": "Events appear chronologically left to right"
-            }
+            },
+
+            "generation_rules": [
+                "Do NOT include title - slide already has title",
+                "Use sections to group related time periods",
+                "Format: time_period : event_description",
+                "Multiple events per period: use : on separate indented lines",
+                "Each time_period MUST have at least one event",
+                "Use simple text only - no markdown or special formatting",
+                "Chronological order - earliest dates/periods first",
+                "Keep event descriptions concise (max 20 chars)",
+                "Include 3-5 sections with 2-4 periods each",
+                "Use consistent time format within the diagram"
+            ]
         },
         
         # ============== 7. KANBAN ==============
@@ -524,6 +519,105 @@ MERMAID_PLAYBOOK_V3 = {
                 "Cards should be indented under their column",
                 "Use sequential task IDs (task1, task2, etc.)"
             ]
+        },
+
+        # ============== 8. PIE CHART ==============
+        "pie": {
+            "mermaid_syntax": "pie",
+            "description": "Pie chart showing proportional distribution of data",
+            "best_for": ["market share", "budget breakdown", "composition analysis", "percentages"],
+            "official_doc": "https://mermaid.js.org/syntax/pie.html",
+
+            "complete_example": """pie showData
+    "North America" : 45
+    "Europe" : 28
+    "Asia Pacific" : 18
+    "Latin America" : 6
+    "Middle East" : 3""",
+
+            "key_syntax": {
+                "declaration": {
+                    "basic": "pie",
+                    "with_data": "pie showData (displays actual values on slices)"
+                },
+                "entry_format": '"Label" : value',
+                "value_rules": {
+                    "type": "Positive numbers only (integers or decimals)",
+                    "auto_percentage": "Values automatically converted to percentages",
+                    "no_negatives": "Negative values will cause rendering errors"
+                },
+                "styling": {
+                    "colors": "Automatically assigned from theme",
+                    "ordering": "Slices render clockwise in order listed"
+                }
+            },
+
+            "generation_rules": [
+                "Do NOT include title - slide already has title",
+                "Use 'pie showData' to display actual values on slices",
+                "Values MUST be positive numbers (no negatives, no zero)",
+                "Labels MUST be in double quotes",
+                "Use colon separator between label and value",
+                "Include 4-8 slices for optimal visual balance",
+                "Keep labels short (max 15 chars) to avoid overlap",
+                "Order slices from largest to smallest for visual clarity",
+                "Sum of values shown as percentages - raw values are fine"
+            ]
+        },
+
+        # ============== 9. MINDMAP ==============
+        "mindmap": {
+            "mermaid_syntax": "mindmap",
+            "description": "Hierarchical mind map with branching ideas from central topic",
+            "best_for": ["brainstorming", "concept organization", "knowledge structure", "planning"],
+            "official_doc": "https://mermaid.js.org/syntax/mindmap.html",
+
+            "complete_example": """mindmap
+    root((Project Planning))
+        Requirements
+            User Stories
+            Technical Specs
+            Acceptance Criteria
+        Design
+            UI Mockups
+            Architecture
+            Database Schema
+        Development
+            Frontend
+            Backend
+            API Integration
+        Testing
+            Unit Tests
+            Integration
+            UAT""",
+
+            "key_syntax": {
+                "declaration": "mindmap",
+                "hierarchy": "Indentation (spaces) determines parent-child relationships",
+                "shapes": {
+                    "default": "Text (rounded rectangle)",
+                    "square": "[Text]",
+                    "rounded": "(Text)",
+                    "circle": "((Text)) - often used for root",
+                    "bang": "))Text(( - explosion shape",
+                    "cloud": ")Text( - cloud shape",
+                    "hexagon": "{{Text}}"
+                },
+                "icons": "::icon(fa fa-icon-name) after node text"
+            },
+
+            "generation_rules": [
+                "Do NOT include title - slide already has title",
+                "Use consistent indentation (4 spaces per level)",
+                "One root node required at top level",
+                "Use ((Text)) for root node (circle shape)",
+                "Each level adds one indentation unit (4 spaces)",
+                "Keep node text concise (max 20 chars)",
+                "3-4 children per node for visual balance",
+                "Maximum 3-4 levels of depth for readability",
+                "Do NOT use tabs - use spaces only",
+                "Avoid special characters in node text"
+            ]
         }
     }
 }
@@ -552,7 +646,11 @@ def get_diagram_spec(diagram_type: str) -> Optional[Dict[str, Any]]:
         "quadrant_chart": "quadrantChart",
         "timeline": "timeline",
         "kanban": "kanban",
-        "kanban_board": "kanban"
+        "kanban_board": "kanban",
+        "pie": "pie",
+        "pie_chart": "pie",
+        "mindmap": "mindmap",
+        "mind_map": "mindmap"
     }
     
     # Get the Mermaid syntax name

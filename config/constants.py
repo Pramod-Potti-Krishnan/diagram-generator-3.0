@@ -26,13 +26,17 @@ SUPPORTED_DIAGRAM_TYPES: Dict[str, List[str]] = {
         "funnel", "timeline", "hub_spoke", "process_flow"
     ],
     "mermaid": [
+        # GOLD Tier (85-95% confidence)
         "flowchart",           # Process flows and decision trees
-        "erDiagram",          # Entity relationship diagrams (was: entity_relationship)
-        "journey",            # User journey with satisfaction scores (was: user_journey)
-        "gantt",              # Project timelines with dependencies
-        "quadrantChart",      # 2x2 matrix plots (was: quadrant)
+        "erDiagram",          # Entity relationship diagrams
+        "journey",            # User journey with satisfaction scores
+        "pie",                # Pie charts with labeled slices
+        "mindmap",            # Hierarchical mind maps
         "timeline",           # Chronological events
-        "kanban"              # Kanban board with columns and cards
+        "kanban",             # Kanban board with columns and cards
+        # SILVER Tier (60-75% confidence)
+        "gantt",              # Project timelines with dependencies
+        "quadrantChart",      # 2x2 matrix plots
     ],
     "python_chart": [
         "pie_chart", "bar_chart", "line_chart",
@@ -271,6 +275,16 @@ DIAGRAM_TYPE_SIGNALS: Dict[str, Dict[str, Any]] = {
         "best_for": ["task management", "workflow status", "board"],
         "keywords": ["kanban", "board", "tasks", "todo", "progress", "status", "backlog", "doing", "done"],
         "ideal_topic_count": {"min": 3, "max": 12}
+    },
+    "pie": {
+        "best_for": ["distribution", "proportions", "market share", "composition"],
+        "keywords": ["pie", "percentage", "share", "distribution", "breakdown", "portion", "composition", "ratio"],
+        "ideal_topic_count": {"min": 3, "max": 8}
+    },
+    "mindmap": {
+        "best_for": ["brainstorming", "concepts", "hierarchies", "organization"],
+        "keywords": ["mindmap", "brainstorm", "ideas", "concepts", "hierarchy", "categories", "structure", "branches"],
+        "ideal_topic_count": {"min": 4, "max": 15}
     }
 }
 
@@ -279,16 +293,20 @@ DIAGRAM_CONTENT_SIGNALS: Dict[str, Any] = {
     "handles_well": [
         "processes", "workflows", "decision_trees", "system_architecture",
         "relationships", "sequences", "timelines", "project_schedules",
-        "user_journeys", "data_models", "task_boards"
+        "user_journeys", "data_models", "task_boards",
+        "pie_charts", "distributions", "proportions", "market_share",
+        "mindmaps", "brainstorming", "concept_hierarchies"
     ],
     "handles_poorly": [
         "pure_data", "bullet_lists", "comparisons_without_flow",
-        "numerical_charts", "pie_charts", "bar_graphs", "scatter_plots"
+        "numerical_charts", "bar_graphs", "scatter_plots"
     ],
     "keywords": [
         "flow", "process", "workflow", "architecture", "components",
         "sequence", "interaction", "diagram", "entity", "relationship",
         "timeline", "gantt", "schedule", "journey", "kanban", "board",
-        "steps", "decision", "database", "schema"
+        "steps", "decision", "database", "schema",
+        "pie", "percentage", "share", "distribution",
+        "mindmap", "brainstorm", "hierarchy", "concepts"
     ]
 }

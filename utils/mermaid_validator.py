@@ -47,31 +47,190 @@ class MermaidValidator:
             logger.warning("No Google API key - MermaidValidator running in basic mode")
     
     async def validate_and_fix(
-        self, 
-        diagram_type: str, 
+        self,
+        diagram_type: str,
         mermaid_code: str
     ) -> Tuple[bool, str, List[str]]:
         """
         Validates and fixes Mermaid code based on diagram type.
-        
+
         Args:
             diagram_type: Type of Mermaid diagram (gantt, flowchart, etc.)
             mermaid_code: The Mermaid code to validate
-            
+
         Returns:
             Tuple of (is_valid, fixed_code, issues_found)
         """
-        
+
         # Normalize diagram type
-        diagram_type = diagram_type.lower()
-        
+        diagram_type_lower = diagram_type.lower()
+
         # Route to specific validators
-        if diagram_type == "gantt":
-            return await self._validate_gantt_with_ai(mermaid_code)
-        else:
-            # Pass-through for other diagram types for now
-            logger.debug(f"No validation rules for {diagram_type}, passing through")
-            return True, mermaid_code, []
+        validators = {
+            "gantt": self._validate_gantt_with_ai,
+            "journey": self._validate_journey,
+            "flowchart": self._validate_flowchart,
+            "quadrantchart": self._validate_quadrant,
+        }
+
+        if diagram_type_lower in validators:
+            return await validators[diagram_type_lower](mermaid_code)
+
+        # Pass-through for other diagram types
+        logger.debug(f"No validation rules for {diagram_type}, passing through")
+        return True, mermaid_code, []
+
+    async def _validate_journey(self, mermaid_code: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate and fix journey diagram scores.
+
+        Journey scores MUST be 0-5, but LLM sometimes generates 6, 7, 8, 10, etc.
+
+        Args:
+            mermaid_code: Journey diagram code
+
+        Returns:
+            Tuple of (is_valid, fixed_code, issues_found)
+        """
+        issues = []
+        fixed_code = mermaid_code
+
+        # Pattern: "task description: SCORE: Actor"
+        # Example: "Search for product: 5: Customer"
+        score_pattern = r':\s*(\d+)\s*:'
+
+        for match in re.finditer(score_pattern, mermaid_code):
+            score = int(match.group(1))
+            if score > 5:
+                issues.append(f"Score {score} exceeds maximum of 5 - clamping")
+                # Map scores > 5 to valid range
+                # 10 -> 5, 8-9 -> 4, 6-7 -> 3
+                if score >= 9:
+                    new_score = 5
+                elif score >= 7:
+                    new_score = 4
+                else:
+                    new_score = 3
+                # Replace the score in the code
+                old_text = f": {score}:"
+                new_text = f": {new_score}:"
+                fixed_code = fixed_code.replace(old_text, new_text, 1)
+                logger.debug(f"Fixed journey score: {score} -> {new_score}")
+
+        if issues:
+            logger.info(f"Journey validator fixed {len(issues)} score issues")
+
+        return len(issues) == 0, fixed_code, issues
+
+    async def _validate_flowchart(self, mermaid_code: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate and fix flowchart reserved word issues.
+
+        The word 'end' is reserved for closing subgraphs, so it can't be used
+        as bare node text. Fix by capitalizing to 'End'.
+
+        Args:
+            mermaid_code: Flowchart diagram code
+
+        Returns:
+            Tuple of (is_valid, fixed_code, issues_found)
+        """
+        issues = []
+        fixed_code = mermaid_code
+
+        # Fix bare "end" as node text (not end of subgraph)
+        # Pattern: node[end] or node(end) or node{end}
+        # But NOT "    end" (subgraph close) which is just "end" on its own line
+
+        # Pattern for node with "end" as text
+        patterns = [
+            (r'(\w+)\[end\]', r'\1[End]', 'end in square brackets'),
+            (r'(\w+)\(end\)', r'\1(End)', 'end in rounded brackets'),
+            (r'(\w+)\{end\}', r'\1{End}', 'end in curly brackets'),
+            (r'(\w+)\[\(end\)\]', r'\1[(End)]', 'end in stadium'),
+        ]
+
+        for pattern, replacement, desc in patterns:
+            if re.search(pattern, fixed_code, re.IGNORECASE):
+                issues.append(f'Reserved word "end" used as node text ({desc})')
+                fixed_code = re.sub(pattern, replacement, fixed_code, flags=re.IGNORECASE)
+                logger.debug(f"Fixed flowchart reserved word: {desc}")
+
+        if issues:
+            logger.info(f"Flowchart validator fixed {len(issues)} reserved word issues")
+
+        return len(issues) == 0, fixed_code, issues
+
+    async def _validate_quadrant(self, mermaid_code: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate quadrant chart coordinate uniqueness.
+
+        LLM sometimes generates points with duplicate or very close coordinates,
+        which causes rendering issues. Nudge overlapping points apart.
+
+        Args:
+            mermaid_code: QuadrantChart diagram code
+
+        Returns:
+            Tuple of (is_valid, fixed_code, issues_found)
+        """
+        issues = []
+        fixed_code = mermaid_code
+
+        # Pattern: "Point Name: [x, y]"
+        point_pattern = r'([^:\n]+):\s*\[(\d+\.?\d*),\s*(\d+\.?\d*)\]'
+
+        points = []
+        for match in re.finditer(point_pattern, mermaid_code):
+            name = match.group(1).strip()
+            x = float(match.group(2))
+            y = float(match.group(3))
+            points.append({
+                'name': name,
+                'x': x,
+                'y': y,
+                'original': match.group(0)
+            })
+
+        # Check for coordinate conflicts (within 0.08)
+        MIN_DISTANCE = 0.08
+        used_coords = []
+        adjustments_made = []
+
+        for point in points:
+            x, y = point['x'], point['y']
+            conflict = True
+            nudge_count = 0
+
+            while conflict and nudge_count < 10:
+                conflict = False
+                for (ux, uy) in used_coords:
+                    if abs(x - ux) < MIN_DISTANCE and abs(y - uy) < MIN_DISTANCE:
+                        conflict = True
+                        issues.append(f"Point '{point['name']}' too close to another point")
+                        # Nudge the coordinate slightly
+                        x = min(0.95, x + 0.1)
+                        y = min(0.95, y + 0.1)
+                        nudge_count += 1
+                        break
+
+            used_coords.append((x, y))
+
+            if x != point['x'] or y != point['y']:
+                adjustments_made.append({
+                    'old': point['original'],
+                    'new': f"{point['name']}: [{x:.2f}, {y:.2f}]"
+                })
+
+        # Apply adjustments
+        for adj in adjustments_made:
+            fixed_code = fixed_code.replace(adj['old'], adj['new'], 1)
+            logger.debug(f"Fixed quadrant coordinates: {adj['old']} -> {adj['new']}")
+
+        if issues:
+            logger.info(f"Quadrant validator fixed {len(adjustments_made)} coordinate conflicts")
+
+        return len(issues) == 0, fixed_code, issues
     
     async def _validate_gantt_with_ai(self, code: str) -> Tuple[bool, str, List[str]]:
         """
@@ -195,131 +354,112 @@ Just return the fixed gantt chart code starting with 'gantt'."""
     def _detect_gantt_issues(self, code: str) -> List[str]:
         """
         Detect common Gantt chart syntax issues.
-        
+
+        SIMPLIFIED to reduce false positives. Only checks for:
+        1. Milestone with non-zero duration (definite error)
+        2. Title line when slide already has title (remove it)
+
+        Does NOT check for "invalid status tags" as this causes too many false positives
+        when task IDs happen to be short (des, db, int, test, etc.)
+
         Args:
             code: Gantt chart code
-            
+
         Returns:
             List of detected issues
         """
         issues = []
         lines = code.split('\n')
-        
-        # Valid status tags
-        valid_status_tags = {'done', 'active', 'crit', 'milestone'}
-        
-        # Common invalid tags that are actually task IDs
-        common_invalid_tags = {'des', 'db', 'int', 'test', 'unit', 'bug', 
-                              'stage', 'prep', 'support', 'dev', 'impl'}
-        
+
         for i, line in enumerate(lines, 1):
             line = line.strip()
-            
-            # Skip empty lines, comments, and headers
-            if not line or line.startswith('%') or line.startswith('gantt'):
+
+            # Skip empty lines, comments
+            if not line or line.startswith('%'):
                 continue
-            if line.startswith('title') or line.startswith('dateFormat'):
+
+            # Check for title line (should be removed - slide has its own title)
+            if line.startswith('title ') or line == 'title':
+                issues.append(f"Line {i}: Title line should be removed - slide already has title")
+                continue
+
+            # Skip header lines
+            if line.startswith('gantt') or line.startswith('dateFormat'):
                 continue
             if line.startswith('axisFormat') or line.startswith('excludes'):
                 continue
             if line.startswith('section'):
                 continue
-            
-            # Check task lines
+
+            # Check task lines for milestone duration issue
             if ':' in line:
-                # Extract the part after the colon
                 parts = line.split(':', 1)
                 if len(parts) == 2:
                     task_def = parts[1].strip()
-                    
-                    # Split by comma to get components
                     components = [c.strip() for c in task_def.split(',')]
-                    
-                    if len(components) >= 3:
-                        # Could be: statusTag, taskId, dependency, duration
-                        # Or: taskId, dependency, duration
-                        
-                        first_component = components[0]
-                        
-                        # Check if first component looks like an invalid status tag
-                        if first_component in common_invalid_tags:
-                            issues.append(f"Line {i}: Invalid status tag '{first_component}' - should be task ID only")
-                        
-                        # Check for milestone with non-zero duration
-                        if 'milestone' in components[0:2]:
-                            # Find duration (last component)
-                            if len(components) >= 3:
-                                duration = components[-1].strip()
-                                if duration != '0d' and duration != '0':
-                                    issues.append(f"Line {i}: Milestone should have 0d duration, found '{duration}'")
-                        
-                        # Check for multiple dependencies with comma (might be wrong)
-                        for j, comp in enumerate(components):
-                            if 'after' in comp and j < len(components) - 1:
-                                # Check if next component looks like a task ID (not duration)
-                                next_comp = components[j + 1]
-                                if not re.match(r'^\d+[dhwms]?$', next_comp):
-                                    # Might be wrong comma-separated dependencies
-                                    issues.append(f"Line {i}: Possible incorrect multiple dependency syntax")
-        
+
+                    # Check for milestone with non-zero duration
+                    # Milestone can be in first or second position
+                    if 'milestone' in components[:2]:
+                        # Find duration (last component)
+                        if len(components) >= 3:
+                            duration = components[-1].strip()
+                            # Valid durations for milestone: 0d, 0
+                            if duration != '0d' and duration != '0':
+                                issues.append(f"Line {i}: Milestone must have 0d duration, found '{duration}'")
+
         return issues
     
     def _apply_basic_gantt_fixes(self, code: str) -> str:
         """
         Apply basic regex-based fixes for common Gantt issues.
-        
+
+        SIMPLIFIED to only fix definite issues:
+        1. Remove title lines
+        2. Fix milestone durations to 0d
+
         Args:
             code: Gantt chart code
-            
+
         Returns:
             Fixed code
         """
         lines = code.split('\n')
         fixed_lines = []
-        
-        # Common invalid status tags to remove
-        invalid_tags = {'des', 'db', 'int', 'test', 'unit', 'bug', 
-                       'stage', 'prep', 'support', 'dev', 'impl'}
-        
+
         for line in lines:
-            original_line = line
-            
+            stripped = line.strip()
+
+            # Remove title lines
+            if stripped.startswith('title ') or stripped == 'title':
+                logger.debug("Removed title line from Gantt chart")
+                continue
+
             # Skip non-task lines
-            if not ':' in line or line.strip().startswith('%'):
+            if ':' not in line or stripped.startswith('%'):
                 fixed_lines.append(line)
                 continue
-            
+
             # Try to fix task lines
             parts = line.split(':', 1)
             if len(parts) == 2:
                 task_name = parts[0]
                 task_def = parts[1].strip()
-                
+
                 # Split task definition
                 components = [c.strip() for c in task_def.split(',')]
-                
-                if len(components) >= 3:
-                    first = components[0]
-                    
-                    # Remove invalid status tags
-                    if first in invalid_tags:
-                        # Remove the invalid tag, making the next component the task ID
-                        components = components[1:]
+
+                # Fix milestone duration
+                if len(components) >= 3 and 'milestone' in components[:2]:
+                    # Ensure last component is 0d
+                    if components[-1] not in ('0d', '0'):
+                        components[-1] = '0d'
                         task_def = ', '.join(components)
                         line = f"{task_name}:{task_def}"
-                        logger.debug(f"Fixed invalid status tag: {first}")
-                    
-                    # Fix milestone duration
-                    if 'milestone' in components[0:2]:
-                        # Ensure last component is 0d
-                        if len(components) >= 3:
-                            components[-1] = '0d'
-                            task_def = ', '.join(components)
-                            line = f"{task_name}:{task_def}"
-                            logger.debug("Fixed milestone duration to 0d")
-            
+                        logger.debug("Fixed milestone duration to 0d")
+
             fixed_lines.append(line)
-        
+
         return '\n'.join(fixed_lines)
     
     def _extract_mermaid_from_response(self, response_text: str) -> Optional[str]:
@@ -357,38 +497,37 @@ Just return the fixed gantt chart code starting with 'gantt'."""
     def _compare_and_list_fixes(self, original: str, fixed: str) -> List[str]:
         """
         Compare original and fixed code to list what was changed.
-        
+
         Args:
             original: Original code
             fixed: Fixed code
-            
+
         Returns:
             List of fixes applied
         """
         if original.strip() == fixed.strip():
             return []
-        
+
         fixes = []
-        
-        # Check for removed invalid status tags
-        invalid_tags = {'des', 'db', 'int', 'test', 'unit', 'bug', 
-                       'stage', 'prep', 'support', 'dev', 'impl'}
-        
-        for tag in invalid_tags:
-            # Check if tag was in original but not in fixed (as a status position)
-            pattern = f':{tag},'
-            if pattern in original and pattern not in fixed:
-                fixes.append(f"Removed invalid status tag '{tag}'")
-        
+
+        # Check for removed title line
+        if 'title ' in original.lower() and 'title ' not in fixed.lower():
+            fixes.append("Removed title line")
+
         # Check for milestone duration fixes
-        if ':milestone' in original:
-            if '1d' in original and '0d' in fixed:
-                fixes.append("Fixed milestone duration from 1d to 0d")
-        
+        if ':milestone' in original or 'milestone,' in original:
+            # Check if any non-zero duration was fixed to 0d
+            import re
+            orig_milestones = re.findall(r'milestone.*?,\s*(\d+[dhwm]?)', original)
+            for dur in orig_milestones:
+                if dur not in ('0d', '0'):
+                    fixes.append(f"Fixed milestone duration from {dur} to 0d")
+                    break
+
         # Generic change detection
-        if not fixes:
+        if not fixes and original.strip() != fixed.strip():
             fixes.append("Applied syntax corrections")
-        
+
         return fixes
 
 
