@@ -44,10 +44,19 @@ class MermaidRenderer:
         Returns:
             SVG string with actual rendered diagram
         """
-        try:
-            # Add Mermaid configuration for theming if provided
-            if theme:
-                theme_config = f"""%%{{init: {{
+        # Diagram types that support %%{init}%% theme directives
+        # erDiagram, quadrantChart, and some others don't work well with init
+        theme_supported_types = ['flowchart', 'graph', 'sequenceDiagram', 'classDiagram',
+                                  'stateDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'kanban']
+
+        # Check if diagram type supports theming
+        first_line = mermaid_code.strip().split('\n')[0].lower()
+        supports_theme = any(dt in first_line for dt in theme_supported_types)
+
+        # Try with theme first if supported, then fallback to plain
+        attempts = []
+        if theme and supports_theme:
+            theme_config = f"""%%{{init: {{
   'theme': 'base',
   'themeVariables': {{
     'primaryColor': '{theme.get("primaryColor", "#3B82F6")}',
@@ -58,31 +67,37 @@ class MermaidRenderer:
   }}
 }}}}%%
 """
-                full_code = theme_config + mermaid_code
-            else:
-                full_code = mermaid_code
+            attempts.append(("themed", theme_config + mermaid_code))
 
-            # Send to Kroki API
-            response = await self.client.post(
-                KROKI_URL,
-                content=full_code,
-                headers={"Content-Type": "text/plain"}
-            )
+        # Always try plain code as fallback
+        attempts.append(("plain", mermaid_code))
 
-            if response.status_code == 200:
-                svg_content = response.text
-                logger.info(f"Kroki rendered Mermaid successfully: {len(svg_content)} chars")
-                return svg_content
-            else:
-                logger.error(f"Kroki API error: {response.status_code} - {response.text}")
-                raise Exception(f"Kroki API returned {response.status_code}: {response.text[:200]}")
+        last_error = None
+        for attempt_name, code in attempts:
+            try:
+                response = await self.client.post(
+                    KROKI_URL,
+                    content=code,
+                    headers={"Content-Type": "text/plain"}
+                )
 
-        except httpx.TimeoutException as e:
-            logger.error(f"Kroki API timeout: {e}")
-            raise Exception(f"Kroki API timeout: {e}")
-        except Exception as e:
-            logger.error(f"Failed to render with Kroki: {e}")
-            raise
+                if response.status_code == 200:
+                    svg_content = response.text
+                    logger.info(f"Kroki rendered Mermaid successfully ({attempt_name}): {len(svg_content)} chars")
+                    return svg_content
+                else:
+                    last_error = f"Kroki API returned {response.status_code}: {response.text[:200]}"
+                    logger.warning(f"Kroki {attempt_name} attempt failed: {last_error}")
+
+            except httpx.TimeoutException as e:
+                last_error = f"Kroki API timeout: {e}"
+                logger.warning(f"Kroki {attempt_name} attempt timed out")
+            except Exception as e:
+                last_error = str(e)
+                logger.warning(f"Kroki {attempt_name} attempt error: {e}")
+
+        # All attempts failed
+        raise Exception(f"All Kroki rendering attempts failed. Last error: {last_error}")
 
     def create_placeholder_svg(
         self,
