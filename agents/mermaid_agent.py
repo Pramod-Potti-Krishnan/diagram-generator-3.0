@@ -11,7 +11,7 @@ Supports two authentication modes:
 
 import os
 import json
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Tuple
 from pydantic import BaseModel, Field
 import asyncio
 from dotenv import load_dotenv
@@ -44,6 +44,15 @@ from playbooks.mermaid_playbook_v3 import (
 )
 
 logger = setup_logger(__name__)
+
+# Model escalation chain - retries with same model first, then escalates
+MODEL_ESCALATION_CHAIN = [
+    "gemini-2.5-flash",      # Attempt 1: Fast, default
+    "gemini-2.5-flash",      # Attempt 2: Retry same model (might be transient)
+    "gemini-2.5-pro",        # Attempt 3: Escalate to more capable
+    "gemini-3-flash-preview" # Attempt 4: Last resort, highest quality
+]
+RETRY_BASE_DELAY = 1.0  # seconds between retries
 
 
 class MermaidOutput(BaseModel):
@@ -133,7 +142,114 @@ class MermaidAgent(BaseAgent):
             logger.error(f"Failed to initialize with API key: {e}")
             self.model = None
             self.enabled = False
-    
+
+    async def _generate_with_retry(
+        self,
+        prompt: str,
+        diagram_type: str,
+        temperature: float = 0.7
+    ) -> Tuple[str, Dict[str, Any]]:
+        """
+        Generate Mermaid code with tiered model escalation on failures.
+
+        Tries models in order: gemini-2.5-flash -> gemini-2.5-pro -> gemini-3-flash-preview
+        Each retry uses a more capable model with exponential backoff.
+
+        Returns:
+            Tuple of (response_text, retry_metadata)
+        """
+        last_error = None
+        retry_metadata = {
+            "attempts": 0,
+            "models_tried": [],
+            "final_model": None,
+            "errors": []
+        }
+
+        json_instruction = "\n\nReturn a JSON object with: mermaid_code, confidence (0-1), entities_extracted (list), relationships_count (int), diagram_type_confirmed"
+        full_prompt = prompt + json_instruction
+
+        for attempt, model_name in enumerate(MODEL_ESCALATION_CHAIN, 1):
+            retry_metadata["attempts"] = attempt
+            retry_metadata["models_tried"].append(model_name)
+
+            try:
+                logger.info(f"🔄 Attempt {attempt}/{len(MODEL_ESCALATION_CHAIN)}: Using {model_name}")
+
+                if self._use_vertex_ai and self._vertex_service:
+                    # Use Vertex AI service with specific model
+                    # Update the model for this attempt
+                    original_model = self._vertex_service.model_name
+                    self._vertex_service.model_name = model_name
+
+                    try:
+                        result = await self._vertex_service.generate_mermaid(
+                            prompt=prompt,
+                            diagram_type=diagram_type,
+                            temperature=temperature
+                        )
+                        if result.get("success"):
+                            response_text = json.dumps(result.get("content", {}))
+                        else:
+                            raise ValueError(result.get("error", "Vertex AI generation failed"))
+                    finally:
+                        # Restore original model name
+                        self._vertex_service.model_name = original_model
+                else:
+                    # Use API key mode with specific model
+                    if not GENAI_AVAILABLE:
+                        raise ValueError("google-generativeai not available")
+
+                    model = genai.GenerativeModel(model_name)
+                    response = await asyncio.get_event_loop().run_in_executor(
+                        None,
+                        lambda: model.generate_content(full_prompt)
+                    )
+                    response_text = response.text
+
+                if not response_text:
+                    raise ValueError("LLM returned empty response")
+
+                # Try to extract JSON from response
+                if '```json' in response_text:
+                    response_text = response_text.split('```json')[1].split('```')[0]
+                elif '{' in response_text:
+                    start = response_text.index('{')
+                    end = response_text.rindex('}') + 1
+                    response_text = response_text[start:end]
+
+                # Attempt JSON parsing - this is where failures often occur
+                output_dict = json.loads(response_text)
+                output = MermaidOutput(**output_dict)
+
+                # Success!
+                retry_metadata["final_model"] = model_name
+                logger.info(f"✅ Success with {model_name} on attempt {attempt}")
+                return response_text, retry_metadata
+
+            except json.JSONDecodeError as e:
+                error_msg = f"JSON parse failed: {str(e)}"
+                logger.warning(f"⚠️ Attempt {attempt}: {error_msg}")
+                logger.debug(f"   Raw response (first 500 chars): {response_text[:500] if 'response_text' in dir() else 'N/A'}...")
+                retry_metadata["errors"].append({"model": model_name, "error": error_msg})
+                last_error = e
+
+            except Exception as e:
+                error_msg = str(e)
+                logger.warning(f"⚠️ Attempt {attempt} failed: {error_msg}")
+                retry_metadata["errors"].append({"model": model_name, "error": error_msg})
+                last_error = e
+
+            # Wait before retrying with next model (except after last attempt)
+            if attempt < len(MODEL_ESCALATION_CHAIN):
+                delay = RETRY_BASE_DELAY * (2 ** (attempt - 1))  # 1s, 2s
+                logger.info(f"⏳ Escalating to next model ({MODEL_ESCALATION_CHAIN[attempt]}) in {delay}s...")
+                await asyncio.sleep(delay)
+
+        # All attempts failed
+        logger.error(f"❌ All {len(MODEL_ESCALATION_CHAIN)} model attempts failed. Last error: {last_error}")
+        raise ValueError(f"LLM generation failed after {len(MODEL_ESCALATION_CHAIN)} attempts with models {retry_metadata['models_tried']}: {last_error}")
+
     async def supports(self, diagram_type: str) -> bool:
         """Check if diagram type is supported"""
         return diagram_type in self.supported_types
@@ -178,48 +294,16 @@ class MermaidAgent(BaseAgent):
                 playbook_context
             )
             
-            logger.info(f"🚀 Generating {request.diagram_type} with {'Vertex AI' if self._use_vertex_ai else 'API key'}")
+            logger.info(f"🚀 Generating {request.diagram_type} with {'Vertex AI' if self._use_vertex_ai else 'API key'} (with tiered retry)")
 
-            # Generate with appropriate service
-            json_instruction = "\n\nReturn a JSON object with: mermaid_code, confidence (0-1), entities_extracted (list), relationships_count (int), diagram_type_confirmed"
-            full_prompt = prompt + json_instruction
+            # Generate with tiered model retry logic
+            response_text, retry_metadata = await self._generate_with_retry(
+                prompt=prompt,
+                diagram_type=request.diagram_type,
+                temperature=0.7
+            )
 
-            if self._use_vertex_ai and self._vertex_service:
-                # Use Vertex AI service
-                result = await self._vertex_service.generate_mermaid(
-                    prompt=prompt,
-                    diagram_type=request.diagram_type,
-                    temperature=0.7
-                )
-                if result.get("success"):
-                    response_text = json.dumps(result.get("content", {}))
-                else:
-                    raise ValueError(result.get("error", "Vertex AI generation failed"))
-            else:
-                # Use optimized Gemini service (API key mode)
-                from utils.gemini_service import optimized_generate
-
-                # Generate with caching for similar requests
-                cache_key = f"{request.diagram_type}_{hash(request.content[:100] if request.content else '')}"
-                response_text = await optimized_generate(
-                    full_prompt,
-                    model_type='flash',
-                    cache_key=cache_key
-                )
-
-            if not response_text:
-                raise ValueError("LLM generation failed - no response")
-            
-            # Parse the response
-            # Try to extract JSON from response
-            if '```json' in response_text:
-                response_text = response_text.split('```json')[1].split('```')[0]
-            elif '{' in response_text:
-                # Find JSON object in response
-                start = response_text.index('{')
-                end = response_text.rindex('}') + 1
-                response_text = response_text[start:end]
-            
+            # Parse the successful response
             output_dict = json.loads(response_text)
             output = MermaidOutput(**output_dict)
             
@@ -261,7 +345,8 @@ class MermaidAgent(BaseAgent):
                     request=request,
                     confidence=output.confidence,
                     entities=output.entities_extracted,
-                    relationships=output.relationships_count
+                    relationships=output.relationships_count,
+                    retry_metadata=retry_metadata
                 )
             else:
                 # Return Mermaid code for client-side rendering
@@ -271,7 +356,8 @@ class MermaidAgent(BaseAgent):
                     confidence=output.confidence,
                     entities=output.entities_extracted,
                     relationships=output.relationships_count,
-                    render_error=render_error
+                    render_error=render_error,
+                    retry_metadata=retry_metadata
                 )
             
         except Exception as e:
@@ -405,17 +491,22 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
         request: DiagramRequest,
         confidence: float,
         entities: List[str],
-        relationships: int
+        relationships: int,
+        retry_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Build response for successfully rendered SVG"""
-        
+
+        # Get final model from retry metadata
+        final_model = retry_metadata.get("final_model") if retry_metadata else None
+        llm_model = final_model or (self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash")
+
         # Build V2-compatible response with both old and new fields
         return {
             # Old format (backward compatibility)
             "content": svg_content,
             "content_type": "svg",
             "diagram_type": request.diagram_type,
-            
+
             # V2 format indicators
             "output_type": OutputType.SVG.value,
             "svg": {
@@ -427,20 +518,25 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
                 "render_method": "mermaid_cli",
                 "render_status": "success"
             },
-            
+
             # Metadata (works for both formats)
             "metadata": {
-                "generation_method": "mermaid_llm",
+                "generation_method": "mermaid",
                 "mermaid_code": mermaid_code,
                 "confidence": confidence,
                 "entities_extracted": entities,
                 "relationships_count": relationships,
                 "llm_attempted": True,
                 "llm_used": True,
-                "llm_model": self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash",
+                "llm_model": llm_model,
                 "auth_mode": "vertex_ai" if self._use_vertex_ai else "api_key",
                 "server_rendered": True,
-                "cache_hit": False
+                "cache_hit": False,
+                # Retry information
+                "retry_attempts": retry_metadata.get("attempts", 1) if retry_metadata else 1,
+                "models_tried": retry_metadata.get("models_tried", [llm_model]) if retry_metadata else [llm_model],
+                "final_model": final_model,
+                "retry_errors": retry_metadata.get("errors") if retry_metadata and retry_metadata.get("errors") else None
             }
         }
     
@@ -451,19 +547,24 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
         confidence: float,
         entities: List[str],
         relationships: int,
-        render_error: Optional[str] = None
+        render_error: Optional[str] = None,
+        retry_metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Build response for Mermaid code requiring client-side rendering"""
-        
+
+        # Get final model from retry metadata
+        final_model = retry_metadata.get("final_model") if retry_metadata else None
+        llm_model = final_model or (self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash")
+
         # For backward compatibility, wrap in fake SVG
         wrapped_svg = self._wrap_for_client(mermaid_code, request.theme.dict())
-        
+
         return {
             # Old format (backward compatibility)
             "content": wrapped_svg,
             "content_type": "svg",  # Misleading but for backward compatibility
             "diagram_type": request.diagram_type,
-            
+
             # V2 format indicators
             "output_type": OutputType.MERMAID.value,
             "mermaid": {
@@ -478,20 +579,25 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
                 "render_status": "pending",
                 "render_error": render_error
             },
-            
+
             # Metadata (works for both formats)
             "metadata": {
-                "generation_method": "mermaid_llm",
+                "generation_method": "mermaid",
                 "mermaid_code": mermaid_code,
                 "confidence": confidence,
                 "entities_extracted": entities,
                 "relationships_count": relationships,
                 "llm_attempted": True,
                 "llm_used": True,
-                "llm_model": self._vertex_service.model_name if self._use_vertex_ai else "gemini-2.5-flash",
+                "llm_model": llm_model,
                 "auth_mode": "vertex_ai" if self._use_vertex_ai else "api_key",
                 "server_rendered": False,
-                "cache_hit": False
+                "cache_hit": False,
+                # Retry information
+                "retry_attempts": retry_metadata.get("attempts", 1) if retry_metadata else 1,
+                "models_tried": retry_metadata.get("models_tried", [llm_model]) if retry_metadata else [llm_model],
+                "final_model": final_model,
+                "retry_errors": retry_metadata.get("errors") if retry_metadata and retry_metadata.get("errors") else None
             }
         }
     
