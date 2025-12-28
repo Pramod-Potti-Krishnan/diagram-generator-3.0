@@ -211,7 +211,6 @@ class MermaidAgent(BaseAgent):
                 raise ValueError("LLM generation failed - no response")
             
             # Parse the response
-            import json
             # Try to extract JSON from response
             if '```json' in response_text:
                 response_text = response_text.split('```json')[1].split('```')[0]
