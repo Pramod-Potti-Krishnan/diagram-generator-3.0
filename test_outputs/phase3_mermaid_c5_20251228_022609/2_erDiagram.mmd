@@ -1,0 +1,53 @@
+erDiagram
+    Users {
+        int id PK
+        varchar email UQ
+        varchar name
+        boolean active
+        datetime created
+    }
+
+    Orders {
+        int id PK
+        int user_id FK
+        decimal total
+        varchar status
+        datetime order_date
+    }
+
+    Products {
+        int id PK
+        varchar name
+        text description
+        decimal price
+        int quantity
+    }
+
+    OrderItems {
+        int id PK
+        int order_id FK
+        int product_id FK
+        int qty
+        decimal price
+    }
+
+    Reviews {
+        int id PK
+        int user_id FK
+        int product_id FK
+        int rating
+        text comment
+    }
+
+    Categories {
+        int id PK
+        varchar name
+        int parent_id FK
+    }
+
+    Users ||--o{ Orders : "places"
+    Orders ||--o{ OrderItems : "contains"
+    Products ||--o{ OrderItems : "included_in"
+    Users ||--o{ Reviews : "writes"
+    Products ||--o{ Reviews : "reviewed_as"
+    Categories }|--o{ Categories : "has_sub_category"

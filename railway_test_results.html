@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Railway API Test Results - Diagram Generator v3.0</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        h1 {
+            color: #667eea;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background: #10B981;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            margin-top: 15px;
+        }
+
+        .api-url {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.95rem;
+            color: #4b5563;
+        }
+
+        .diagram-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(600px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .diagram-card {
+            background: white;
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .diagram-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+        }
+
+        .diagram-header {
+            margin-bottom: 20px;
+        }
+
+        .diagram-title {
+            font-size: 1.5rem;
+            color: #1f2937;
+            margin-bottom: 8px;
+        }
+
+        .diagram-type {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .diagram-viewer {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 400px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: auto;
+        }
+
+        .diagram-viewer img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .diagram-meta {
+            background: #f3f4f6;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .meta-row:last-child {
+            border-bottom: none;
+        }
+
+        .meta-label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+
+        .meta-value {
+            color: #6b7280;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+        }
+
+        .diagram-url {
+            display: block;
+            margin-top: 10px;
+            padding: 10px;
+            background: white;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+            transition: background 0.2s;
+        }
+
+        .diagram-url:hover {
+            background: #f3f4f6;
+        }
+
+        footer {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            color: #6b7280;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎨 Diagram Generator v3.0</h1>
+            <p class="subtitle">Railway API Test Results</p>
+            <span class="status-badge">✅ All Systems Operational</span>
+            <div class="api-url">
+                <strong>API URL:</strong> https://web-production-e0ad0.up.railway.app
+            </div>
+        </header>
+
+        <div class="diagram-grid">
+            <!-- Diagram 1: 3-Step Cycle -->
+            <div class="diagram-card">
+                <div class="diagram-header">
+                    <h2 class="diagram-title">1️⃣ Three-Step Cycle</h2>
+                    <span class="diagram-type">SVG Template</span>
+                </div>
+                <div class="diagram-viewer">
+                    <img src="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/cycle_3_step_20251019_184354_5042ae55.svg" alt="3-Step Cycle Diagram">
+                </div>
+                <div class="diagram-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Content:</span>
+                        <span class="meta-value">Plan → Execute → Review</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Generation Time:</span>
+                        <span class="meta-value">1.67 seconds</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Quality Score:</span>
+                        <span class="meta-value">1.0 (Perfect)</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Theme:</span>
+                        <span class="meta-value">Professional (#3B82F6)</span>
+                    </div>
+                    <a href="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/cycle_3_step_20251019_184354_5042ae55.svg" target="_blank" class="diagram-url">
+                        🔗 Open Full Size
+                    </a>
+                </div>
+            </div>
+
+            <!-- Diagram 2: Flowchart -->
+            <div class="diagram-card">
+                <div class="diagram-header">
+                    <h2 class="diagram-title">2️⃣ Process Flowchart</h2>
+                    <span class="diagram-type">Mermaid + AI</span>
+                </div>
+                <div class="diagram-viewer">
+                    <img src="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/flowchart_20251019_184403_b5c25c6c.svg" alt="Flowchart Diagram">
+                </div>
+                <div class="diagram-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Content:</span>
+                        <span class="meta-value">Process with conditions</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Generation Time:</span>
+                        <span class="meta-value">5.64 seconds</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">AI Model:</span>
+                        <span class="meta-value">gemini-2.5-flash</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Quality Score:</span>
+                        <span class="meta-value">0.9 (Excellent)</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Theme:</span>
+                        <span class="meta-value">Modern (#10B981)</span>
+                    </div>
+                    <a href="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/flowchart_20251019_184403_b5c25c6c.svg" target="_blank" class="diagram-url">
+                        🔗 Open Full Size
+                    </a>
+                </div>
+            </div>
+
+            <!-- Diagram 3: Pyramid -->
+            <div class="diagram-card">
+                <div class="diagram-header">
+                    <h2 class="diagram-title">3️⃣ Four-Level Pyramid</h2>
+                    <span class="diagram-type">SVG Template</span>
+                </div>
+                <div class="diagram-viewer">
+                    <img src="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/pyramid_4_level_20251019_184407_6c5cd5c7.svg" alt="Pyramid Diagram">
+                </div>
+                <div class="diagram-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Content:</span>
+                        <span class="meta-value">Vision → Strategy → Tactics → Execution</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Generation Time:</span>
+                        <span class="meta-value">1.15 seconds</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Quality Score:</span>
+                        <span class="meta-value">1.0 (Perfect)</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Theme:</span>
+                        <span class="meta-value">Bold (#F59E0B)</span>
+                    </div>
+                    <a href="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/pyramid_4_level_20251019_184407_6c5cd5c7.svg" target="_blank" class="diagram-url">
+                        🔗 Open Full Size
+                    </a>
+                </div>
+            </div>
+
+            <!-- Diagram 4: Venn -->
+            <div class="diagram-card">
+                <div class="diagram-header">
+                    <h2 class="diagram-title">4️⃣ Venn Diagram</h2>
+                    <span class="diagram-type">SVG Template</span>
+                </div>
+                <div class="diagram-viewer">
+                    <img src="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/venn_2_circle_20251019_184412_eb995b88.svg" alt="Venn Diagram">
+                </div>
+                <div class="diagram-meta">
+                    <div class="meta-row">
+                        <span class="meta-label">Content:</span>
+                        <span class="meta-value">Design ∩ Engineering</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Generation Time:</span>
+                        <span class="meta-value">1.14 seconds</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Quality Score:</span>
+                        <span class="meta-value">1.0 (Perfect)</span>
+                    </div>
+                    <div class="meta-row">
+                        <span class="meta-label">Theme:</span>
+                        <span class="meta-value">Minimal (#8B5CF6)</span>
+                    </div>
+                    <a href="https://eshvntffcestlfuofwhv.supabase.co/storage/v1/object/public/diagram-charts/anonymous/default/venn_2_circle_20251019_184412_eb995b88.svg" target="_blank" class="diagram-url">
+                        🔗 Open Full Size
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>Test Summary:</strong> 4/4 diagrams generated successfully ✅</p>
+            <p style="margin-top: 10px;">Generated on Railway deployment at <strong>2025-10-19 18:43-18:44 UTC</strong></p>
+            <p style="margin-top: 10px; font-size: 0.9rem;">
+                API Features: 21 SVG Templates • 7 Mermaid Types • 6 Python Charts • AI-Powered Generation
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+flowchart TD
+    A["Customer places order online"]
+    B["System validates payment method"]
+    C["Payment processor authorizes transaction"]
+    D["Inventory system checks stock availability"]
+    E["Warehouse receives picking list"]
+    F["Order is packed and shipped"]
+    G["Customer receives delivery confirmation"]
+    H["Order marked as complete"]
+
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E --> F
+    F --> G
+    G --> H

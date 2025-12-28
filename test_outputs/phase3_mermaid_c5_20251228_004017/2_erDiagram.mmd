@@ -1,0 +1,59 @@
+erDiagram
+    Users ||--o{ Orders : places
+    Users ||--o{ Reviews : writes
+    Orders ||--o{ OrderItems : contains
+    Products ||--o{ OrderItems : appears_in
+    Products ||--o{ Reviews : receives
+    Products ||--o{ ProductCategories : is_categorized_as
+    Categories ||--o{ ProductCategories : contains_product
+    Categories }|--o{ Categories : has_parent
+
+    Users {
+        VARCHAR(255) id PK
+        VARCHAR(255) email
+        VARCHAR(255) name
+        DATETIME created_at
+    }
+
+    Orders {
+        VARCHAR(255) id PK
+        VARCHAR(255) user_id FK
+        DECIMAL(10,2) total_amount
+        VARCHAR(50) status
+        DATETIME created_at
+    }
+
+    Products {
+        VARCHAR(255) id PK
+        VARCHAR(255) name
+        TEXT description
+        DECIMAL(10,2) price
+        INT stock_quantity
+    }
+
+    OrderItems {
+        VARCHAR(255) id PK
+        VARCHAR(255) order_id FK
+        VARCHAR(255) product_id FK
+        INT quantity
+        DECIMAL(10,2) unit_price
+    }
+
+    Reviews {
+        VARCHAR(255) id PK
+        VARCHAR(255) user_id FK
+        VARCHAR(255) product_id FK
+        INT rating
+        TEXT comment
+    }
+
+    Categories {
+        VARCHAR(255) id PK
+        VARCHAR(255) name
+        VARCHAR(255) parent_id FK
+    }
+
+    ProductCategories {
+        VARCHAR(255) product_id PK,FK
+        VARCHAR(255) category_id PK,FK
+    }

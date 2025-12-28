@@ -1,0 +1,48 @@
+erDiagram
+    Users {
+        INT id PK "Primary Key"
+        VARCHAR email
+        VARCHAR name
+        DATETIME created_at
+    }
+    Orders {
+        INT id PK "Primary Key"
+        INT user_id FK "Foreign Key"
+        DECIMAL total_amount
+        VARCHAR status
+        DATETIME created_at
+    }
+    Products {
+        INT id PK "Primary Key"
+        VARCHAR name
+        TEXT description
+        DECIMAL price
+        INT stock_quantity
+    }
+    OrderItems {
+        INT id PK "Primary Key"
+        INT order_id FK "Foreign Key"
+        INT product_id FK "Foreign Key"
+        INT quantity
+        DECIMAL unit_price
+    }
+    Reviews {
+        INT id PK "Primary Key"
+        INT user_id FK "Foreign Key"
+        INT product_id FK "Foreign Key"
+        INT rating
+        TEXT comment
+    }
+    Categories {
+        INT id PK "Primary Key"
+        VARCHAR name
+        INT parent_id FK "Foreign Key (Self-Referencing)"
+    }
+
+    Users ||--o{ Orders : "places"
+    Orders ||--o{ OrderItems : "contains"
+    Products ||--o{ OrderItems : "is_part_of"
+    Users ||--o{ Reviews : "writes"
+    Products ||--o{ Reviews : "has"
+    Categories ||--o{ Categories : "has_children"
+    Products }o--o{ Categories : "belongs_to"}

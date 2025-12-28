@@ -1,0 +1,65 @@
+{
+  "title": "Phase 3: Mermaid Diagrams + C5-diagram (7 slides)",
+  "slides": [
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "Order Processing Flow",
+        "subtitle": "Mermaid: flowchart",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"flowchart TD\\n    A[\\\"Customer places order online\\\"]\\n    B[\\\"System validates payment method\\\"]\\n    C[\\\"Payment processor authorizes transaction\\\"]\\n    D[\\\"Inventory system checks stock availability\\\"]\\n    E[\\\"Warehouse receives picking list\\\"]\\n    F[\\\"Order is packed and shipped\\\"]\\n    G[\\\"Customer receives delivery confirmation\\\"]\\n    H[\\\"Order marked as complete\\\"]\\n\\n    A --> B\\n    B --> C\\n    C --> D\\n    D --> E\\n    E --> F\\n    F --> G\\n    G --> H\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    },
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "E-Commerce Data Schema",
+        "subtitle": "Mermaid: erDiagram",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"erDiagram\\n    Users {\\n        VARCHAR id PK\\n        VARCHAR email\\n        VARCHAR name\\n        DATETIME created_at\\n    }\\n\\n    Orders {\\n        VARCHAR id PK\\n        VARCHAR user_id FK\\n        DECIMAL total_amount\\n        VARCHAR status\\n        DATETIME created_at\\n    }\\n\\n    Products {\\n        VARCHAR id PK\\n        VARCHAR name\\n        VARCHAR description\\n        DECIMAL price\\n        INT stock_quantity\\n    }\\n\\n    OrderItems {\\n        VARCHAR id PK\\n        VARCHAR order_id FK\\n        VARCHAR product_id FK\\n        INT quantity\\n        DECIMAL unit_price\\n    }\\n\\n    Reviews {\\n        VARCHAR id PK\\n        VARCHAR user_id FK\\n        VARCHAR product_id FK\\n        INT rating\\n        VARCHAR comment\\n    }\\n\\n    Categories {\\n        VARCHAR id PK\\n        VARCHAR name\\n        VARCHAR parent_id FK\\n    }\\n\\n    ProductCategories {\\n        VARCHAR product_id FK\\n        VARCHAR category_id FK\\n    }\\n\\n    Users ||--o{ Orders : \\\"places\\\"\\n    Orders ||--o{ OrderItems : \\\"contains\\\"\\n    Products ||--o{ OrderItems : \\\"included in\\\"\\n    Users ||--o{ Reviews : \\\"writes\\\"\\n    Products ||--o{ Reviews : \\\"has\\\"\\n    Categories ||--o{ Categories : \\\"has sub-categories\\\"\\n    Products ||--o{ ProductCategories : \\\"categorized in\\\"\\n    Categories ||--o{ ProductCategories : \\\"contains products\\\"}\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    },
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "Customer Onboarding Journey",
+        "subtitle": "Mermaid: journey",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"journey\\n    title User Onboarding Journey\\n    section Discovery\\n        Discovers product through marketing: 10: User\\n    section Exploration\\n        Visits website and browses features: 10: User\\n    section Trial Signup\\n        Signs up for free trial: 10: User\\n        Completes profile setup: 10: User\\n        Receives welcome email tutorial: 10: User\\n    section Engagement\\n        Explores main features: 10: User\\n        Invites team members: 10: User\\n    section Conversion\\n        Converts to paid plan: 10: User\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    },
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "Q1 Project Timeline",
+        "subtitle": "Mermaid: gantt",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"gantt\\n    title Project Schedule\\n    dateFormat YYYY-MM-DD\\n\\n    section Planning\\n        Project Planning :projplan, 2024-01-01, 14d\\n        Requirements Gathering :reqs, 2024-01-01, 21d\\n\\n    section Design & Development\\n        UI/UX Design :uiux, 2024-01-15, 21d\\n        Backend Development :backend, 2024-01-22, 35d\\n        Frontend Development :frontend, 2024-01-29, 35d\\n\\n    section Testing\\n        Integration Testing :inttest, 2024-02-19, 21d\\n        User Acceptance Testing :uat, 2024-03-04, 14d\\n\\n    section Deployment & Support\\n        Production Deployment :deploy, 2024-03-18, 7d\\n        Post-Launch Support :support, 2024-03-18, 14d\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    },
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "Technology Assessment Matrix",
+        "subtitle": "Mermaid: quadrantChart",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"quadrantChart\\n    title Technology Portfolio Analysis\\n    x-axis \\\"Low Maturity\\\" --> \\\"High Maturity\\\"\\n    y-axis \\\"Low Strategic Value\\\" --> \\\"High Strategic Value\\\"\\n    quadrant-1 \\\"High Maturity, High Strategic Value\\\"\\n    quadrant-2 \\\"Low Maturity, High Strategic Value\\\"\\n    quadrant-3 \\\"Low Maturity, Low Strategic Value\\\"\\n    quadrant-4 \\\"High Maturity, Low Strategic Value\\\"\\n    AI/ML Platform: [0.8, 0.8]\\n    Legacy ERP: [0.8, 0.2]\\n    Blockchain: [0.2, 0.5]\\n    IoT Sensors: [0.5, 0.8]\\n    Cloud Infrastructure: [0.8, 0.8]\\n    Quantum Computing: [0.2, 0.2]\\n    Edge Computing: [0.5, 0.5]\\n    AR/VR: [0.2, 0.5]\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    },
+    {
+      "layout": "C5-diagram",
+      "content": {
+        "slide_title": "Sprint Board Status",
+        "subtitle": "Mermaid: kanban",
+        "diagram_html": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 800 600\">\n    <defs>\n        <script type=\"application/mermaid+json\">{\n            \"code\": \"flowchart LR\\n    subgraph backlog[\\\"Backlog\\\"]\\n        task1[\\\"User authentication improvements\\\"]\\n        task2[\\\"Payment gateway integration\\\"]\\n        task3[\\\"Mobile app notifications\\\"]\\n    end\\n    \\n    subgraph inprogress[\\\"In Progress\\\"]\\n        task4[\\\"Dashboard redesign\\\"]\\n        task5[\\\"API performance optimization\\\"]\\n    end\\n    \\n    subgraph inreview[\\\"In Review\\\"]\\n        task6[\\\"Search functionality upgrade\\\"]\\n        task7[\\\"Email template system\\\"]\\n    end\\n    \\n    subgraph done[\\\"Done\\\"]\\n        task8[\\\"Database migration\\\"]\\n        task9[\\\"Security audit fixes\\\"]\\n        task10[\\\"Documentation update\\\"]\\n    end\\n    \\n    backlog ~~~ inprogress\\n    inprogress ~~~ inreview\\n    inreview ~~~ done\",\n            \"theme\": \"default\",\n            \"themeVariables\": {\"primaryColor\": \"#8B5CF6\", \"primaryTextColor\": \"#1F2937\", \"primaryBorderColor\": \"#A78BFA\", \"lineColor\": \"#A78BFA\", \"background\": \"#FFFFFF\"}\n        }</script>\n    </defs>\n    <rect width=\"800\" height=\"600\" fill=\"#FFFFFF\"/>\n    <text x=\"400\" y=\"300\" text-anchor=\"middle\" fill=\"#1F2937\">\n        [Mermaid Diagram - Client Render Required]\n    </text>\n</svg>\n",
+        "presentation_name": "Phase 3: Mermaid Diagrams",
+        "logo": " "
+      }
+    }
+  ]
+}

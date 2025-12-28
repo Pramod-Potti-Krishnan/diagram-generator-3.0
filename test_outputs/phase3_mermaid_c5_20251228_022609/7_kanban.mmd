@@ -1,0 +1,43 @@
+flowchart LR
+    subgraph Backlog["Backlog"]
+        b1["User authentication improvements"]
+        b2["Payment gateway integration"]
+        b3["Mobile push notifications"]
+        b4["Email template redesign"]
+        b5["Dashboard widgets"]
+        b6["Search optimization"]
+    end
+    
+    subgraph InProgress["In Progress"]
+        ip1["Dashboard redesign"]
+        ip2["API performance tuning"]
+        ip3["Database indexing"]
+        ip4["Cache implementation"]
+    end
+    
+    subgraph CodeReview["Code Review"]
+        cr1["Auth module refactor"]
+        cr2["Payment flow updates"]
+        cr3["Notification service"]
+        cr4["Export feature"]
+    end
+    
+    subgraph QATesting["QA Testing"]
+        qa1["Search functionality"]
+        qa2["Reporting module"]
+        qa3["User settings page"]
+        qa4["Admin dashboard"]
+    end
+    
+    subgraph Done["Done"]
+        d1["Database migration"]
+        d2["Security audit fixes"]
+        d3["Documentation update"]
+        d4["CI/CD pipeline"]
+        d5["Logging system"]
+    end
+    
+    Backlog ~~~ InProgress
+    InProgress ~~~ CodeReview
+    CodeReview ~~~ QATesting
+    QATesting ~~~ Done

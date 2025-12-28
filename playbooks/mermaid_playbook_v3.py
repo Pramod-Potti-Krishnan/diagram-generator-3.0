@@ -617,10 +617,10 @@ def get_supported_types() -> List[str]:
 def get_type_description(diagram_type: str) -> Optional[str]:
     """
     Get description of what a diagram type is best for.
-    
+
     Args:
         diagram_type: The diagram type
-        
+
     Returns:
         Description string or None
     """
@@ -628,3 +628,18 @@ def get_type_description(diagram_type: str) -> Optional[str]:
     if spec:
         return f"{spec.get('description')}. Best for: {', '.join(spec.get('best_for', []))}"
     return None
+
+
+def get_generation_rules(diagram_type: str) -> Optional[List[str]]:
+    """
+    Get generation rules for a diagram type.
+    These are CRITICAL rules the LLM must follow when generating diagrams.
+
+    Args:
+        diagram_type: The diagram type
+
+    Returns:
+        List of generation rules or None
+    """
+    spec = get_diagram_spec(diagram_type)
+    return spec.get("generation_rules") if spec else None

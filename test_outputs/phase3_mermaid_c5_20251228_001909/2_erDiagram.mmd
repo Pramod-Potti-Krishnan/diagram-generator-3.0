@@ -1,0 +1,59 @@
+erDiagram
+    Users {
+        VARCHAR id PK
+        VARCHAR email
+        VARCHAR name
+        DATETIME created_at
+    }
+
+    Orders {
+        VARCHAR id PK
+        VARCHAR user_id FK
+        DECIMAL total_amount
+        VARCHAR status
+        DATETIME created_at
+    }
+
+    Products {
+        VARCHAR id PK
+        VARCHAR name
+        VARCHAR description
+        DECIMAL price
+        INT stock_quantity
+    }
+
+    OrderItems {
+        VARCHAR id PK
+        VARCHAR order_id FK
+        VARCHAR product_id FK
+        INT quantity
+        DECIMAL unit_price
+    }
+
+    Reviews {
+        VARCHAR id PK
+        VARCHAR user_id FK
+        VARCHAR product_id FK
+        INT rating
+        VARCHAR comment
+    }
+
+    Categories {
+        VARCHAR id PK
+        VARCHAR name
+        VARCHAR parent_id FK
+    }
+
+    ProductCategories {
+        VARCHAR product_id FK
+        VARCHAR category_id FK
+    }
+
+    Users ||--o{ Orders : "places"
+    Orders ||--o{ OrderItems : "contains"
+    Products ||--o{ OrderItems : "included in"
+    Users ||--o{ Reviews : "writes"
+    Products ||--o{ Reviews : "has"
+    Categories ||--o{ Categories : "has sub-categories"
+    Products ||--o{ ProductCategories : "categorized in"
+    Categories ||--o{ ProductCategories : "contains products"}

@@ -36,11 +36,11 @@ from .base_agent import BaseAgent
 from utils.logger import setup_logger
 from utils.mermaid_renderer import render_mermaid_to_svg
 import uuid
-from playbooks.mermaid_playbook import (
+from playbooks.mermaid_playbook_v3 import (
     get_diagram_spec,
-    get_syntax_patterns,
-    get_construction_rules,
-    get_diagram_examples
+    get_complete_example,
+    get_key_syntax,
+    get_generation_rules
 )
 
 logger = setup_logger(__name__)
@@ -274,19 +274,19 @@ class MermaidAgent(BaseAgent):
             raise ValueError(f"LLM generation failed: {str(e)}")
     
     def _build_playbook_context(self, diagram_type: str) -> Dict[str, Any]:
-        """Build context from Mermaid playbook"""
-        
+        """Build context from Mermaid playbook V3"""
+
         spec = get_diagram_spec(diagram_type)
         if not spec:
             return {}
-        
+
         return {
-            "name": spec.get("name", diagram_type),
-            "mermaid_type": spec.get("mermaid_type", diagram_type),
-            "syntax_patterns": get_syntax_patterns(diagram_type),
-            "construction_rules": get_construction_rules(diagram_type),
-            "examples": get_diagram_examples(diagram_type),
-            "escape_rules": spec.get("escape_rules", {})
+            "name": diagram_type,
+            "mermaid_syntax": spec.get("mermaid_syntax", diagram_type),
+            "description": spec.get("description", ""),
+            "complete_example": get_complete_example(diagram_type) or "",
+            "key_syntax": get_key_syntax(diagram_type) or {},
+            "generation_rules": get_generation_rules(diagram_type) or []
         }
     
     def _build_prompt(
@@ -296,63 +296,45 @@ class MermaidAgent(BaseAgent):
         theme: Dict[str, Any],
         playbook_context: Dict[str, Any]
     ) -> str:
-        """Build comprehensive prompt for PydanticAI agent"""
-        
-        # Special handling for kanban - convert to flowchart columns
-        if diagram_type == "kanban":
-            return self._build_kanban_prompt(content, theme)
-        
-        # Get examples - prefer complete over basic
-        examples = playbook_context.get("examples", {})
-        complete_example = examples.get("complete", "")
-        basic_example = examples.get("basic", "")
-        example_to_use = complete_example if complete_example else basic_example
-        
-        # Format syntax patterns more clearly
-        syntax_patterns = playbook_context.get("syntax_patterns", {})
-        syntax_str = json.dumps(syntax_patterns, indent=2)
-        
-        # Get the diagram start pattern specifically
-        diagram_start = syntax_patterns.get("diagram_start", diagram_type)
-        
-        # Format rules
-        rules = playbook_context.get("construction_rules", [])
-        rules_str = "\n".join(f"- {rule}" for rule in rules) if rules else "No specific rules"
-        
-        # Get escape rules if available
-        escape_rules = playbook_context.get("escape_rules", {})
-        escape_str = json.dumps(escape_rules, indent=2) if escape_rules else ""
-        
-        # Build escape rules section
-        escape_section = f"ESCAPE RULES (IMPORTANT):\n{escape_str}\n\n" if escape_str else ""
-        
+        """Build comprehensive prompt for Mermaid generation using V3 playbook"""
+
+        # Get context from playbook
+        mermaid_syntax = playbook_context.get("mermaid_syntax", diagram_type)
+        complete_example = playbook_context.get("complete_example", "")
+        key_syntax = playbook_context.get("key_syntax", {})
+        generation_rules = playbook_context.get("generation_rules", [])
+
+        # Format key syntax
+        key_syntax_str = json.dumps(key_syntax, indent=2) if key_syntax else "See example"
+
+        # Format generation rules - these are CRITICAL
+        rules_str = "\n".join(f"- {rule}" for rule in generation_rules) if generation_rules else ""
+
         prompt = f"""Generate a Mermaid {diagram_type} diagram.
 
 USER CONTENT:
 {content}
 
-DIAGRAM TYPE: {playbook_context.get('name', diagram_type)}
-MERMAID TYPE: {playbook_context.get('mermaid_type', diagram_type)}
+MERMAID SYNTAX: {mermaid_syntax}
 
-CRITICAL: Start your diagram with: {diagram_start}
-
-SYNTAX PATTERNS:
-{syntax_str}
-
-CONSTRUCTION RULES:
+=== CRITICAL GENERATION RULES (MUST FOLLOW) ===
 {rules_str}
+================================================
 
-{escape_section}WORKING EXAMPLE:
+KEY SYNTAX PATTERNS:
+{key_syntax_str}
+
+COMPLETE WORKING EXAMPLE (FOLLOW THIS FORMAT EXACTLY):
 ```mermaid
-{example_to_use}
+{complete_example}
 ```
 
 REQUIREMENTS:
-1. MUST start with exactly: {diagram_start}
-2. Generate syntactically correct Mermaid code
-3. Extract ALL entities and relationships from the content
-4. Use proper node IDs and connections
-5. Follow the EXACT syntax patterns provided above
+1. MUST start with: {mermaid_syntax}
+2. MUST follow ALL generation rules above - they are CRITICAL
+3. Generate syntactically correct Mermaid code
+4. Extract ALL entities and relationships from the content
+5. Follow the EXACT format shown in the working example
 6. Apply escape rules for special characters
 7. Make the diagram meaningful and complete
 8. Do NOT add any extra decorations or unsupported syntax

@@ -1,0 +1,26 @@
+flowchart LR
+    subgraph backlog["Backlog"]
+        task1["User authentication improvements"]
+        task2["Payment gateway integration"]
+        task3["Mobile app notifications"]
+    end
+    
+    subgraph inprogress["In Progress"]
+        task4["Dashboard redesign"]
+        task5["API performance optimization"]
+    end
+    
+    subgraph inreview["In Review"]
+        task6["Search functionality upgrade"]
+        task7["Email template system"]
+    end
+    
+    subgraph done["Done"]
+        task8["Database migration"]
+        task9["Security audit fixes"]
+        task10["Documentation update"]
+    end
+    
+    backlog ~~~ inprogress
+    inprogress ~~~ inreview
+    inreview ~~~ done
