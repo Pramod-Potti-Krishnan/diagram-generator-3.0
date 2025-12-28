@@ -82,7 +82,7 @@ class MermaidAgent(BaseAgent):
             "class_diagram", "entity_relationship", "user_journey",
             "timeline", "kanban", "quadrant",
             # Also support actual Mermaid syntax names
-            "erDiagram", "journey", "quadrantChart"
+            "erDiagram", "journey", "quadrantChart", "pie", "mindmap"
         ]
 
         # Track which auth mode we're using
