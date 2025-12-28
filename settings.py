@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # LLM Model for diagram generation
     llm_diagram: str = Field(
-        default="gemini-2.0-flash-exp",
+        default="gemini-2.5-flash",
         alias="LLM_DIAGRAM",
         description="Gemini model for diagram generation"
     )

@@ -157,7 +157,7 @@ class VertexAIService:
         # Read from environment variables
         self.project_id = project_id or os.getenv("GCP_PROJECT_ID")
         self.location = location or os.getenv("GEMINI_LOCATION", "us-central1")
-        self.model_name = model_name or os.getenv("LLM_DIAGRAM", "gemini-2.0-flash-exp")
+        self.model_name = model_name or os.getenv("LLM_DIAGRAM", "gemini-2.5-flash")
 
         # Validate required configuration
         if not self.project_id:
@@ -344,7 +344,7 @@ def get_mermaid_llm_service() -> VertexAIService:
         # Create service with LLM_DIAGRAM_MERMAID model if set, otherwise use default
         project_id = os.getenv("GCP_PROJECT_ID")
         location = os.getenv("GEMINI_LOCATION")
-        model_name = os.getenv("LLM_DIAGRAM_MERMAID", os.getenv("LLM_DIAGRAM", "gemini-2.0-flash-exp"))
+        model_name = os.getenv("LLM_DIAGRAM_MERMAID", os.getenv("LLM_DIAGRAM", "gemini-2.5-flash"))
         _mermaid_service = VertexAIService(
             project_id=project_id,
             location=location,
