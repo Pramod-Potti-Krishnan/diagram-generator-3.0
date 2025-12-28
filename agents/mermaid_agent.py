@@ -343,8 +343,8 @@ Theme colors to consider:
 - Primary: {theme.get('primaryColor', '#3B82F6')}
 - Background: {theme.get('backgroundColor', '#ffffff')}
 
-Generate ONLY the Mermaid code, starting with {diagram_start}:"""
-        
+Generate ONLY the Mermaid code, starting with {mermaid_syntax}:"""
+
         return prompt
     
     def _build_kanban_prompt(self, content: str, theme: Dict[str, Any]) -> str:
