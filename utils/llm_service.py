@@ -182,6 +182,18 @@ class VertexAIService:
             f"model={self.model_name}"
         )
 
+    def switch_model(self, new_model_name: str):
+        """
+        Switch to a different model for generation.
+
+        Args:
+            new_model_name: Name of the new Gemini model to use
+        """
+        if new_model_name != self.model_name:
+            logger.info(f"Switching model from {self.model_name} to {new_model_name}")
+            self.model_name = new_model_name
+            self.model = _GenerativeModel(self.model_name)
+
     async def generate_content(
         self,
         prompt: str,

@@ -178,9 +178,9 @@ class MermaidAgent(BaseAgent):
 
                 if self._use_vertex_ai and self._vertex_service:
                     # Use Vertex AI service with specific model
-                    # Update the model for this attempt
+                    # Switch to the model for this attempt (recreates the underlying model)
                     original_model = self._vertex_service.model_name
-                    self._vertex_service.model_name = model_name
+                    self._vertex_service.switch_model(model_name)
 
                     try:
                         result = await self._vertex_service.generate_mermaid(
@@ -193,8 +193,8 @@ class MermaidAgent(BaseAgent):
                         else:
                             raise ValueError(result.get("error", "Vertex AI generation failed"))
                     finally:
-                        # Restore original model name
-                        self._vertex_service.model_name = original_model
+                        # Restore original model
+                        self._vertex_service.switch_model(original_model)
                 else:
                     # Use API key mode with specific model
                     if not GENAI_AVAILABLE:
