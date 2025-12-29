@@ -71,6 +71,7 @@ class MermaidValidator:
             "journey": self._validate_journey,
             "flowchart": self._validate_flowchart,
             "quadrantchart": self._validate_quadrant,
+            "timeline": self._validate_timeline,
         }
 
         if diagram_type_lower in validators:
@@ -177,8 +178,8 @@ class MermaidValidator:
         issues = []
         fixed_code = mermaid_code
 
-        # Pattern: "Point Name: [x, y]"
-        point_pattern = r'([^:\n]+):\s*\[(\d+\.?\d*),\s*(\d+\.?\d*)\]'
+        # Pattern: "Point Name: [x, y]" - flexible spacing to handle variations
+        point_pattern = r'([^:\n]+)\s*:\s*\[\s*(\d+\.?\d*)\s*,\s*(\d+\.?\d*)\s*\]'
 
         points = []
         for match in re.finditer(point_pattern, mermaid_code):
@@ -231,7 +232,47 @@ class MermaidValidator:
             logger.info(f"Quadrant validator fixed {len(adjustments_made)} coordinate conflicts")
 
         return len(issues) == 0, fixed_code, issues
-    
+
+    async def _validate_timeline(self, mermaid_code: str) -> Tuple[bool, str, List[str]]:
+        """
+        Validate and fix timeline diagram issues.
+
+        Timeline diagrams should NOT have title lines (slide already has title),
+        and must start with the 'timeline' keyword.
+
+        Args:
+            mermaid_code: Timeline diagram code
+
+        Returns:
+            Tuple of (is_valid, fixed_code, issues_found)
+        """
+        issues = []
+        fixed_code = mermaid_code
+
+        # Remove title line if present (slide already has title)
+        title_pattern = r'^title\s+.*$'
+        if re.search(title_pattern, fixed_code, re.MULTILINE):
+            issues.append("Timeline should not have title line - removing")
+            fixed_code = re.sub(title_pattern, '', fixed_code, flags=re.MULTILINE)
+            logger.debug("Removed title line from timeline diagram")
+
+        # Ensure timeline keyword is present at the start
+        fixed_code = fixed_code.strip()
+        if not fixed_code.lower().startswith('timeline'):
+            issues.append("Timeline missing 'timeline' keyword - adding")
+            fixed_code = 'timeline\n' + fixed_code
+            logger.debug("Added 'timeline' keyword to diagram")
+
+        # Remove any empty lines at the start after cleanup
+        lines = fixed_code.split('\n')
+        non_empty_lines = [line for line in lines if line.strip()]
+        fixed_code = '\n'.join(non_empty_lines)
+
+        if issues:
+            logger.info(f"Timeline validator fixed {len(issues)} issues")
+
+        return len(issues) == 0, fixed_code, issues
+
     async def _validate_gantt_with_ai(self, code: str) -> Tuple[bool, str, List[str]]:
         """
         Use Gemini to intelligently fix Gantt chart syntax issues.

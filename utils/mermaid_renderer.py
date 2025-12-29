@@ -2,6 +2,7 @@
 Mermaid Renderer Module
 
 Renders Mermaid diagrams to SVG using Kroki API for server-side rendering.
+Includes intelligent sizing and color contrast handling.
 """
 
 import json
@@ -11,6 +12,7 @@ import httpx
 from typing import Dict, Any, Optional
 
 from utils.logger import setup_logger
+from utils.color_utils import calculate_luminance, get_contrast_color
 
 logger = setup_logger(__name__)
 
@@ -30,8 +32,8 @@ class MermaidRenderer:
         self,
         mermaid_code: str,
         theme: Optional[Dict[str, Any]] = None,
-        width: int = 800,
-        height: int = 600
+        width: int = 1800,
+        height: int = 840
     ) -> str:
         """
         Render Mermaid code to SVG using Kroki API
@@ -39,8 +41,8 @@ class MermaidRenderer:
         Args:
             mermaid_code: Mermaid diagram code
             theme: Theme configuration (used for fallback)
-            width: SVG width (used for fallback)
-            height: SVG height (used for fallback)
+            width: SVG width (default 1800 for slide-sized diagrams)
+            height: SVG height (default 840 for slide-sized diagrams)
 
         Returns:
             SVG string with actual rendered diagram
@@ -48,7 +50,7 @@ class MermaidRenderer:
         # Diagram types that support %%{init}%% theme directives
         # erDiagram, quadrantChart, and some others don't work well with init
         theme_supported_types = ['flowchart', 'graph', 'sequenceDiagram', 'classDiagram',
-                                  'stateDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'kanban']
+                                  'stateDiagram', 'journey', 'gantt', 'pie', 'mindmap', 'kanban', 'timeline']
 
         # Check if diagram type supports theming
         first_line = mermaid_code.strip().split('\n')[0].lower()
@@ -57,15 +59,38 @@ class MermaidRenderer:
         # Try with theme first if supported, then fallback to plain
         attempts = []
         if theme and supports_theme:
+            # Get colors from theme
+            primary_color = theme.get("primaryColor", "#3B82F6")
+            secondary_color = theme.get("secondaryColor", "#60A5FA")
+            background_color = theme.get("backgroundColor", "#FFFFFF")
+
+            # AUTO-COMPUTE text colors for proper contrast
+            # Use white text on dark backgrounds, black on light
+            primary_text_color = get_contrast_color(primary_color)
+            background_text_color = get_contrast_color(background_color)
+
+            logger.debug(f"Color contrast: primary={primary_color} -> text={primary_text_color}, bg={background_color} -> text={background_text_color}")
+
+            # Build theme config with sizing directives to prevent auto-shrinking
             theme_config = f"""%%{{init: {{
   'theme': 'base',
   'themeVariables': {{
-    'primaryColor': '{theme.get("primaryColor", "#3B82F6")}',
-    'primaryTextColor': '{theme.get("textColor", "#1F2937")}',
-    'primaryBorderColor': '{theme.get("secondaryColor", "#60A5FA")}',
-    'lineColor': '{theme.get("secondaryColor", "#60A5FA")}',
-    'background': '{theme.get("backgroundColor", "#FFFFFF")}'
-  }}
+    'primaryColor': '{primary_color}',
+    'primaryTextColor': '{primary_text_color}',
+    'secondaryTextColor': '{background_text_color}',
+    'primaryBorderColor': '{secondary_color}',
+    'lineColor': '{secondary_color}',
+    'background': '{background_color}',
+    'mainBkg': '{background_color}',
+    'textColor': '{background_text_color}'
+  }},
+  'flowchart': {{ 'useMaxWidth': false }},
+  'gantt': {{ 'useMaxWidth': false }},
+  'journey': {{ 'useMaxWidth': false }},
+  'mindmap': {{ 'useMaxWidth': false }},
+  'pie': {{ 'useMaxWidth': false }},
+  'timeline': {{ 'useMaxWidth': false }},
+  'kanban': {{ 'useMaxWidth': false }}
 }}}}%%
 """
             attempts.append(("themed", theme_config + mermaid_code))
@@ -234,7 +259,9 @@ async def render_mermaid_to_svg(
     mermaid_code: str,
     theme: Optional[Dict[str, Any]] = None,
     fallback_to_placeholder: bool = True,
-    wrap_in_container: bool = True
+    wrap_in_container: bool = True,
+    width: int = 1800,
+    height: int = 840
 ) -> str:
     """
     Convenience function to render Mermaid to SVG
@@ -244,6 +271,8 @@ async def render_mermaid_to_svg(
         theme: Theme configuration
         fallback_to_placeholder: If True, return placeholder on error
         wrap_in_container: If True, wrap SVG in HTML container for scaling
+        width: Target width for the diagram (default 1800 for slide-sized)
+        height: Target height for the diagram (default 840 for slide-sized)
 
     Returns:
         SVG string (rendered or placeholder), optionally wrapped in HTML container
@@ -252,8 +281,8 @@ async def render_mermaid_to_svg(
     renderer = await get_mermaid_renderer()
 
     try:
-        # Render with Kroki API
-        svg = await renderer.render_to_svg(mermaid_code, theme)
+        # Render with Kroki API using provided dimensions
+        svg = await renderer.render_to_svg(mermaid_code, theme, width, height)
         logger.info("Mermaid diagram rendered successfully via Kroki")
 
         # Optionally wrap in container for proper scaling

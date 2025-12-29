@@ -315,15 +315,21 @@ class MermaidAgent(BaseAgent):
             render_success = False
             render_error = None
 
+            # Get constraints for sizing (default to slide-sized if not provided)
+            render_width = request.constraints.maxWidth if request.constraints else 1800
+            render_height = request.constraints.maxHeight if request.constraints else 840
+
             if self.server_side_rendering:
                 logger.info(f"🔄 Attempting server-side rendering via Kroki for {request.diagram_type}...")
-                logger.debug(f"   Mermaid code length: {len(output.mermaid_code)} chars")
+                logger.debug(f"   Mermaid code length: {len(output.mermaid_code)} chars, target size: {render_width}x{render_height}")
                 try:
                     svg_content = await render_mermaid_to_svg(
                         output.mermaid_code,
                         request.theme.dict(),
                         fallback_to_placeholder=False,
-                        wrap_in_container=True
+                        wrap_in_container=True,
+                        width=render_width,
+                        height=render_height
                     )
                     if svg_content and ("<svg" in svg_content or "<div" in svg_content):
                         logger.info(f"✅ Rendered to SVG on server: {len(svg_content)} chars")
