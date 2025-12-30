@@ -221,25 +221,52 @@ async def get_stats():
 async def debug_status():
     """Debug endpoint to verify deployment and storage status."""
     import os
+    import base64
+    from datetime import datetime
 
     # Get storage status from conductor
     storage_enabled = False
     storage_bucket = "unknown"
+    storage_test_result = "not_tested"
+    storage_test_error = None
+
     if conductor and hasattr(conductor, 'storage'):
         storage_enabled = getattr(conductor.storage, 'enabled', False)
         storage_bucket = getattr(conductor.storage, 'bucket_name', 'unknown')
+
+        # Try a test upload to see actual error
+        if storage_enabled:
+            try:
+                # Create tiny test PNG (1x1 pixel transparent)
+                test_png_base64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+                test_url = await conductor.storage.upload_diagram(
+                    svg_content=test_png_base64,
+                    diagram_type="debug_test",
+                    session_id="debug",
+                    user_id="debug",
+                    metadata={"test": True},
+                    content_type="png"
+                )
+                storage_test_result = "success" if test_url else "empty_url"
+                if test_url:
+                    storage_test_result = f"success: {test_url[:80]}..."
+            except Exception as e:
+                storage_test_result = "failed"
+                storage_test_error = str(e)
 
     # Check env vars (masked for security)
     supabase_url = os.getenv('SUPABASE_URL', 'not_set')
     supabase_key = os.getenv('SUPABASE_SERVICE_KEY', os.getenv('SUPABASE_ANON_KEY', 'not_set'))
 
     return {
-        "deployment_version": "3.0.0-png-fix",
+        "deployment_version": "3.0.0-png-fix-v2",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
             "supabase_url_set": supabase_url != 'not_set' and 'supabase.co' in supabase_url,
-            "supabase_key_set": supabase_key != 'not_set' and len(supabase_key) > 20
+            "supabase_key_set": supabase_key != 'not_set' and len(supabase_key) > 20,
+            "test_upload_result": storage_test_result,
+            "test_upload_error": storage_test_error
         },
         "conductor_ready": conductor is not None,
         "v3_routing": conductor.get_v3_routing_info() if conductor else {}
