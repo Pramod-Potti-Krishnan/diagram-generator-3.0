@@ -340,7 +340,7 @@ async def debug_status():
         d2_path_check = f"error: {e}"
 
     return {
-        "deployment_version": "3.0.1-d2-kaleido-debug",
+        "deployment_version": "3.0.2-kaleido-downgrade-d2-binary",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,

@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "pip install -r requirements.txt && playwright install chromium --with-deps && curl -fsSL https://d2lang.com/install.sh | sh -s -- && export PATH=\"$HOME/.local/bin:$PATH\""
+buildCommand = "pip install -r requirements.txt && playwright install chromium --with-deps && mkdir -p ~/.local/bin && curl -fsSL https://github.com/terrastruct/d2/releases/download/v0.6.9/d2-v0.6.9-linux-amd64.tar.gz | tar -xz -C /tmp && mv /tmp/d2-v0.6.9/bin/d2 ~/.local/bin/d2 && chmod +x ~/.local/bin/d2"
 
 [deploy]
 startCommand = "export PATH=\"$HOME/.local/bin:$PATH\" && python main.py"
