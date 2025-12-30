@@ -17,61 +17,40 @@ DEFAULT_THEME: Dict[str, Any] = {
 
 # Supported diagram types by method
 SUPPORTED_DIAGRAM_TYPES: Dict[str, List[str]] = {
-    # Legacy methods
     "svg_template": [
         "cycle_3_step", "cycle_4_step", "cycle_5_step",
         "pyramid_3_level", "pyramid_4_level", "pyramid_5_level",
         "venn_2_circle", "venn_3_circle",
         "honeycomb_3", "honeycomb_5", "honeycomb_7",
-        "matrix_2x2", "matrix_3x3", "swot",
-        "funnel", "hub_spoke", "process_flow"
+        "matrix_2x2", "matrix_3x3", "swot", "quadrant",
+        "funnel", "timeline", "hub_spoke", "process_flow"
     ],
     "mermaid": [
-        # Kept for fallback only
-        "flowchart", "erDiagram", "journey", "pie",
-        "mindmap", "timeline", "kanban", "gantt", "quadrantChart"
+        # GOLD Tier (85-95% confidence)
+        "flowchart",           # Process flows and decision trees
+        "erDiagram",          # Entity relationship diagrams
+        "journey",            # User journey with satisfaction scores
+        "pie",                # Pie charts with labeled slices
+        "mindmap",            # Hierarchical mind maps
+        "timeline",           # Chronological events
+        "kanban",             # Kanban board with columns and cards
+        # SILVER Tier (60-75% confidence)
+        "gantt",              # Project timelines with dependencies
+        "quadrantChart",      # 2x2 matrix plots
     ],
     "python_chart": [
         "pie_chart", "bar_chart", "line_chart",
-        "scatter_plot", "sankey", "network", "funnel"
-    ],
-    # v3.0 Structured methods (PRIMARY for these types)
-    "plotly": [
-        "timeline",        # Chronological events
-        "quadrant",        # 2x2 matrix plots
-        "journey",         # User journey with satisfaction scores
-        "journey_map"      # Alternative name for journey
-    ],
-    "d2": [
-        "flowchart",       # Process flows and decision trees
-        "er_diagram",      # Entity relationship diagrams
-        "architecture"     # System architecture diagrams
-    ],
-    "frappe_gantt": [
-        "gantt"            # Project timelines with dependencies (C5 only)
-    ],
-    "markmap": [
-        "mindmap",         # Hierarchical mind maps
-        "mind_map"         # Alternative name
-    ],
-    "kanban": [
-        "kanban"           # Kanban boards (C5 only)
+        "scatter_plot", "sankey", "network",
+        "funnel", "quadrant"
     ]
 }
 
 # Method selection priorities (lower is better)
 METHOD_PRIORITIES: Dict[str, int] = {
-    # v3.0 structured methods (highest priority)
-    "plotly": 1,
-    "d2": 1,
-    "frappe_gantt": 1,
-    "markmap": 1,
-    "kanban": 1,
-    # Legacy methods (fallback)
-    "svg_template": 2,
-    "mermaid": 3,
-    "python_chart": 4,
-    "custom": 5
+    "svg_template": 1,
+    "mermaid": 2,
+    "python_chart": 3,
+    "custom": 4
 }
 
 # Cache key prefixes
@@ -89,17 +68,10 @@ WS_PING_TIMEOUT = 10  # seconds
 
 # Generation timeouts (milliseconds)
 GENERATION_TIMEOUTS = {
-    # Legacy methods
     "svg_template": 1000,
     "mermaid": 3000,
     "python_chart": 5000,
-    "custom": 10000,
-    # v3.0 structured methods
-    "plotly": 5000,         # Python + Kaleido rendering
-    "d2": 3000,             # D2 CLI subprocess
-    "frappe_gantt": 8000,   # HTML + Playwright screenshot
-    "markmap": 5000,        # HTML + Playwright screenshot
-    "kanban": 5000          # Tailwind HTML + Playwright screenshot
+    "custom": 10000
 }
 
 # Quality thresholds

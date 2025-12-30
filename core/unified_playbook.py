@@ -105,16 +105,9 @@ class UnifiedPlaybook:
         # Check if method is forced in request
         if hasattr(request, 'method') and request.method:
             method_map = {
-                # Legacy methods
                 'svg_template': GenerationMethod.SVG_TEMPLATE,
                 'mermaid': GenerationMethod.MERMAID,
-                'python_chart': GenerationMethod.PYTHON_CHART,
-                # v3.0 structured methods
-                'plotly': GenerationMethod.PLOTLY,
-                'd2': GenerationMethod.D2,
-                'frappe_gantt': GenerationMethod.FRAPPE_GANTT,
-                'markmap': GenerationMethod.MARKMAP,
-                'kanban': GenerationMethod.KANBAN,
+                'python_chart': GenerationMethod.PYTHON_CHART
             }
             forced_method = method_map.get(request.method)
             if forced_method:
@@ -191,24 +184,12 @@ class UnifiedPlaybook:
             
             # Convert to GenerationStrategy
             method_map = {
-                # Legacy methods
                 "svg_template": GenerationMethod.SVG_TEMPLATE,
                 "mermaid": GenerationMethod.MERMAID,
                 "python_chart": GenerationMethod.PYTHON_CHART,
                 "SVG_TEMPLATE": GenerationMethod.SVG_TEMPLATE,
                 "MERMAID": GenerationMethod.MERMAID,
-                "PYTHON_CHART": GenerationMethod.PYTHON_CHART,
-                # v3.0 structured methods
-                "plotly": GenerationMethod.PLOTLY,
-                "d2": GenerationMethod.D2,
-                "frappe_gantt": GenerationMethod.FRAPPE_GANTT,
-                "markmap": GenerationMethod.MARKMAP,
-                "kanban": GenerationMethod.KANBAN,
-                "PLOTLY": GenerationMethod.PLOTLY,
-                "D2": GenerationMethod.D2,
-                "FRAPPE_GANTT": GenerationMethod.FRAPPE_GANTT,
-                "MARKMAP": GenerationMethod.MARKMAP,
-                "KANBAN": GenerationMethod.KANBAN,
+                "PYTHON_CHART": GenerationMethod.PYTHON_CHART
             }
             
             primary_method = method_map.get(
@@ -300,16 +281,9 @@ Choose the single best method. Do not suggest fallbacks."""
     def _estimate_time(self, method: GenerationMethod) -> int:
         """Estimate generation time in milliseconds"""
         estimates = {
-            # Legacy methods
             GenerationMethod.SVG_TEMPLATE: 200,
             GenerationMethod.MERMAID: 800,
-            GenerationMethod.PYTHON_CHART: 1200,
-            # v3.0 structured methods
-            GenerationMethod.PLOTLY: 1500,
-            GenerationMethod.D2: 800,
-            GenerationMethod.FRAPPE_GANTT: 2000,
-            GenerationMethod.MARKMAP: 1500,
-            GenerationMethod.KANBAN: 1500,
+            GenerationMethod.PYTHON_CHART: 1200
         }
         return estimates.get(method, 1000)
     

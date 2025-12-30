@@ -63,19 +63,11 @@ class DiagramType(str, Enum):
 
 class GenerationMethod(str, Enum):
     """Available generation methods"""
-
-    # Legacy methods
+    
     SVG_TEMPLATE = "svg_template"
     MERMAID = "mermaid"
     PYTHON_CHART = "python_chart"
     CUSTOM = "custom"
-
-    # v3.0 Structured methods
-    PLOTLY = "plotly"              # Timeline, Quadrant, Journey
-    D2 = "d2"                      # Flowchart, ER, Architecture
-    FRAPPE_GANTT = "frappe_gantt"  # Gantt charts (C5 only)
-    MARKMAP = "markmap"            # Mind maps
-    KANBAN = "kanban"              # Kanban boards (C5 only)
 
 
 class DiagramSpec(BaseModel):
@@ -207,16 +199,9 @@ class GenerationStrategy(BaseModel):
     def _estimate_time(self, method: GenerationMethod) -> int:
         """Estimate generation time for method"""
         estimates = {
-            # Legacy methods
             GenerationMethod.SVG_TEMPLATE: 200,
             GenerationMethod.MERMAID: 500,
             GenerationMethod.PYTHON_CHART: 2000,
-            GenerationMethod.CUSTOM: 3000,
-            # v3.0 structured methods
-            GenerationMethod.PLOTLY: 1500,         # Python rendering
-            GenerationMethod.D2: 800,              # CLI subprocess
-            GenerationMethod.FRAPPE_GANTT: 2000,   # Playwright rendering
-            GenerationMethod.MARKMAP: 1500,        # Playwright rendering
-            GenerationMethod.KANBAN: 1500,         # Playwright rendering
+            GenerationMethod.CUSTOM: 3000
         }
         return estimates.get(method, 1000)
