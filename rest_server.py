@@ -217,6 +217,35 @@ async def get_stats():
     }
 
 
+@app.get("/debug")
+async def debug_status():
+    """Debug endpoint to verify deployment and storage status."""
+    import os
+
+    # Get storage status from conductor
+    storage_enabled = False
+    storage_bucket = "unknown"
+    if conductor and hasattr(conductor, 'storage'):
+        storage_enabled = getattr(conductor.storage, 'enabled', False)
+        storage_bucket = getattr(conductor.storage, 'bucket_name', 'unknown')
+
+    # Check env vars (masked for security)
+    supabase_url = os.getenv('SUPABASE_URL', 'not_set')
+    supabase_key = os.getenv('SUPABASE_SERVICE_KEY', os.getenv('SUPABASE_ANON_KEY', 'not_set'))
+
+    return {
+        "deployment_version": "3.0.0-png-fix",
+        "storage": {
+            "enabled": storage_enabled,
+            "bucket": storage_bucket,
+            "supabase_url_set": supabase_url != 'not_set' and 'supabase.co' in supabase_url,
+            "supabase_key_set": supabase_key != 'not_set' and len(supabase_key) > 20
+        },
+        "conductor_ready": conductor is not None,
+        "v3_routing": conductor.get_v3_routing_info() if conductor else {}
+    }
+
+
 @app.post("/generate", response_model=JobResponse)
 async def generate_diagram(request: DiagramRequest):
     """
