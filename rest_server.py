@@ -275,8 +275,55 @@ async def debug_status():
         playwright_status = "failed"
         playwright_error = str(e)
 
+    # Test v3.0 agents
+    agent_tests = {}
+    if conductor:
+        for diagram_type in ["gantt", "kanban", "timeline", "mindmap", "flowchart"]:
+            if diagram_type in conductor.v3_routing:
+                method, _ = conductor.v3_routing[diagram_type]
+                agent = conductor.agents.get(method)
+                if agent:
+                    try:
+                        # Check if agent has renderer
+                        renderer_status = "ok"
+                        if hasattr(agent, 'renderer') and agent.renderer:
+                            renderer_status = f"ok: {agent.renderer.__class__.__name__}"
+                        else:
+                            renderer_status = "no_renderer"
+                        agent_tests[diagram_type] = {
+                            "method": method.value,
+                            "agent": agent.__class__.__name__,
+                            "renderer": renderer_status,
+                            "llm_ready": agent.llm_service is not None
+                        }
+                    except Exception as e:
+                        agent_tests[diagram_type] = {"error": str(e)}
+                else:
+                    agent_tests[diagram_type] = {"error": "agent_not_found"}
+
+    # Test D2 CLI
+    d2_status = "not_tested"
+    try:
+        import shutil
+        if shutil.which('d2'):
+            import subprocess
+            result = subprocess.run(['d2', '--version'], capture_output=True, text=True)
+            d2_status = f"ok: {result.stdout.strip()}"
+        else:
+            d2_status = "not_found"
+    except Exception as e:
+        d2_status = f"error: {e}"
+
+    # Test Kaleido
+    kaleido_status = "not_tested"
+    try:
+        import kaleido
+        kaleido_status = f"ok: {kaleido.__version__}"
+    except Exception as e:
+        kaleido_status = f"error: {e}"
+
     return {
-        "deployment_version": "3.0.0-playwright-test",
+        "deployment_version": "3.0.0-v3-debug",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
@@ -289,6 +336,11 @@ async def debug_status():
             "status": playwright_status,
             "error": playwright_error
         },
+        "dependencies": {
+            "d2_cli": d2_status,
+            "kaleido": kaleido_status
+        },
+        "v3_agents": agent_tests,
         "conductor_ready": conductor is not None,
         "v3_routing": conductor.get_v3_routing_info() if conductor else {}
     }
