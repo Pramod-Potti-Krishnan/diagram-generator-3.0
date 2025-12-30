@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gantt_schema.json",
+  "title": "Gantt Chart Schema",
+  "description": "Schema for Frappe Gantt chart data extraction",
+  "type": "object",
+  "required": ["tasks"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Chart title",
+      "maxLength": 100
+    },
+    "tasks": {
+      "type": "array",
+      "description": "List of tasks to display",
+      "minItems": 1,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "required": ["id", "name", "start", "end", "progress"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique task identifier",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "name": {
+            "type": "string",
+            "description": "Task name displayed on chart",
+            "maxLength": 50
+          },
+          "start": {
+            "type": "string",
+            "description": "Start date in YYYY-MM-DD format",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "end": {
+            "type": "string",
+            "description": "End date in YYYY-MM-DD format",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "progress": {
+            "type": "integer",
+            "description": "Completion percentage",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "dependencies": {
+            "type": "string",
+            "description": "Comma-separated IDs of dependent tasks",
+            "default": ""
+          },
+          "custom_class": {
+            "type": "string",
+            "description": "CSS class for styling",
+            "enum": ["critical", "normal", "completed", "active", ""],
+            "default": "normal"
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "description": "Frappe Gantt configuration",
+      "properties": {
+        "view_mode": {
+          "type": "string",
+          "enum": ["Hour", "Day", "Week", "Month", "Year"],
+          "default": "Month"
+        },
+        "readonly": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "Q1 Project Timeline",
+      "tasks": [
+        {
+          "id": "1",
+          "name": "Planning",
+          "start": "2024-01-01",
+          "end": "2024-01-15",
+          "progress": 100,
+          "dependencies": "",
+          "custom_class": "completed"
+        },
+        {
+          "id": "2",
+          "name": "Development",
+          "start": "2024-01-15",
+          "end": "2024-02-28",
+          "progress": 50,
+          "dependencies": "1",
+          "custom_class": "active"
+        },
+        {
+          "id": "3",
+          "name": "Testing",
+          "start": "2024-02-15",
+          "end": "2024-03-15",
+          "progress": 0,
+          "dependencies": "2",
+          "custom_class": "critical"
+        }
+      ],
+      "config": {
+        "view_mode": "Month",
+        "readonly": true
+      }
+    }
+  ]
+}

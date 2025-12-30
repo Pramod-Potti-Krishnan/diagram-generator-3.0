@@ -1,0 +1,87 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "timeline_schema.json",
+  "title": "Timeline Chart Schema",
+  "description": "Schema for Plotly timeline chart data extraction",
+  "type": "object",
+  "required": ["events"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Timeline title",
+      "maxLength": 100
+    },
+    "events": {
+      "type": "array",
+      "description": "List of timeline events",
+      "minItems": 2,
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["label", "date"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Event name/label",
+            "maxLength": 40
+          },
+          "date": {
+            "type": "string",
+            "description": "Event date in YYYY-MM-DD format",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief event description",
+            "maxLength": 100
+          },
+          "category": {
+            "type": "string",
+            "description": "Event category for color grouping",
+            "maxLength": 30
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#FFFFFF"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "Company Milestones",
+      "events": [
+        {
+          "label": "Company Founded",
+          "date": "2018-01-15",
+          "description": "Started with 3 founders",
+          "category": "milestone"
+        },
+        {
+          "label": "Series A",
+          "date": "2019-06-20",
+          "description": "$5M raised",
+          "category": "funding"
+        },
+        {
+          "label": "100K Users",
+          "date": "2021-03-01",
+          "description": "Major growth milestone",
+          "category": "growth"
+        }
+      ]
+    }
+  ]
+}

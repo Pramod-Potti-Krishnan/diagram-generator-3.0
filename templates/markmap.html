@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: {{BACKGROUND_COLOR}};
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        #markmap {
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* Custom node styling */
+        .markmap-node-circle {
+            fill: {{PRIMARY_COLOR}} !important;
+        }
+        .markmap-node-text {
+            fill: {{TEXT_COLOR}} !important;
+        }
+        .markmap-link {
+            stroke: {{PRIMARY_COLOR}} !important;
+            stroke-opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <svg id="markmap"></svg>
+
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.16.0/dist/browser/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.16.0/dist/browser/index.min.js"></script>
+    <script>
+        (async () => {
+            const markdown = {{MARKDOWN_JSON}};
+
+            // Transform markdown to markmap data
+            const { Transformer } = window.markmap;
+            const transformer = new Transformer();
+            const { root } = transformer.transform(markdown);
+
+            // Create markmap
+            const { Markmap } = window.markmap;
+            const svg = document.getElementById('markmap');
+
+            const mm = Markmap.create(svg, {
+                autoFit: true,
+                color: (node) => {
+                    const depth = node.state?.depth || 0;
+                    const colors = [
+                        '{{PRIMARY_COLOR}}',
+                        '#A78BFA',
+                        '#C4B5FD',
+                        '#DDD6FE',
+                        '#EDE9FE'
+                    ];
+                    return colors[Math.min(depth, colors.length - 1)];
+                },
+                paddingX: 16,
+                duration: 0,
+                maxWidth: 250,
+                initialExpandLevel: -1
+            }, root);
+
+            await new Promise(r => setTimeout(r, 500));
+            window.markmapReady = true;
+        })();
+    </script>
+</body>
+</html>

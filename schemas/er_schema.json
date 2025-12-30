@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "er_schema.json",
+  "title": "ER Diagram Schema",
+  "description": "Schema for D2 entity-relationship diagram data extraction",
+  "type": "object",
+  "required": ["entities"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Diagram title",
+      "maxLength": 100
+    },
+    "entities": {
+      "type": "array",
+      "description": "Database entities/tables",
+      "minItems": 2,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["name", "columns"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Table/entity name",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+            "maxLength": 30
+          },
+          "columns": {
+            "type": "array",
+            "description": "Table columns",
+            "minItems": 1,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "required": ["name", "type"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Column name",
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$",
+                  "maxLength": 30
+                },
+                "type": {
+                  "type": "string",
+                  "description": "Data type",
+                  "maxLength": 30
+                },
+                "constraint": {
+                  "type": ["string", "null"],
+                  "description": "Column constraint",
+                  "enum": ["primary_key", "foreign_key", "unique", null]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Foreign key relationships",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source in table.column format"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target in table.column format"
+          },
+          "label": {
+            "type": "string",
+            "description": "Relationship label",
+            "maxLength": 30
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#FFFFFF"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "E-Commerce Database",
+      "entities": [
+        {
+          "name": "users",
+          "columns": [
+            {"name": "id", "type": "int", "constraint": "primary_key"},
+            {"name": "email", "type": "varchar(255)", "constraint": "unique"},
+            {"name": "name", "type": "varchar(100)", "constraint": null}
+          ]
+        },
+        {
+          "name": "orders",
+          "columns": [
+            {"name": "id", "type": "int", "constraint": "primary_key"},
+            {"name": "user_id", "type": "int", "constraint": "foreign_key"},
+            {"name": "total", "type": "decimal(10,2)", "constraint": null}
+          ]
+        }
+      ],
+      "relationships": [
+        {"from": "orders.user_id", "to": "users.id", "label": "belongs to"}
+      ]
+    }
+  ]
+}

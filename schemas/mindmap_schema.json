@@ -1,0 +1,115 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "mindmap_schema.json",
+  "title": "Mind Map Schema",
+  "description": "Schema for Markmap mind map data extraction",
+  "type": "object",
+  "required": ["root"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Mind map title",
+      "maxLength": 100
+    },
+    "root": {
+      "type": "object",
+      "description": "Root node of the mind map",
+      "required": ["label"],
+      "$ref": "#/$defs/node"
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#FFFFFF"
+        },
+        "text_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#1F2937"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "node": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Node text",
+          "maxLength": 50
+        },
+        "children": {
+          "type": "array",
+          "description": "Child nodes",
+          "maxItems": 8,
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "Project Planning",
+      "root": {
+        "label": "Project Planning",
+        "children": [
+          {
+            "label": "Requirements",
+            "children": [
+              {"label": "User Stories", "children": []},
+              {"label": "Technical Specs", "children": []},
+              {"label": "Acceptance Criteria", "children": []}
+            ]
+          },
+          {
+            "label": "Design",
+            "children": [
+              {"label": "UI Mockups", "children": []},
+              {"label": "Architecture", "children": []},
+              {"label": "Database Schema", "children": []}
+            ]
+          },
+          {
+            "label": "Development",
+            "children": [
+              {
+                "label": "Frontend",
+                "children": [
+                  {"label": "Components", "children": []},
+                  {"label": "Styling", "children": []}
+                ]
+              },
+              {
+                "label": "Backend",
+                "children": [
+                  {"label": "API Endpoints", "children": []},
+                  {"label": "Business Logic", "children": []}
+                ]
+              }
+            ]
+          },
+          {
+            "label": "Testing",
+            "children": [
+              {"label": "Unit Tests", "children": []},
+              {"label": "Integration Tests", "children": []},
+              {"label": "UAT", "children": []}
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
