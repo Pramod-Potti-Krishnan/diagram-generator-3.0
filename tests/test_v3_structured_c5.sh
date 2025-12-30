@@ -198,17 +198,13 @@ for item in "${TESTS[@]}"; do
   fi
 
   # Extract result
-  DIAGRAM_URL=$(echo "$RESULT_RESPONSE" | jq -r '.diagram_url // .result.diagram_url')
+  DIAGRAM_URL=$(echo "$RESULT_RESPONSE" | jq -r '.diagram_url // .result.diagram_url // ""')
   GENERATION_METHOD=$(echo "$RESULT_RESPONSE" | jq -r '.generation_method // .metadata.generation_method // "unknown"')
+  CONTENT_TYPE=$(echo "$RESULT_RESPONSE" | jq -r '.content_type // "png"')
+  HTML_CONTENT=$(echo "$RESULT_RESPONSE" | jq -r '.html_content // ""')
 
-  if [ "$DIAGRAM_URL" = "null" ] || [ -z "$DIAGRAM_URL" ]; then
-    echo "    ERROR: No diagram URL in response"
-    ((FAIL_COUNT++))
-    continue
-  fi
-
-  echo "    URL: $DIAGRAM_URL"
   echo "    Method: $GENERATION_METHOD"
+  echo "    Content Type: $CONTENT_TYPE"
 
   # Verify expected generation method
   EXPECTED_METHOD=""
@@ -225,11 +221,32 @@ for item in "${TESTS[@]}"; do
     echo "    Method mismatch: got $GENERATION_METHOD, expected $EXPECTED_METHOD"
   fi
 
-  # Determine content type from URL
-  # PNG files need img tag wrapping; SVG can be embedded directly
-  if [[ "$DIAGRAM_URL" == *".png"* ]]; then
-    FILE_EXT="png"
-    # PNG: Create img tag instead of fetching binary (binary cannot be JSON-encoded)
+  # Handle different content types:
+  # - html: Interactive HTML content (Kanban) - use directly, no URL
+  # - png: Binary image - use img tag with URL
+  # - svg: XML text - fetch and embed directly
+  if [ "$CONTENT_TYPE" = "html" ]; then
+    # HTML: Use html_content directly (interactive Kanban)
+    if [ -z "$HTML_CONTENT" ] || [ "$HTML_CONTENT" = "null" ]; then
+      echo "    ERROR: No HTML content in response for html content_type"
+      ((FAIL_COUNT++))
+      continue
+    fi
+    DIAGRAM_HTML="$HTML_CONTENT"
+    echo "    Type: HTML (interactive, embedding directly)"
+    echo "    HTML: ${#DIAGRAM_HTML} chars"
+    ((SUCCESS_COUNT++))
+
+    # Save HTML for debugging
+    echo "$DIAGRAM_HTML" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}.html"
+  elif [ "$CONTENT_TYPE" = "png" ] || [[ "$DIAGRAM_URL" == *".png"* ]]; then
+    # PNG: Create img tag with URL
+    if [ -z "$DIAGRAM_URL" ] || [ "$DIAGRAM_URL" = "null" ]; then
+      echo "    ERROR: No diagram URL in response for PNG"
+      ((FAIL_COUNT++))
+      continue
+    fi
+    echo "    URL: $DIAGRAM_URL"
     DIAGRAM_HTML="<img src=\"$DIAGRAM_URL\" alt=\"$diagram_type diagram\" style=\"max-width:100%;height:auto;display:block;\">"
     echo "    Type: PNG (using img tag)"
     echo "    HTML: ${#DIAGRAM_HTML} chars"
@@ -239,8 +256,13 @@ for item in "${TESTS[@]}"; do
     echo "$DIAGRAM_URL" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}_url.txt"
     echo "$DIAGRAM_HTML" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}_html.txt"
   else
-    FILE_EXT="svg"
-    # SVG: Fetch and embed directly (it's XML text, safe to embed)
+    # SVG: Fetch and embed directly
+    if [ -z "$DIAGRAM_URL" ] || [ "$DIAGRAM_URL" = "null" ]; then
+      echo "    ERROR: No diagram URL in response for SVG"
+      ((FAIL_COUNT++))
+      continue
+    fi
+    echo "    URL: $DIAGRAM_URL"
     DIAGRAM_CONTENT=$(curl -s "$DIAGRAM_URL")
 
     if [ -z "$DIAGRAM_CONTENT" ]; then
@@ -255,7 +277,7 @@ for item in "${TESTS[@]}"; do
     ((SUCCESS_COUNT++))
 
     # Save SVG for debugging
-    echo "$DIAGRAM_CONTENT" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}.$FILE_EXT"
+    echo "$DIAGRAM_CONTENT" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}.svg"
   fi
 
   # Skip Layout Service if requested
@@ -365,10 +387,13 @@ echo "  [ ] Gantt: Frappe Gantt library used (not Mermaid)"
 echo "      - Tasks displayed with date ranges"
 echo "      - Dependencies shown if specified"
 echo "      - Theme colors applied"
-echo "  [ ] Kanban: Custom HTML/Tailwind used (not Mermaid)"
+echo "      - Full-width with minimal padding"
+echo "  [ ] Kanban: Interactive HTML/Tailwind (not PNG)"
 echo "      - Multiple columns displayed"
 echo "      - Cards in each column"
 echo "      - Priority colors if applicable"
+echo "      - INTERACTIVE: Drag-and-drop between columns"
+echo "      - INTERACTIVE: Edit cards by clicking pencil icon"
 echo ""
 
 # Open in browser

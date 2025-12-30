@@ -87,17 +87,22 @@ class FrappeGanttRenderer(PlaywrightRenderer):
         body {{
             background: {background};
             font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            padding: 20px;
+            padding: 8px;
         }}
         h1 {{
             color: {text_color};
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 600;
-            margin-bottom: 20px;
+            margin-bottom: 8px;
+            padding-left: 4px;
         }}
         .gantt-container {{
             width: 100%;
-            overflow-x: auto;
+            overflow-x: hidden;
+        }}
+        /* Force gantt SVG to fill container */
+        .gantt {{
+            width: 100% !important;
         }}
 
         /* Frappe Gantt Theme Overrides */
@@ -180,18 +185,30 @@ class FrappeGanttRenderer(PlaywrightRenderer):
     <script>
         const tasks = {tasks_json};
 
+        // Calculate column width to fill container (1780px usable width)
+        // Default is ~38px per column. Month view shows ~6 months typically.
+        const containerWidth = 1780;
+        const numColumns = 12; // Approximate number of time columns
+        const columnWidth = Math.max(45, Math.floor(containerWidth / numColumns));
+
         const gantt = new Gantt('#gantt', tasks, {{
             view_mode: '{view_mode}',
             readonly: true,
-            bar_height: 30,
-            padding: 18,
+            bar_height: 32,
+            padding: 14,
+            column_width: columnWidth,
             date_format: 'YYYY-MM-DD',
             language: 'en',
             custom_popup_html: null
         }});
 
-        // Signal ready after render
+        // Expand SVG to fill container after render
         setTimeout(() => {{
+            const svg = document.querySelector('.gantt');
+            if (svg) {{
+                svg.style.width = '100%';
+                svg.style.minWidth = '1780px';
+            }}
             window.ganttReady = true;
         }}, 300);
     </script>

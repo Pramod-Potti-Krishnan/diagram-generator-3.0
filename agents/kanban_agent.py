@@ -20,7 +20,7 @@ class KanbanAgent(StructuredBaseAgent):
     """
     Agent for Kanban board diagrams.
 
-    Uses custom HTML/Tailwind with Playwright for rendering.
+    Returns interactive HTML with drag-and-drop functionality.
     C5 layout only - requires full slide width.
     """
 
@@ -28,6 +28,69 @@ class KanbanAgent(StructuredBaseAgent):
         super().__init__(settings)
         self.supported_types = ["kanban"]
         self.renderer = KanbanRenderer()
+
+    async def generate(self, request: DiagramRequest) -> Dict[str, Any]:
+        """
+        Generate Kanban board as interactive HTML (not PNG).
+
+        Overrides base class to return HTML content that can be
+        embedded directly in the Layout Service with drag-and-drop.
+        """
+        self.validate_request(request)
+
+        if not self.llm_service:
+            return {
+                "success": False,
+                "error": "LLM service not available",
+                "diagram_type": request.diagram_type
+            }
+
+        try:
+            # Step 1: Extract structured data using LLM
+            logger.info(f"Extracting structured data for {request.diagram_type}")
+            extraction_result = await self._extract_structured_data(request)
+
+            if not extraction_result.get("success"):
+                return {
+                    "success": False,
+                    "error": extraction_result.get("error", "Data extraction failed"),
+                    "diagram_type": request.diagram_type
+                }
+
+            structured_data = extraction_result.get("content", {})
+            logger.info(f"Extracted Kanban data: {len(structured_data.get('columns', []))} columns")
+
+            # Step 2: Prepare theme
+            theme = {}
+            if request.theme:
+                theme = request.theme.dict() if hasattr(request.theme, 'dict') else request.theme
+
+            # Step 3: Render as interactive HTML (not PNG)
+            html_content = self.renderer.render_interactive_html(
+                data=structured_data,
+                theme=theme
+            )
+
+            return {
+                "success": True,
+                "content": html_content,
+                "content_type": "html",  # HTML, not PNG!
+                "diagram_type": request.diagram_type,
+                "metadata": {
+                    "renderer": "KanbanRenderer",
+                    "interactive": True,
+                    "columns": len(structured_data.get("columns", [])),
+                    "extracted_fields": list(structured_data.keys())
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error generating Kanban: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "diagram_type": request.diagram_type
+            }
 
     def get_json_schema(self) -> Dict[str, Any]:
         """Return schema for Kanban board data."""

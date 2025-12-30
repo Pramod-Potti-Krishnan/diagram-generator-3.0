@@ -51,7 +51,7 @@ class KanbanRenderer(PlaywrightRenderer):
         height: int = 840,
         theme: Optional[Dict[str, Any]] = None
     ) -> bytes:
-        """Render Kanban board to PNG."""
+        """Render Kanban board to PNG (legacy method)."""
         theme = self.merge_theme(theme)
 
         columns = data.get("columns", [])
@@ -59,7 +59,7 @@ class KanbanRenderer(PlaywrightRenderer):
             raise ValueError("Kanban board requires at least 2 columns")
 
         title = data.get("title", "")
-        html = self._build_html(columns, title, theme)
+        html = self._build_html(columns, title, theme, interactive=False)
 
         return await self._render_html_to_png(
             html=html,
@@ -68,11 +68,27 @@ class KanbanRenderer(PlaywrightRenderer):
             extra_wait_ms=500  # Wait for Tailwind to process
         )
 
+    def render_interactive_html(
+        self,
+        data: Dict[str, Any],
+        theme: Optional[Dict[str, Any]] = None
+    ) -> str:
+        """Render Kanban board as interactive HTML with drag-and-drop."""
+        theme = self.merge_theme(theme)
+
+        columns = data.get("columns", [])
+        if not columns or len(columns) < 2:
+            raise ValueError("Kanban board requires at least 2 columns")
+
+        title = data.get("title", "")
+        return self._build_html(columns, title, theme, interactive=True)
+
     def _build_html(
         self,
         columns: List[dict],
         title: str,
-        theme: dict
+        theme: dict,
+        interactive: bool = False
     ) -> str:
         """Build the complete HTML for Kanban board."""
 
@@ -80,7 +96,106 @@ class KanbanRenderer(PlaywrightRenderer):
         background = theme.get("background_color", "#FFFFFF")
         text_color = theme.get("text_color", "#1F2937")
 
-        columns_html = self._build_columns(columns, primary_color, text_color)
+        columns_html = self._build_columns(columns, primary_color, text_color, interactive)
+
+        # Add interactive JavaScript for drag-and-drop
+        interactive_js = ""
+        interactive_css = ""
+        if interactive:
+            interactive_css = """
+        .kanban-card {
+            cursor: grab;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .kanban-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .kanban-card.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+        }
+        .kanban-column.drag-over {
+            background: rgba(59, 130, 246, 0.1) !important;
+            border: 2px dashed #3B82F6;
+        }
+        .kanban-card-edit {
+            display: none;
+            position: absolute;
+            top: 4px;
+            right: 4px;
+        }
+        .kanban-card:hover .kanban-card-edit {
+            display: block;
+        }
+"""
+            interactive_js = """
+    <script>
+        // Kanban Drag and Drop
+        let draggedCard = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const cards = document.querySelectorAll('.kanban-card');
+            const columns = document.querySelectorAll('.kanban-column');
+
+            cards.forEach(card => {
+                card.setAttribute('draggable', 'true');
+
+                card.addEventListener('dragstart', (e) => {
+                    draggedCard = card;
+                    card.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                card.addEventListener('dragend', () => {
+                    card.classList.remove('dragging');
+                    columns.forEach(col => col.classList.remove('drag-over'));
+                    draggedCard = null;
+                });
+            });
+
+            columns.forEach(column => {
+                column.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    column.classList.add('drag-over');
+                });
+
+                column.addEventListener('dragleave', () => {
+                    column.classList.remove('drag-over');
+                });
+
+                column.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    column.classList.remove('drag-over');
+                    if (draggedCard) {
+                        const cardContainer = column.querySelector('.kanban-cards');
+                        cardContainer.appendChild(draggedCard);
+                        updateColumnCounts();
+                    }
+                });
+            });
+        });
+
+        function updateColumnCounts() {
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                const count = col.querySelectorAll('.kanban-card').length;
+                const countEl = col.querySelector('.kanban-count');
+                if (countEl) countEl.textContent = count;
+            });
+        }
+
+        function editCard(btn) {
+            const card = btn.closest('.kanban-card');
+            const titleEl = card.querySelector('.kanban-title');
+            const currentText = titleEl.textContent;
+            const newText = prompt('Edit card:', currentText);
+            if (newText && newText.trim()) {
+                titleEl.textContent = newText.trim();
+            }
+        }
+    </script>
+"""
 
         return f"""
 <!DOCTYPE html>
@@ -102,15 +217,14 @@ class KanbanRenderer(PlaywrightRenderer):
             width: 4px;
             border-radius: 2px;
         }}
+        {interactive_css}
     </style>
 </head>
 <body class="antialiased">
-    <div class="p-6 min-h-screen">
-        {"<h1 class='text-2xl font-bold mb-6' style='color: " + text_color + "'>" + title + "</h1>" if title else ""}
-        <div class="flex gap-4 overflow-x-auto">
-            {columns_html}
-        </div>
+    <div class="flex gap-4 overflow-x-auto h-full w-full p-4">
+        {columns_html}
     </div>
+    {interactive_js}
 </body>
 </html>
 """
@@ -119,25 +233,29 @@ class KanbanRenderer(PlaywrightRenderer):
         self,
         columns: List[dict],
         primary_color: str,
-        text_color: str
+        text_color: str,
+        interactive: bool = False
     ) -> str:
         """Build HTML for all columns."""
         html_parts = []
+        num_columns = len(columns)
+        # Calculate column width to fill container evenly
+        col_width_class = "flex-1 min-w-[200px]" if interactive else "flex-shrink-0 w-64"
 
         for i, column in enumerate(columns):
             name = column.get("name", f"Column {i+1}")
             color = column.get("color", self.DEFAULT_COLUMN_COLORS[i % len(self.DEFAULT_COLUMN_COLORS)])
             items = column.get("items", [])
 
-            cards_html = self._build_cards(items, primary_color, text_color)
+            cards_html = self._build_cards(items, primary_color, text_color, interactive)
 
             html_parts.append(f"""
-<div class="flex-shrink-0 w-64">
+<div class="{col_width_class} kanban-column" data-column="{i}">
     <div class="flex items-center justify-between mb-3 px-1">
         <span class="text-sm font-semibold uppercase tracking-wide" style="color: {text_color}">{name}</span>
-        <span class="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{len(items)}</span>
+        <span class="kanban-count text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{len(items)}</span>
     </div>
-    <div class="rounded-xl p-2 min-h-[600px]" style="background: {color}">
+    <div class="rounded-xl p-2 min-h-[500px] kanban-cards" style="background: {color}">
         <div class="space-y-2">
             {cards_html}
         </div>
@@ -151,7 +269,8 @@ class KanbanRenderer(PlaywrightRenderer):
         self,
         items: List[dict],
         primary_color: str,
-        text_color: str
+        text_color: str,
+        interactive: bool = False
     ) -> str:
         """Build HTML for cards in a column."""
         if not items:
@@ -159,7 +278,7 @@ class KanbanRenderer(PlaywrightRenderer):
 
         html_parts = []
 
-        for item in items:
+        for i, item in enumerate(items):
             title = item.get("title", "Untitled")
             priority = item.get("priority", "").lower()
             assignee = item.get("assignee", "")
@@ -176,14 +295,26 @@ class KanbanRenderer(PlaywrightRenderer):
 </div>
 """
 
+            # Add edit button for interactive mode
+            edit_btn = ""
+            if interactive:
+                edit_btn = """
+<button onclick="editCard(this)" class="kanban-card-edit p-1 rounded hover:bg-gray-100">
+    <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+    </svg>
+</button>
+"""
+
             html_parts.append(f"""
-<div class="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
+<div class="kanban-card bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative" data-card="{i}">
     <div class="flex">
         <div class="priority-bar" style="background: {priority_color}"></div>
         <div class="flex-1 p-3">
-            <p class="text-sm font-medium" style="color: {text_color}">{title}</p>
+            <p class="kanban-title text-sm font-medium" style="color: {text_color}">{title}</p>
             {assignee_html}
         </div>
+        {edit_btn}
     </div>
 </div>
 """)

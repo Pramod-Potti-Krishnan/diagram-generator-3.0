@@ -378,7 +378,17 @@ class DiagramConductor:
         content = result.get("content", "")
         logger.info(f"Storage upload debug: content_type={content_type}, content_size={len(content) if content else 0}, result_keys={list(result.keys())}")
 
-        # Try to upload to storage
+        # HTML content type: Skip storage upload, deliver inline
+        # This is used for interactive content like Kanban boards
+        if content_type == "html":
+            logger.info(f"HTML content - delivering inline (no storage upload)")
+            result["url"] = ""
+            result["diagram_id"] = diagram_id
+            result["content_delivery"] = "inline"
+            result["html_content"] = content
+            return result
+
+        # Try to upload to storage (PNG/SVG only)
         try:
             if not content:
                 logger.error("No content in result to upload!")
