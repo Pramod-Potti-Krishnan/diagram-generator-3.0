@@ -344,7 +344,8 @@ async def _process_layout_service_job(
             generationId=str(uuid.uuid4()),
             mermaidCode=mermaid_code,
             rendered=RenderedContent(
-                svg=result.get("content") if result.get("content_type") == "svg" else None
+                svg=result.get("content") if result.get("content_type") == "svg" else None,
+                png=result.get("url") if result.get("content_type") == "png" else None
             ),
             structure=DiagramStructure(
                 nodeCount=stats.get("nodeCount", 0),
@@ -372,7 +373,9 @@ async def _process_layout_service_job(
             "diagram_url": result.get("url", ""),
             "diagram_type": request.type.value,
             "generation_method": result.get("metadata", {}).get("generation_method", "mermaid"),
-            "metadata": result.get("metadata", {})
+            "metadata": result.get("metadata", {}),
+            "html_content": result.get("html_content", ""),
+            "content_type": result.get("content_type", "svg")
         })
 
         # Store the Layout Service formatted result

@@ -225,26 +225,38 @@ for item in "${TESTS[@]}"; do
     echo "    Method mismatch: got $GENERATION_METHOD, expected $EXPECTED_METHOD"
   fi
 
-  # Fetch diagram content from URL
-  DIAGRAM_CONTENT=$(curl -s "$DIAGRAM_URL")
-
-  if [ -z "$DIAGRAM_CONTENT" ]; then
-    echo "    ERROR: Failed to fetch diagram from URL"
-    ((FAIL_COUNT++))
-    continue
-  fi
-
-  # Determine file extension based on content
-  FILE_EXT="svg"
-  if [[ "$DIAGRAM_CONTENT" == *"PNG"* ]] || [[ "$DIAGRAM_URL" == *".png"* ]]; then
+  # Determine content type from URL
+  # PNG files need img tag wrapping; SVG can be embedded directly
+  if [[ "$DIAGRAM_URL" == *".png"* ]]; then
     FILE_EXT="png"
+    # PNG: Create img tag instead of fetching binary (binary cannot be JSON-encoded)
+    DIAGRAM_HTML="<img src=\"$DIAGRAM_URL\" alt=\"$diagram_type diagram\" style=\"max-width:100%;height:auto;display:block;\">"
+    echo "    Type: PNG (using img tag)"
+    echo "    HTML: ${#DIAGRAM_HTML} chars"
+    ((SUCCESS_COUNT++))
+
+    # Save URL reference for debugging
+    echo "$DIAGRAM_URL" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}_url.txt"
+    echo "$DIAGRAM_HTML" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}_html.txt"
+  else
+    FILE_EXT="svg"
+    # SVG: Fetch and embed directly (it's XML text, safe to embed)
+    DIAGRAM_CONTENT=$(curl -s "$DIAGRAM_URL")
+
+    if [ -z "$DIAGRAM_CONTENT" ]; then
+      echo "    ERROR: Failed to fetch SVG from URL"
+      ((FAIL_COUNT++))
+      continue
+    fi
+
+    DIAGRAM_HTML="$DIAGRAM_CONTENT"
+    echo "    Type: SVG (embedding directly)"
+    echo "    Size: ${#DIAGRAM_CONTENT} bytes"
+    ((SUCCESS_COUNT++))
+
+    # Save SVG for debugging
+    echo "$DIAGRAM_CONTENT" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}.$FILE_EXT"
   fi
-
-  echo "    Size: ${#DIAGRAM_CONTENT} bytes"
-  ((SUCCESS_COUNT++))
-
-  # Save diagram
-  echo "$DIAGRAM_CONTENT" > "$OUTPUT_DIR/${SLIDE_NUM}_${diagram_type}.$FILE_EXT"
 
   # Skip Layout Service if requested
   if [ "$SKIP_RENDER" = true ]; then
@@ -252,8 +264,8 @@ for item in "${TESTS[@]}"; do
     continue
   fi
 
-  # Escape content for JSON
-  DIAGRAM_ESCAPED=$(echo "$DIAGRAM_CONTENT" | jq -Rs .)
+  # Escape content for JSON (safe for both img tags and SVG)
+  DIAGRAM_ESCAPED=$(echo "$DIAGRAM_HTML" | jq -Rs .)
 
   # Build slide JSON for C5-diagram layout
   SLIDE_JSON=$(jq -n \

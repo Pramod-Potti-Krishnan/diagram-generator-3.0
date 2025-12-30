@@ -418,6 +418,18 @@ class DiagramConductor:
         result["diagram_id"] = diagram_id
         result["content_delivery"] = "url" if url else "inline"
 
+        # Create HTML-wrapped content for Layout Service integration
+        # PNG images need img tag wrapping; SVG can be embedded directly
+        if content_type == "png" and url:
+            # PNG: Wrap in img tag with URL (binary cannot be embedded directly)
+            result["html_content"] = f'<img src="{url}" alt="{request.diagram_type} diagram" style="max-width:100%;height:auto;display:block;">'
+        elif content_type == "svg" and url:
+            # SVG: Can embed the content directly (it's XML text)
+            result["html_content"] = result.get("content", f'<img src="{url}" alt="{request.diagram_type} diagram">')
+        else:
+            # Fallback: use raw content or empty
+            result["html_content"] = result.get("content", "")
+
         return result
     
     def get_metrics(self) -> Dict[str, Any]:
