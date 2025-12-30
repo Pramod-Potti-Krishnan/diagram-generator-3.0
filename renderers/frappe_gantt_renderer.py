@@ -52,8 +52,8 @@ class FrappeGanttRenderer(PlaywrightRenderer):
             html=html,
             width=width,
             height=height,
-            wait_for_selector=".gantt-container svg",
-            extra_wait_ms=500
+            wait_for_selector=".gantt .bar",  # Wait for actual bars to render
+            extra_wait_ms=1000  # More time for CDN + rendering
         )
 
     def _build_html(
