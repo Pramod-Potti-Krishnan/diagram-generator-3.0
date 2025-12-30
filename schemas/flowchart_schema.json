@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "flowchart_schema.json",
+  "title": "Flowchart Schema",
+  "description": "Schema for D2 flowchart data extraction",
+  "type": "object",
+  "required": ["nodes", "edges"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Flowchart title",
+      "maxLength": 100
+    },
+    "direction": {
+      "type": "string",
+      "description": "Flow direction",
+      "enum": ["right", "down", "left", "up"],
+      "default": "right"
+    },
+    "nodes": {
+      "type": "array",
+      "description": "Flowchart nodes",
+      "minItems": 2,
+      "maxItems": 15,
+      "items": {
+        "type": "object",
+        "required": ["id", "label"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique node identifier",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+          },
+          "label": {
+            "type": "string",
+            "description": "Node display text",
+            "maxLength": 40
+          },
+          "shape": {
+            "type": "string",
+            "description": "Node shape",
+            "enum": ["oval", "rectangle", "diamond", "cylinder", "hexagon", "parallelogram", "cloud", "circle"],
+            "default": "rectangle"
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "description": "Connections between nodes",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source node ID"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target node ID"
+          },
+          "label": {
+            "type": "string",
+            "description": "Edge label",
+            "maxLength": 30
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#FFFFFF"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "User Authentication Flow",
+      "direction": "right",
+      "nodes": [
+        {"id": "start", "label": "Start", "shape": "oval"},
+        {"id": "login", "label": "Login Page", "shape": "rectangle"},
+        {"id": "validate", "label": "Valid?", "shape": "diamond"},
+        {"id": "dashboard", "label": "Dashboard", "shape": "rectangle"},
+        {"id": "error", "label": "Show Error", "shape": "rectangle"},
+        {"id": "end", "label": "End", "shape": "oval"}
+      ],
+      "edges": [
+        {"from": "start", "to": "login"},
+        {"from": "login", "to": "validate", "label": "Submit"},
+        {"from": "validate", "to": "dashboard", "label": "Yes"},
+        {"from": "validate", "to": "error", "label": "No"},
+        {"from": "error", "to": "login", "label": "Retry"},
+        {"from": "dashboard", "to": "end"}
+      ]
+    }
+  ]
+}

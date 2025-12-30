@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "quadrant_schema.json",
+  "title": "Quadrant Chart Schema",
+  "description": "Schema for Plotly 2x2 quadrant matrix data extraction",
+  "type": "object",
+  "required": ["x_axis", "y_axis", "points"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Chart title",
+      "maxLength": 100
+    },
+    "x_axis": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "X-axis label",
+          "maxLength": 30
+        },
+        "min_label": {
+          "type": "string",
+          "description": "Label for low end of X-axis",
+          "default": "Low",
+          "maxLength": 20
+        },
+        "max_label": {
+          "type": "string",
+          "description": "Label for high end of X-axis",
+          "default": "High",
+          "maxLength": 20
+        }
+      }
+    },
+    "y_axis": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Y-axis label",
+          "maxLength": 30
+        },
+        "min_label": {
+          "type": "string",
+          "description": "Label for low end of Y-axis",
+          "default": "Low",
+          "maxLength": 20
+        },
+        "max_label": {
+          "type": "string",
+          "description": "Label for high end of Y-axis",
+          "default": "High",
+          "maxLength": 20
+        }
+      }
+    },
+    "quadrants": {
+      "type": "array",
+      "description": "Quadrant definitions",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": ["name", "position"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Quadrant label",
+            "maxLength": 20
+          },
+          "position": {
+            "type": "string",
+            "enum": ["top-right", "top-left", "bottom-right", "bottom-left"]
+          },
+          "color": {
+            "type": "string",
+            "description": "Background color for quadrant",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          }
+        }
+      }
+    },
+    "points": {
+      "type": "array",
+      "description": "Data points to plot",
+      "minItems": 1,
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["label", "x", "y"],
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "Point label",
+            "maxLength": 30
+          },
+          "x": {
+            "type": "number",
+            "description": "X coordinate (0-1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "y": {
+            "type": "number",
+            "description": "Y coordinate (0-1)",
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "text_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#1F2937"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "Technology Assessment Matrix",
+      "x_axis": {
+        "label": "Impact",
+        "min_label": "Low",
+        "max_label": "High"
+      },
+      "y_axis": {
+        "label": "Maturity",
+        "min_label": "Low",
+        "max_label": "High"
+      },
+      "quadrants": [
+        {"name": "INVEST", "position": "top-right", "color": "#D1FAE5"},
+        {"name": "MAINTAIN", "position": "top-left", "color": "#DBEAFE"},
+        {"name": "DEPRIORITIZE", "position": "bottom-left", "color": "#FEE2E2"},
+        {"name": "EXPLORE", "position": "bottom-right", "color": "#FEF3C7"}
+      ],
+      "points": [
+        {"label": "AI Platform", "x": 0.85, "y": 0.90},
+        {"label": "Cloud Infrastructure", "x": 0.75, "y": 0.85},
+        {"label": "Legacy ERP", "x": 0.25, "y": 0.90},
+        {"label": "Blockchain", "x": 0.20, "y": 0.25}
+      ]
+    }
+  ]
+}

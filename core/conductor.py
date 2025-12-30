@@ -17,7 +17,12 @@ from datetime import datetime
 from models import DiagramRequest, GenerationStrategy, GenerationMethod
 from utils.logger import setup_logger
 from .unified_playbook import UnifiedPlaybook
-from agents import SVGAgent, MermaidAgent, PythonChartAgent
+from agents import (
+    # Legacy agents
+    SVGAgent, MermaidAgent, PythonChartAgent,
+    # v3.0 structured agents
+    PlotlyAgent, D2Agent, FrappeGanttAgent, MarkmapAgent, KanbanAgent
+)
 from storage import DiagramStorage, DiagramOperations, CacheManager, DiagramSessionManager
 
 logger = setup_logger(__name__)
@@ -35,11 +40,35 @@ class DiagramConductor:
         self.settings = settings
         self.playbook = UnifiedPlaybook(settings)
         
-        # Initialize agents
+        # Initialize agents - legacy and v3.0 structured
         self.agents = {
+            # Legacy agents
             GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
             GenerationMethod.MERMAID: MermaidAgent(settings),
-            GenerationMethod.PYTHON_CHART: PythonChartAgent(settings)
+            GenerationMethod.PYTHON_CHART: PythonChartAgent(settings),
+            # v3.0 structured agents
+            GenerationMethod.PLOTLY: PlotlyAgent(settings),
+            GenerationMethod.D2: D2Agent(settings),
+            GenerationMethod.FRAPPE_GANTT: FrappeGanttAgent(settings),
+            GenerationMethod.MARKMAP: MarkmapAgent(settings),
+            GenerationMethod.KANBAN: KanbanAgent(settings),
+        }
+
+        # v3.0 Routing table: diagram_type -> (method, allowed_layouts)
+        self.v3_routing = {
+            # C5 layout only (full-width diagrams)
+            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5"]),
+            "kanban": (GenerationMethod.KANBAN, ["C5"]),
+            # V3 layout only (content diagrams for split layouts)
+            "timeline": (GenerationMethod.PLOTLY, ["V3"]),
+            "quadrant": (GenerationMethod.PLOTLY, ["V3"]),
+            "journey": (GenerationMethod.PLOTLY, ["V3"]),
+            "journey_map": (GenerationMethod.PLOTLY, ["V3"]),
+            "flowchart": (GenerationMethod.D2, ["V3"]),
+            "er_diagram": (GenerationMethod.D2, ["V3"]),
+            "architecture": (GenerationMethod.D2, ["V3"]),
+            "mindmap": (GenerationMethod.MARKMAP, ["V3"]),
+            "mind_map": (GenerationMethod.MARKMAP, ["V3"]),
         }
         
         # Initialize storage components
@@ -128,9 +157,24 @@ class DiagramConductor:
                 logger.info("Cache hit - returning cached diagram")
                 cached["metadata"]["cache_hit"] = True
                 return cached
-            
-            # Get generation strategy from playbook
-            strategy = await self.playbook.get_strategy(request)
+
+            # v3.0 Direct routing for new structured agents
+            diagram_type_lower = request.diagram_type.lower()
+            if diagram_type_lower in self.v3_routing:
+                method, allowed_layouts = self.v3_routing[diagram_type_lower]
+                logger.info(f"v3.0 routing: {diagram_type_lower} -> {method.value}")
+
+                strategy = GenerationStrategy(
+                    method=method,
+                    confidence=0.95,
+                    reasoning=f"v3.0 structured agent for {diagram_type_lower}",
+                    fallback_chain=[GenerationMethod.MERMAID],  # Mermaid as fallback
+                    estimated_time_ms=self._estimate_v3_time(method),
+                    quality_estimate="high"
+                )
+            else:
+                # Get generation strategy from playbook (legacy routing)
+                strategy = await self.playbook.get_strategy(request)
             logger.info(
                 f"Selected strategy: {strategy.method} "
                 f"(confidence: {strategy.confidence:.2f})"
@@ -370,4 +414,25 @@ class DiagramConductor:
             ),
             "cache_stats": self.cache.get_statistics(),
             "session_stats": self.session_manager.get_global_statistics()
+        }
+
+    def _estimate_v3_time(self, method: GenerationMethod) -> int:
+        """Estimate generation time for v3.0 methods in milliseconds"""
+        estimates = {
+            GenerationMethod.PLOTLY: 1500,         # Python + Kaleido rendering
+            GenerationMethod.D2: 800,              # D2 CLI subprocess
+            GenerationMethod.FRAPPE_GANTT: 2000,   # HTML + Playwright screenshot
+            GenerationMethod.MARKMAP: 1500,        # HTML + Playwright screenshot
+            GenerationMethod.KANBAN: 1500,         # Tailwind HTML + Playwright screenshot
+        }
+        return estimates.get(method, 1500)
+
+    def get_v3_routing_info(self) -> Dict[str, Any]:
+        """Get v3.0 routing table for debugging"""
+        return {
+            diagram_type: {
+                "method": method.value,
+                "layouts": layouts
+            }
+            for diagram_type, (method, layouts) in self.v3_routing.items()
         }

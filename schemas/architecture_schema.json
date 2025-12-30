@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "architecture_schema.json",
+  "title": "Architecture Diagram Schema",
+  "description": "Schema for D2 architecture diagram data extraction",
+  "type": "object",
+  "required": ["groups"],
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Diagram title",
+      "maxLength": 100
+    },
+    "direction": {
+      "type": "string",
+      "description": "Flow direction",
+      "enum": ["right", "down"],
+      "default": "right"
+    },
+    "groups": {
+      "type": "array",
+      "description": "Component groups/containers",
+      "minItems": 2,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["name", "label", "nodes"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Group identifier",
+            "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+          },
+          "label": {
+            "type": "string",
+            "description": "Group display name",
+            "maxLength": 30
+          },
+          "nodes": {
+            "type": "array",
+            "description": "Components in this group",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "required": ["id", "label"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "Component identifier",
+                  "pattern": "^[a-zA-Z][a-zA-Z0-9_]*$"
+                },
+                "label": {
+                  "type": "string",
+                  "description": "Component display name",
+                  "maxLength": 30
+                },
+                "shape": {
+                  "type": "string",
+                  "description": "Component shape",
+                  "enum": ["rectangle", "cylinder", "hexagon", "cloud", "circle", "person"],
+                  "default": "rectangle"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "description": "Connections between components",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "description": "Source component ID"
+          },
+          "to": {
+            "type": "string",
+            "description": "Target component ID"
+          },
+          "label": {
+            "type": "string",
+            "description": "Connection label (protocol, action)",
+            "maxLength": 20
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "properties": {
+        "primary_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#8B5CF6"
+        },
+        "background_color": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$",
+          "default": "#FFFFFF"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "title": "Microservices Architecture",
+      "direction": "right",
+      "groups": [
+        {
+          "name": "clients",
+          "label": "Clients",
+          "nodes": [
+            {"id": "web", "label": "Web App", "shape": "rectangle"},
+            {"id": "mobile", "label": "Mobile App", "shape": "rectangle"}
+          ]
+        },
+        {
+          "name": "gateway",
+          "label": "API Gateway",
+          "nodes": [
+            {"id": "api_gw", "label": "Gateway", "shape": "hexagon"}
+          ]
+        },
+        {
+          "name": "services",
+          "label": "Services",
+          "nodes": [
+            {"id": "auth", "label": "Auth Service", "shape": "rectangle"},
+            {"id": "user", "label": "User Service", "shape": "rectangle"}
+          ]
+        },
+        {
+          "name": "data",
+          "label": "Data Layer",
+          "nodes": [
+            {"id": "db", "label": "PostgreSQL", "shape": "cylinder"},
+            {"id": "cache", "label": "Redis", "shape": "cylinder"}
+          ]
+        }
+      ],
+      "connections": [
+        {"from": "web", "to": "api_gw", "label": "HTTPS"},
+        {"from": "mobile", "to": "api_gw", "label": "HTTPS"},
+        {"from": "api_gw", "to": "auth", "label": "gRPC"},
+        {"from": "api_gw", "to": "user", "label": "gRPC"},
+        {"from": "auth", "to": "db"},
+        {"from": "auth", "to": "cache", "label": "Sessions"}
+      ]
+    }
+  ]
+}
