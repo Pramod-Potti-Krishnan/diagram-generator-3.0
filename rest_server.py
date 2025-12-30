@@ -259,7 +259,7 @@ async def debug_status():
     supabase_key = os.getenv('SUPABASE_SERVICE_KEY', os.getenv('SUPABASE_ANON_KEY', 'not_set'))
 
     return {
-        "deployment_version": "3.0.0-png-fix-v2",
+        "deployment_version": "3.0.0-conductor-fix",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
