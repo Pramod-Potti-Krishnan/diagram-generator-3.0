@@ -294,7 +294,18 @@ class DiagramConductor:
                 agent.generate(request),
                 timeout=timeout
             )
-            
+
+            # Check if generation was successful
+            if not result.get("success", False):
+                error_msg = result.get("error", "Unknown error")
+                logger.error(f"Agent {strategy.method} generation failed: {error_msg}")
+                return None
+
+            # Verify content exists
+            if not result.get("content"):
+                logger.error(f"Agent {strategy.method} returned empty content")
+                return None
+
             # Add metadata
             result["metadata"] = result.get("metadata", {})
             result["metadata"]["generation_method"] = strategy.method.value
@@ -302,7 +313,7 @@ class DiagramConductor:
                 result,
                 strategy
             )
-            
+
             return result
         
         except asyncio.TimeoutError:
@@ -363,19 +374,26 @@ class DiagramConductor:
         # Determine content type from result (v3.0 agents set this)
         content_type = result.get("content_type", "svg")
 
+        # Debug logging for storage upload
+        content = result.get("content", "")
+        logger.info(f"Storage upload debug: content_type={content_type}, content_size={len(content) if content else 0}, result_keys={list(result.keys())}")
+
         # Try to upload to storage
         try:
-            url = await self.storage.upload_diagram(
-                svg_content=result["content"],
-                diagram_type=request.diagram_type,
-                session_id=request.session_id or "default",
-                user_id=request.user_id or "anonymous",
-                metadata=result.get("metadata", {}),
-                content_type=content_type
-            )
-            logger.info(f"Uploaded diagram to storage: {url}")
+            if not content:
+                logger.error("No content in result to upload!")
+            else:
+                url = await self.storage.upload_diagram(
+                    svg_content=content,
+                    diagram_type=request.diagram_type,
+                    session_id=request.session_id or "default",
+                    user_id=request.user_id or "anonymous",
+                    metadata=result.get("metadata", {}),
+                    content_type=content_type
+                )
+                logger.info(f"Uploaded diagram to storage: {url}")
         except Exception as e:
-            logger.error(f"Failed to upload to storage: {e}")
+            logger.error(f"Failed to upload to storage: {e}", exc_info=True)
             # Continue without URL - will use inline content
 
         # Try to save metadata to database (optional)
