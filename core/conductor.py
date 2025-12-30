@@ -360,6 +360,9 @@ class DiagramConductor:
         url = ""
         diagram_id = str(uuid.uuid4())
 
+        # Determine content type from result (v3.0 agents set this)
+        content_type = result.get("content_type", "svg")
+
         # Try to upload to storage
         try:
             url = await self.storage.upload_diagram(
@@ -367,7 +370,8 @@ class DiagramConductor:
                 diagram_type=request.diagram_type,
                 session_id=request.session_id or "default",
                 user_id=request.user_id or "anonymous",
-                metadata=result.get("metadata", {})
+                metadata=result.get("metadata", {}),
+                content_type=content_type
             )
             logger.info(f"Uploaded diagram to storage: {url}")
         except Exception as e:

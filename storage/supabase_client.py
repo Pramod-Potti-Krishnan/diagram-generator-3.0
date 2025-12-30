@@ -118,52 +118,74 @@ class DiagramStorage:
         diagram_type: str,
         session_id: str,
         user_id: str,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        content_type: str = "svg"
     ) -> str:
         """
-        Upload SVG diagram to Supabase Storage and return public URL.
-        
+        Upload diagram to Supabase Storage and return public URL.
+
         Args:
-            svg_content: SVG content as string
-            diagram_type: Type of diagram (e.g., 'cycle_3_step')
+            svg_content: Diagram content (SVG string or base64-encoded PNG)
+            diagram_type: Type of diagram (e.g., 'cycle_3_step', 'gantt')
             session_id: Session identifier
             user_id: User identifier
             metadata: Optional metadata to include
-            
+            content_type: Content type - 'svg' or 'png' (default: 'svg')
+
         Returns:
             Public URL to the uploaded diagram, or empty string if storage disabled
-            
+
         Raises:
             Exception: If upload fails
         """
+        import base64
 
-        # Log incoming SVG content size
-        logger.info(f"upload_diagram called with SVG content size: {len(svg_content) if svg_content else 0} bytes")
+        # Log incoming content size
+        logger.info(f"upload_diagram called with {content_type} content size: {len(svg_content) if svg_content else 0} chars")
 
         # Return empty string if Supabase is not configured
         if not self.enabled:
             logger.debug("Supabase storage disabled - returning empty URL")
             return ""
-        
+
+        # Determine file extension and MIME type based on content_type
+        if content_type == "png":
+            file_ext = "png"
+            mime_type = "image/png"
+        else:
+            file_ext = "svg"
+            mime_type = "image/svg+xml"
+
         # Generate unique file path
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
-        file_name = f"{user_id}/{session_id}/{diagram_type}_{timestamp}_{unique_id}.svg"
-        
+        file_name = f"{user_id}/{session_id}/{diagram_type}_{timestamp}_{unique_id}.{file_ext}"
+
         try:
             # Prepare file options
             file_options = {
-                "content-type": "image/svg+xml",
+                "content-type": mime_type,
                 "cache-control": "public, max-age=3600",
             }
-            
+
             # Add metadata if provided
             if metadata:
                 file_options["x-metadata"] = str(metadata)
-            
-            # Log before upload
-            encoded_content = svg_content.encode('utf-8')
-            logger.info(f"Uploading to Supabase: {file_name}, encoded size: {len(encoded_content)} bytes")
+
+            # Encode content based on type
+            if content_type == "png":
+                # PNG content is base64-encoded - decode it to binary
+                try:
+                    encoded_content = base64.b64decode(svg_content)
+                    logger.info(f"Decoded base64 PNG: {len(encoded_content)} bytes")
+                except Exception as e:
+                    logger.error(f"Failed to decode base64 PNG: {e}")
+                    raise ValueError(f"Invalid base64 PNG content: {e}")
+            else:
+                # SVG content is plain text - encode to UTF-8
+                encoded_content = svg_content.encode('utf-8')
+
+            logger.info(f"Uploading to Supabase: {file_name}, size: {len(encoded_content)} bytes, type: {mime_type}")
 
             # Upload to storage
             response = self.client.storage.from_(self.bucket_name).upload(
