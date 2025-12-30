@@ -340,7 +340,7 @@ async def debug_status():
         d2_path_check = f"error: {e}"
 
     return {
-        "deployment_version": "3.0.2-kaleido-downgrade-d2-binary",
+        "deployment_version": "3.0.3-markmap-debug",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
@@ -363,6 +363,87 @@ async def debug_status():
         "conductor_ready": conductor is not None,
         "v3_routing": conductor.get_v3_routing_info() if conductor else {}
     }
+
+
+@app.get("/debug/markmap")
+async def debug_markmap():
+    """Debug endpoint to test markmap rendering directly."""
+    import base64
+    from models import DiagramRequest, GenerationMethod
+
+    result = {
+        "test": "markmap",
+        "steps": {}
+    }
+
+    try:
+        # Step 1: Get the MarkmapAgent
+        if not conductor:
+            result["error"] = "conductor not initialized"
+            return result
+
+        method = GenerationMethod.MARKMAP
+        agent = conductor.agents.get(method)
+        if not agent:
+            result["error"] = f"MarkmapAgent not found"
+            return result
+
+        result["steps"]["agent_found"] = agent.__class__.__name__
+        result["steps"]["llm_ready"] = agent.llm_service is not None
+        result["steps"]["renderer"] = agent.renderer.__class__.__name__ if agent.renderer else "none"
+
+        # Step 2: Test LLM extraction
+        test_request = DiagramRequest(
+            content="Test Mindmap: Topic A (Sub1, Sub2), Topic B (Sub3)",
+            diagram_type="mindmap",
+            theme={"primaryColor": "#8B5CF6"},
+            constraints={"maxWidth": 800, "maxHeight": 600}
+        )
+
+        # Extract structured data
+        extraction_result = await agent._extract_structured_data(test_request)
+        result["steps"]["llm_extraction"] = {
+            "success": extraction_result.get("success"),
+            "error": extraction_result.get("error"),
+            "content_keys": list(extraction_result.get("content", {}).keys()) if extraction_result.get("content") else []
+        }
+
+        if not extraction_result.get("success"):
+            result["error"] = f"LLM extraction failed: {extraction_result.get('error')}"
+            return result
+
+        # Step 3: Test markdown conversion
+        structured_data = extraction_result.get("content", {})
+        if "root" in structured_data:
+            markdown = agent.renderer._json_to_markdown(structured_data["root"])
+            result["steps"]["markdown_conversion"] = f"Generated {len(markdown)} chars"
+            result["steps"]["markdown_preview"] = markdown[:500] if len(markdown) > 500 else markdown
+        else:
+            result["steps"]["markdown_conversion"] = f"No 'root' in data, keys: {list(structured_data.keys())}"
+
+        # Step 4: Test rendering
+        try:
+            image_bytes = await agent.renderer.render(
+                data=structured_data,
+                width=800,
+                height=600,
+                theme={"primary_color": "#8B5CF6"}
+            )
+            result["steps"]["render"] = f"success: {len(image_bytes)} bytes"
+            # Return base64 of first 100 bytes for verification
+            result["steps"]["render_preview"] = base64.b64encode(image_bytes[:100]).decode() if image_bytes else "empty"
+        except Exception as e:
+            result["steps"]["render"] = f"failed: {str(e)}"
+            result["error"] = f"Render failed: {str(e)}"
+
+        result["success"] = "error" not in result
+
+    except Exception as e:
+        result["error"] = str(e)
+        import traceback
+        result["traceback"] = traceback.format_exc()
+
+    return result
 
 
 @app.post("/generate", response_model=JobResponse)

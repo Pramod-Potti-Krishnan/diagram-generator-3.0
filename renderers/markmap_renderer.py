@@ -124,47 +124,69 @@ class MarkmapRenderer(PlaywrightRenderer):
 <body>
     <svg id="markmap"></svg>
 
-    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <script src="https://cdn.jsdelivr.net/npm/d3@7.8.5/dist/d3.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markmap-lib@0.16.0/dist/browser/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/markmap-view@0.16.0/dist/browser/index.min.js"></script>
     <script>
+        window.markmapError = null;
         (async () => {{
-            const markdown = {escaped_markdown};
+            try {{
+                const markdown = {escaped_markdown};
 
-            // Transform markdown to markmap data
-            const {{ Transformer }} = window.markmap;
-            const transformer = new Transformer();
-            const {{ root }} = transformer.transform(markdown);
+                // Wait for libraries to load
+                await new Promise(r => setTimeout(r, 500));
 
-            // Create markmap
-            const {{ Markmap }} = window.markmap;
-            const svg = document.getElementById('markmap');
+                // Check if markmap is loaded
+                if (!window.markmap) {{
+                    throw new Error('markmap library not loaded');
+                }}
 
-            const mm = Markmap.create(svg, {{
-                autoFit: true,
-                color: (node) => {{
-                    // Depth-based coloring from primary
-                    const depth = node.state?.depth || 0;
-                    const colors = [
-                        '{primary_color}',
-                        '#A78BFA',
-                        '#C4B5FD',
-                        '#DDD6FE',
-                        '#EDE9FE'
-                    ];
-                    return colors[Math.min(depth, colors.length - 1)];
-                }},
-                paddingX: 16,
-                duration: 0,  // No animation for static render
-                maxWidth: 250,
-                initialExpandLevel: -1  // Expand all
-            }}, root);
+                // Transform markdown to markmap data
+                const {{ Transformer }} = window.markmap;
+                if (!Transformer) {{
+                    throw new Error('Transformer not found in window.markmap');
+                }}
+                const transformer = new Transformer();
+                const {{ root }} = transformer.transform(markdown);
 
-            // Wait for rendering
-            await new Promise(r => setTimeout(r, 500));
+                // Create markmap
+                const {{ Markmap }} = window.markmap;
+                if (!Markmap) {{
+                    throw new Error('Markmap not found in window.markmap');
+                }}
+                const svg = document.getElementById('markmap');
 
-            // Signal ready
-            window.markmapReady = true;
+                const mm = Markmap.create(svg, {{
+                    autoFit: true,
+                    color: (node) => {{
+                        // Depth-based coloring from primary
+                        const depth = node.state?.depth || 0;
+                        const colors = [
+                            '{primary_color}',
+                            '#A78BFA',
+                            '#C4B5FD',
+                            '#DDD6FE',
+                            '#EDE9FE'
+                        ];
+                        return colors[Math.min(depth, colors.length - 1)];
+                    }},
+                    paddingX: 16,
+                    duration: 0,  // No animation for static render
+                    maxWidth: 250,
+                    initialExpandLevel: -1  // Expand all
+                }}, root);
+
+                // Wait for rendering
+                await new Promise(r => setTimeout(r, 500));
+
+                // Signal ready
+                window.markmapReady = true;
+            }} catch (e) {{
+                window.markmapError = e.message;
+                console.error('Markmap error:', e);
+                // Still signal ready so we don't timeout
+                window.markmapReady = true;
+            }}
         }})();
     </script>
 </body>
