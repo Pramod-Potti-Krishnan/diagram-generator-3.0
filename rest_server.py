@@ -314,16 +314,33 @@ async def debug_status():
     except Exception as e:
         d2_status = f"error: {e}"
 
-    # Test Kaleido
+    # Test Kaleido (with actual Plotly rendering)
     kaleido_status = "not_tested"
+    kaleido_render_test = "not_tested"
     try:
-        import kaleido
-        kaleido_status = f"ok: {kaleido.__version__}"
+        # Try to render a simple Plotly figure
+        import plotly.graph_objects as go
+        fig = go.Figure(data=[go.Bar(y=[2, 3, 1])])
+        fig.update_layout(width=100, height=100)
+        img_bytes = fig.to_image(format='png', width=100, height=100)
+        kaleido_render_test = f"success: {len(img_bytes)} bytes"
+        kaleido_status = "ok (render works)"
     except Exception as e:
+        kaleido_render_test = f"failed: {e}"
         kaleido_status = f"error: {e}"
 
+    # Test D2 path detection
+    d2_path_check = "not_tested"
+    try:
+        import os
+        home_local_bin = os.path.expanduser("~/.local/bin")
+        d2_in_home = os.path.exists(os.path.join(home_local_bin, "d2"))
+        d2_path_check = f"~/.local/bin/d2 exists: {d2_in_home}, PATH contains ~/.local/bin: {home_local_bin in os.environ.get('PATH', '')}"
+    except Exception as e:
+        d2_path_check = f"error: {e}"
+
     return {
-        "deployment_version": "3.0.0-v3-debug",
+        "deployment_version": "3.0.1-d2-kaleido-debug",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
@@ -338,7 +355,9 @@ async def debug_status():
         },
         "dependencies": {
             "d2_cli": d2_status,
-            "kaleido": kaleido_status
+            "d2_path_check": d2_path_check,
+            "kaleido": kaleido_status,
+            "kaleido_render_test": kaleido_render_test
         },
         "v3_agents": agent_tests,
         "conductor_ready": conductor is not None,
