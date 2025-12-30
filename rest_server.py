@@ -258,8 +258,25 @@ async def debug_status():
     supabase_url = os.getenv('SUPABASE_URL', 'not_set')
     supabase_key = os.getenv('SUPABASE_SERVICE_KEY', os.getenv('SUPABASE_ANON_KEY', 'not_set'))
 
+    # Test Playwright if available
+    playwright_status = "not_tested"
+    playwright_error = None
+    try:
+        from playwright.async_api import async_playwright
+        pw = await async_playwright().start()
+        browser = await pw.chromium.launch(headless=True, args=['--no-sandbox'])
+        page = await browser.new_page()
+        await page.set_content("<html><body><h1>Test</h1></body></html>")
+        screenshot = await page.screenshot()
+        await browser.close()
+        await pw.stop()
+        playwright_status = f"success: {len(screenshot)} bytes"
+    except Exception as e:
+        playwright_status = "failed"
+        playwright_error = str(e)
+
     return {
-        "deployment_version": "3.0.0-conductor-fix",
+        "deployment_version": "3.0.0-playwright-test",
         "storage": {
             "enabled": storage_enabled,
             "bucket": storage_bucket,
@@ -267,6 +284,10 @@ async def debug_status():
             "supabase_key_set": supabase_key != 'not_set' and len(supabase_key) > 20,
             "test_upload_result": storage_test_result,
             "test_upload_error": storage_test_error
+        },
+        "playwright": {
+            "status": playwright_status,
+            "error": playwright_error
         },
         "conductor_ready": conductor is not None,
         "v3_routing": conductor.get_v3_routing_info() if conductor else {}
