@@ -92,17 +92,25 @@ class JobManager:
         """
         with self._lock:
             if job_id in self._jobs:
+                # Extract generation_method from result or metadata
+                metadata = result.get("metadata", {})
+                generation_method = result.get("generation_method")
+                if not generation_method or generation_method == "unknown":
+                    generation_method = metadata.get("generation_method", "unknown")
+
                 self._jobs[job_id].update({
                     "status": JobStatus.COMPLETED,
                     "progress": 100,
                     "stage": "completed",
                     "diagram_url": result.get("diagram_url", result.get("url", "")),
                     "diagram_type": result.get("diagram_type", self._jobs[job_id]["diagram_type"]),
-                    "generation_method": result.get("generation_method", "unknown"),
-                    "metadata": result.get("metadata", {}),
+                    "generation_method": generation_method,
+                    "metadata": metadata,
                     "content_type": result.get("content_type", "svg"),
                     "html_content": result.get("html_content", ""),
                     "content_delivery": result.get("content_delivery", "url"),
+                    "layout": result.get("layout", metadata.get("layout_type")),  # Layout type (C5, V3, etc.)
+                    "insights_html": result.get("insights_html"),  # Key Insights panel HTML
                     "updated_at": datetime.utcnow().isoformat(),
                     "completed_at": datetime.utcnow().isoformat()
                 })

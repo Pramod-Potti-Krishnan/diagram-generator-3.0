@@ -30,8 +30,9 @@ THEME='{
 }'
 
 # Test configurations: diagram_type|layout|width|height|title|content
+# Layout IDs: C5-diagram (full-width), V3-diagram-text (split with text panel)
 declare -a TESTS=(
-  "timeline|C5|1800|840|Company Milestones|Company History and Key Milestones:
+  "timeline|C5-diagram|1800|840|Company Milestones|Company History and Key Milestones:
 2018: Founded in San Francisco with \$500K seed funding
 2019: Launched MVP product, acquired first 100 paying customers
 2020: Series A funding - \$5M raised, expanded team to 25 employees
@@ -40,7 +41,7 @@ declare -a TESTS=(
 2023: Acquired competitor startup, reached 100,000 users milestone
 2024: IPO preparation underway, 500 employees globally"
 
-  "quadrant|V3|1080|840|Technology Investment Matrix|Technology Investment Decision Matrix:
+  "quadrant|V3-diagram-text|1080|840|Technology Investment Matrix|Technology Investment Decision Matrix:
 Axes: X = Business Impact (Low to High), Y = Technical Maturity (Low to High)
 
 High Impact + High Maturity (MAINTAIN):
@@ -59,7 +60,7 @@ Low Impact + Low Maturity (EVALUATE):
 - Blockchain: 0.20 impact, 0.15 maturity
 - Quantum Computing: 0.15 impact, 0.10 maturity"
 
-  "journey|C5|1440|840|Customer Onboarding Journey|Customer Onboarding Experience Journey:
+  "journey|C5-diagram|1440|840|Customer Onboarding Journey|Customer Onboarding Experience Journey:
 
 Discovery Phase:
 - Sees advertisement: excited and curious (4 out of 5)
@@ -232,15 +233,16 @@ for item in "${TESTS[@]}"; do
   INSIGHTS_ESCAPED=$(echo "$INSIGHTS_HTML" | jq -Rs .)
 
   # Build slide JSON based on layout type
-  if [ "$layout" = "V3" ]; then
+  if [[ "$layout" == V3* ]]; then
     # V3-diagram-text: Split layout with chart left, insights right
     SLIDE_JSON=$(jq -n \
       --arg title "$title" \
       --arg subtitle "Plotly: $diagram_type" \
+      --arg layout_id "$layout" \
       --argjson diagram_html "$DIAGRAM_ESCAPED" \
       --argjson text_insights "$INSIGHTS_ESCAPED" \
       '{
-        layout: "V3-diagram-text",
+        layout: $layout_id,
         content: {
           slide_title: $title,
           subtitle: $subtitle,
@@ -251,7 +253,7 @@ for item in "${TESTS[@]}"; do
         }
       }')
   else
-    # C5: Full-width layout
+    # C5-diagram: Full-width layout
     # For Journey (with insights), we create a flex container
     if [ "$diagram_type" = "journey" ] && [ -n "$INSIGHTS_HTML" ]; then
       # Journey: 80/20 split - chart and insights side by side in C5
@@ -261,9 +263,10 @@ for item in "${TESTS[@]}"; do
       SLIDE_JSON=$(jq -n \
         --arg title "$title" \
         --arg subtitle "Plotly: $diagram_type" \
+        --arg layout_id "$layout" \
         --argjson diagram_html "$COMBINED_ESCAPED" \
         '{
-          layout: "C5",
+          layout: $layout_id,
           content: {
             slide_title: $title,
             subtitle: $subtitle,
@@ -273,13 +276,14 @@ for item in "${TESTS[@]}"; do
           }
         }')
     else
-      # Timeline or other C5: Full-width chart only
+      # Timeline or other C5-diagram: Full-width chart only
       SLIDE_JSON=$(jq -n \
         --arg title "$title" \
         --arg subtitle "Plotly: $diagram_type" \
+        --arg layout_id "$layout" \
         --argjson diagram_html "$DIAGRAM_ESCAPED" \
         '{
-          layout: "C5",
+          layout: $layout_id,
           content: {
             slide_title: $title,
             subtitle: $subtitle,
