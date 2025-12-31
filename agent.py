@@ -84,6 +84,10 @@ async def process_diagram_direct(
 
         await deps.send_progress_update("completed", 100, "Diagram generation complete")
 
+        # Extract layout and insights_html for Plotly diagrams (V3/C5 layouts)
+        layout = generation_result.get("layout")
+        insights_html = generation_result.get("insights_html")
+
         return {
             "success": True,
             "diagram_url": diagram_url,
@@ -95,6 +99,8 @@ async def process_diagram_direct(
             "generation_method": generation_method,
             "content_type": content_type,         # svg, png, or html
             "content_delivery": content_delivery, # url or inline
+            "layout": layout,                     # Layout type (V3, C5) for Plotly diagrams
+            "insights_html": insights_html,       # Key Insights panel HTML for Plotly diagrams
             "metadata": {
                 **metadata,
                 "generated_at": datetime.utcnow().isoformat()
