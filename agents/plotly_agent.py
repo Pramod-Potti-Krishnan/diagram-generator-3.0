@@ -302,14 +302,19 @@ Return ONLY valid JSON, no markdown or explanation."""
                 insights = structured_data.get("insights", [])
                 logger.info(f"Found {len(insights)} insights in structured_data: {insights[:2] if insights else 'none'}")
                 if insights:
-                    logger.info(f"Generating insights panel with {len(insights)} insights")
-                    insights_html = self.renderer.generate_insights_html(
-                        insights=insights,
-                        title="Key Insights",
-                        theme=theme
-                    )
-                    logger.info(f"Generated insights_html: {len(insights_html) if insights_html else 0} chars")
+                    try:
+                        logger.info(f"Generating insights panel with {len(insights)} insights")
+                        insights_html = self.renderer.generate_insights_html(
+                            insights=insights,
+                            title="Key Insights",
+                            theme=theme
+                        )
+                        logger.info(f"Generated insights_html: {len(insights_html) if insights_html else 0} chars")
+                    except Exception as e:
+                        logger.error(f"Failed to generate insights HTML: {e}", exc_info=True)
+                        insights_html = None
 
+            logger.info(f"Returning result for {diagram_type}: insights_html length = {len(insights_html) if insights_html else 0}")
             return {
                 "success": True,
                 "content": content,
