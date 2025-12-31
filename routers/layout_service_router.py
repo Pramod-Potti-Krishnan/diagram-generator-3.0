@@ -375,7 +375,9 @@ async def _process_layout_service_job(
             "generation_method": result.get("metadata", {}).get("generation_method", "mermaid"),
             "metadata": result.get("metadata", {}),
             "html_content": result.get("html_content", ""),
-            "content_type": result.get("content_type", "svg")
+            "content_type": result.get("content_type", "svg"),
+            "layout": result.get("layout"),  # V3, C5, etc.
+            "insights_html": result.get("insights_html")  # Key Insights panel for Plotly diagrams
         })
 
         # Store the Layout Service formatted result
