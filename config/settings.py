@@ -93,9 +93,9 @@ class Settings(BaseSettings):
         description="Maximum tokens per request"
     )
     request_timeout: int = Field(
-        default=30,
+        default=60,
         env="REQUEST_TIMEOUT",
-        description="Request timeout in seconds"
+        description="Request timeout in seconds (increased for Playwright-based renderers)"
     )
     max_connections: int = Field(
         default=100,

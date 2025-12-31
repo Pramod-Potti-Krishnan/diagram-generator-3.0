@@ -96,10 +96,13 @@ class JobManager:
                     "status": JobStatus.COMPLETED,
                     "progress": 100,
                     "stage": "completed",
-                    "diagram_url": result.get("diagram_url", ""),
+                    "diagram_url": result.get("diagram_url", result.get("url", "")),
                     "diagram_type": result.get("diagram_type", self._jobs[job_id]["diagram_type"]),
                     "generation_method": result.get("generation_method", "unknown"),
                     "metadata": result.get("metadata", {}),
+                    "content_type": result.get("content_type", "svg"),
+                    "html_content": result.get("html_content", ""),
+                    "content_delivery": result.get("content_delivery", "url"),
                     "updated_at": datetime.utcnow().isoformat(),
                     "completed_at": datetime.utcnow().isoformat()
                 })

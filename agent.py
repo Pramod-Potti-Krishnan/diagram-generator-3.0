@@ -72,9 +72,14 @@ async def process_diagram_direct(
         diagram_type = generation_result.get("diagram_type", request_data.get("diagram_type"))
         generation_method = generation_result.get("generation_method", "unknown")
         metadata = generation_result.get("metadata", {})
+        content_type = generation_result.get("content_type", "svg")
+        content_delivery = generation_result.get("content_delivery", "url")
 
-        # Step 4: Extract SVG content for inline delivery
-        svg_content = generation_result.get("content", "")
+        # Step 4: Extract content for delivery
+        # For HTML content type (interactive components like Kanban), use html_content
+        # For SVG/PNG, use regular content
+        content = generation_result.get("content", "")
+        html_content = generation_result.get("html_content", content)
         mermaid_code = metadata.get("mermaid_code", "")
 
         await deps.send_progress_update("completed", 100, "Diagram generation complete")
@@ -82,11 +87,14 @@ async def process_diagram_direct(
         return {
             "success": True,
             "diagram_url": diagram_url,
-            "svg_content": svg_content,           # Inline SVG content (preferred)
-            "diagram_html": svg_content,          # Alias for Layout Service compatibility
+            "svg_content": content,               # Inline content (SVG or HTML)
+            "diagram_html": html_content,         # HTML-safe content for Layout Service
+            "html_content": html_content,         # Alias for interactive HTML content
             "mermaid_code": mermaid_code,         # Source code for debugging
             "diagram_type": diagram_type,
             "generation_method": generation_method,
+            "content_type": content_type,         # svg, png, or html
+            "content_delivery": content_delivery, # url or inline
             "metadata": {
                 **metadata,
                 "generated_at": datetime.utcnow().isoformat()

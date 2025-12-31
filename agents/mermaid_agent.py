@@ -508,6 +508,9 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
 
         # Build V2-compatible response with both old and new fields
         return {
+            # Success flag for conductor validation
+            "success": True,
+
             # Old format (backward compatibility)
             "content": svg_content,
             "content_type": "svg",
@@ -566,6 +569,9 @@ Generate ONLY the Mermaid code, starting with flowchart LR:"""
         wrapped_svg = self._wrap_for_client(mermaid_code, request.theme.dict())
 
         return {
+            # Success flag for conductor validation
+            "success": True,
+
             # Old format (backward compatibility)
             "content": wrapped_svg,
             "content_type": "svg",  # Misleading but for backward compatibility
