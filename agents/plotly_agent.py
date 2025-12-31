@@ -273,14 +273,15 @@ Return ONLY valid JSON, no markdown or explanation."""
             width = layout_config["chart_width"]
             height = layout_config["chart_height"]
 
-            # Override with constraints if provided
+            # Override with constraints if explicitly provided (ignore legacy 800x600 defaults)
             if request.constraints:
                 req_width = getattr(request.constraints, 'maxWidth', None)
                 req_height = getattr(request.constraints, 'maxHeight', None)
-                # Only use constraint if explicitly provided
-                if req_width and req_width != 1800:
+                # Only use constraint if it's NOT the legacy default (800x600)
+                # and not the C5 full-width default (1800x840)
+                if req_width and req_width not in (800, 1800):
                     width = req_width
-                if req_height and req_height != 840:
+                if req_height and req_height not in (600, 840):
                     height = req_height
 
             # Step 4: Render chart
