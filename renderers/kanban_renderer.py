@@ -106,6 +106,7 @@ class KanbanRenderer(PlaywrightRenderer):
         .kanban-card {
             cursor: grab;
             transition: transform 0.15s ease, box-shadow 0.15s ease;
+            user-select: none;
         }
         .kanban-card:hover {
             transform: translateY(-2px);
@@ -115,9 +116,10 @@ class KanbanRenderer(PlaywrightRenderer):
             opacity: 0.5;
             cursor: grabbing;
         }
-        .kanban-column.drag-over {
-            background: rgba(59, 130, 246, 0.1) !important;
-            border: 2px dashed #3B82F6;
+        .kanban-cards.drag-over {
+            background: rgba(59, 130, 246, 0.15) !important;
+            outline: 2px dashed #3B82F6;
+            outline-offset: -2px;
         }
         .kanban-card-edit {
             display: none;
@@ -128,6 +130,12 @@ class KanbanRenderer(PlaywrightRenderer):
         .kanban-card:hover .kanban-card-edit {
             display: block;
         }
+        .add-card-btn {
+            transition: all 0.15s ease;
+        }
+        .add-card-btn:hover {
+            background: rgba(0,0,0,0.05);
+        }
 """
             interactive_js = """
     <script>
@@ -135,8 +143,12 @@ class KanbanRenderer(PlaywrightRenderer):
         let draggedCard = null;
 
         document.addEventListener('DOMContentLoaded', () => {
+            initDragAndDrop();
+        });
+
+        function initDragAndDrop() {
             const cards = document.querySelectorAll('.kanban-card');
-            const columns = document.querySelectorAll('.kanban-column');
+            const cardContainers = document.querySelectorAll('.kanban-cards');
 
             cards.forEach(card => {
                 card.setAttribute('draggable', 'true');
@@ -145,37 +157,41 @@ class KanbanRenderer(PlaywrightRenderer):
                     draggedCard = card;
                     card.classList.add('dragging');
                     e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', ''); // Required for Firefox
                 });
 
                 card.addEventListener('dragend', () => {
                     card.classList.remove('dragging');
-                    columns.forEach(col => col.classList.remove('drag-over'));
+                    cardContainers.forEach(container => container.classList.remove('drag-over'));
                     draggedCard = null;
                 });
             });
 
-            columns.forEach(column => {
-                column.addEventListener('dragover', (e) => {
+            cardContainers.forEach(container => {
+                container.addEventListener('dragover', (e) => {
                     e.preventDefault();
                     e.dataTransfer.dropEffect = 'move';
-                    column.classList.add('drag-over');
+                    container.classList.add('drag-over');
                 });
 
-                column.addEventListener('dragleave', () => {
-                    column.classList.remove('drag-over');
+                container.addEventListener('dragleave', (e) => {
+                    // Only remove if leaving the container entirely
+                    if (!container.contains(e.relatedTarget)) {
+                        container.classList.remove('drag-over');
+                    }
                 });
 
-                column.addEventListener('drop', (e) => {
+                container.addEventListener('drop', (e) => {
                     e.preventDefault();
-                    column.classList.remove('drag-over');
+                    container.classList.remove('drag-over');
                     if (draggedCard) {
-                        const cardContainer = column.querySelector('.kanban-cards');
-                        cardContainer.appendChild(draggedCard);
+                        const cardsDiv = container.querySelector('.space-y-2') || container;
+                        cardsDiv.appendChild(draggedCard);
                         updateColumnCounts();
                     }
                 });
             });
-        });
+        }
 
         function updateColumnCounts() {
             document.querySelectorAll('.kanban-column').forEach(col => {
@@ -185,13 +201,52 @@ class KanbanRenderer(PlaywrightRenderer):
             });
         }
 
-        function editCard(btn) {
+        function editCard(btn, e) {
+            if (e) e.stopPropagation();
             const card = btn.closest('.kanban-card');
             const titleEl = card.querySelector('.kanban-title');
             const currentText = titleEl.textContent;
             const newText = prompt('Edit card:', currentText);
             if (newText && newText.trim()) {
                 titleEl.textContent = newText.trim();
+            }
+        }
+
+        function addCard(btn) {
+            const column = btn.closest('.kanban-column');
+            const cardsContainer = column.querySelector('.space-y-2');
+            const newTitle = prompt('Enter card title:');
+            if (newTitle && newTitle.trim()) {
+                const cardHtml = `
+                    <div class="kanban-card bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden relative" draggable="true">
+                        <div class="flex">
+                            <div class="priority-bar" style="background: #9CA3AF"></div>
+                            <div class="flex-1 p-3">
+                                <p class="kanban-title text-sm font-medium" style="color: #1F2937">${newTitle.trim()}</p>
+                            </div>
+                            <button onclick="editCard(this, event)" class="kanban-card-edit p-1 rounded hover:bg-gray-100">
+                                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+                // Re-init drag for new card
+                const newCard = cardsContainer.lastElementChild;
+                newCard.addEventListener('dragstart', (e) => {
+                    draggedCard = newCard;
+                    newCard.classList.add('dragging');
+                    e.dataTransfer.effectAllowed = 'move';
+                    e.dataTransfer.setData('text/plain', '');
+                });
+                newCard.addEventListener('dragend', () => {
+                    newCard.classList.remove('dragging');
+                    document.querySelectorAll('.kanban-cards').forEach(c => c.classList.remove('drag-over'));
+                    draggedCard = null;
+                });
+                updateColumnCounts();
             }
         }
     </script>
@@ -221,7 +276,7 @@ class KanbanRenderer(PlaywrightRenderer):
     </style>
 </head>
 <body class="antialiased">
-    <div class="flex gap-4 overflow-x-auto h-full w-full p-4">
+    <div class="flex gap-4 overflow-x-auto w-full" style="padding: 40px 16px 30px 16px;">
         {columns_html}
     </div>
     {interactive_js}
@@ -249,16 +304,29 @@ class KanbanRenderer(PlaywrightRenderer):
 
             cards_html = self._build_cards(items, primary_color, text_color, interactive)
 
+            # Add card button for interactive mode
+            add_card_btn = ""
+            if interactive:
+                add_card_btn = f"""
+        <button onclick="addCard(this)" class="add-card-btn w-full mt-2 p-2 rounded-lg border-2 border-dashed border-gray-300 text-gray-400 text-sm font-medium flex items-center justify-center gap-1 hover:border-gray-400 hover:text-gray-500">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            </svg>
+            Add Card
+        </button>
+"""
+
             html_parts.append(f"""
 <div class="{col_width_class} kanban-column" data-column="{i}">
     <div class="flex items-center justify-between mb-3 px-1">
         <span class="text-sm font-semibold uppercase tracking-wide" style="color: {text_color}">{name}</span>
         <span class="kanban-count text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{len(items)}</span>
     </div>
-    <div class="rounded-xl p-2 min-h-[500px] kanban-cards" style="background: {color}">
+    <div class="rounded-xl p-2 kanban-cards" style="background: {color}; min-height: 280px;">
         <div class="space-y-2">
             {cards_html}
         </div>
+        {add_card_btn}
     </div>
 </div>
 """)
@@ -299,7 +367,7 @@ class KanbanRenderer(PlaywrightRenderer):
             edit_btn = ""
             if interactive:
                 edit_btn = """
-<button onclick="editCard(this)" class="kanban-card-edit p-1 rounded hover:bg-gray-100">
+<button onclick="editCard(this, event)" class="kanban-card-edit p-1 rounded hover:bg-gray-100">
     <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
     </svg>
