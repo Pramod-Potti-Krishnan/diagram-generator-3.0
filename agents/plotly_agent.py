@@ -225,6 +225,7 @@ Return ONLY valid JSON, no markdown or explanation."""
         2. Generate Key Insights HTML for quadrant and journey
         3. Return both chart image and insights HTML in response
         """
+        logger.info(f"PlotlyAgent.generate() called for {request.diagram_type}")
         self.validate_request(request)
 
         if not self.llm_service:
@@ -292,8 +293,10 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             # Step 6: Generate insights HTML if applicable
             insights_html = None
+            logger.info(f"Layout config for {diagram_type}: has_insights={layout_config.get('has_insights')}")
             if layout_config.get("has_insights"):
                 insights = structured_data.get("insights", [])
+                logger.info(f"Found {len(insights)} insights in structured_data: {insights[:2] if insights else 'none'}")
                 if insights:
                     logger.info(f"Generating insights panel with {len(insights)} insights")
                     insights_html = self.renderer.generate_insights_html(
@@ -301,6 +304,7 @@ Return ONLY valid JSON, no markdown or explanation."""
                         title="Key Insights",
                         theme=theme
                     )
+                    logger.info(f"Generated insights_html: {len(insights_html) if insights_html else 0} chars")
 
             return {
                 "success": True,
