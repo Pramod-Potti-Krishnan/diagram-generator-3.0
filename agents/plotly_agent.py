@@ -1,5 +1,5 @@
 """
-Plotly Agent
+Plotly Agent v2.0
 
 Handles Timeline, Quadrant, and Journey diagrams using Plotly + Kaleido.
 
@@ -7,6 +7,10 @@ Layout Support:
 - Timeline: C5 full-width (1800x840) - vertical layout
 - Quadrant: V3 split layout (1080x840) with Key Insights panel
 - Journey: C5 full-width with 80/20 split (1440px chart + 360px insights)
+
+CHANGELOG:
+- v2.0: Added Key Insights panel generation for quadrant and journey
+- v2.0: Override generate() to use layout-specific dimensions
 """
 
 import base64
