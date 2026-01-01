@@ -18,10 +18,14 @@ from models import DiagramRequest, GenerationStrategy, GenerationMethod
 from utils.logger import setup_logger
 from .unified_playbook import UnifiedPlaybook
 from agents import (
-    # Legacy agents
-    SVGAgent, MermaidAgent, PythonChartAgent,
-    # v3.0 structured agents
-    PlotlyAgent, D2Agent, FrappeGanttAgent, MarkmapAgent, KanbanAgent
+    # PRIMARY: Gemini Image (v3.1)
+    GeminiImageAgent,
+    # Playwright-based agents
+    FrappeGanttAgent, MarkmapAgent, KanbanAgent,
+    # Fallback agents
+    MermaidAgent, SVGAgent,
+    # Legacy agents (kept for compatibility)
+    PlotlyAgent, D2Agent, PythonChartAgent
 )
 from storage import DiagramStorage, DiagramOperations, CacheManager, DiagramSessionManager
 
@@ -40,35 +44,52 @@ class DiagramConductor:
         self.settings = settings
         self.playbook = UnifiedPlaybook(settings)
         
-        # Initialize agents - legacy and v3.0 structured
+        # Initialize agents - v3.1 architecture with Gemini Image as primary
         self.agents = {
-            # Legacy agents
-            GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
-            GenerationMethod.MERMAID: MermaidAgent(settings),
-            GenerationMethod.PYTHON_CHART: PythonChartAgent(settings),
-            # v3.0 structured agents
-            GenerationMethod.PLOTLY: PlotlyAgent(settings),
-            GenerationMethod.D2: D2Agent(settings),
+            # PRIMARY: Gemini Image (v3.1) - Direct image generation
+            GenerationMethod.GEMINI_IMAGE: GeminiImageAgent(settings),
+
+            # Playwright-based agents (interactive diagrams)
             GenerationMethod.FRAPPE_GANTT: FrappeGanttAgent(settings),
             GenerationMethod.MARKMAP: MarkmapAgent(settings),
             GenerationMethod.KANBAN: KanbanAgent(settings),
+
+            # Fallback agents
+            GenerationMethod.MERMAID: MermaidAgent(settings),
+            GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
+
+            # Legacy agents (kept for compatibility)
+            GenerationMethod.PLOTLY: PlotlyAgent(settings),
+            GenerationMethod.D2: D2Agent(settings),
+            GenerationMethod.PYTHON_CHART: PythonChartAgent(settings),
         }
 
-        # v3.0 Routing table: diagram_type -> (method, allowed_layouts)
+        # v3.1 Routing table: diagram_type -> (method, allowed_layouts)
+        # Prioritizes Gemini Image for most diagram types, with Playwright for interactive
         self.v3_routing = {
-            # C5 layout only (full-width diagrams)
-            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5"]),
-            "kanban": (GenerationMethod.KANBAN, ["C5"]),
-            # V3 layout only (content diagrams for split layouts)
-            "timeline": (GenerationMethod.PLOTLY, ["V3"]),
-            "quadrant": (GenerationMethod.PLOTLY, ["V3"]),
-            "journey": (GenerationMethod.PLOTLY, ["V3"]),
-            "journey_map": (GenerationMethod.PLOTLY, ["V3"]),
-            "flowchart": (GenerationMethod.D2, ["V3"]),
-            "er_diagram": (GenerationMethod.D2, ["V3"]),
-            "architecture": (GenerationMethod.D2, ["V3"]),
-            "mindmap": (GenerationMethod.MARKMAP, ["V3"]),
-            "mind_map": (GenerationMethod.MARKMAP, ["V3"]),
+            # Playwright-based (C5 full-width layout)
+            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5", "V3"]),
+            "kanban": (GenerationMethod.KANBAN, ["C5", "V3"]),
+
+            # Gemini Image primary (works with any layout)
+            "architecture": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "microservice": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "er_diagram": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "entity_relationship": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "flowchart": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "sequence": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "timeline": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "quadrant": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "journey": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "journey_map": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "data_flow": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "network": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "concept_map": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+            "process_flow": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
+
+            # Mind maps: prefer Markmap, fallback to Gemini Image
+            "mindmap": (GenerationMethod.MARKMAP, ["C5", "V3"]),
+            "mind_map": (GenerationMethod.MARKMAP, ["C5", "V3"]),
         }
         
         # Initialize storage components
@@ -301,8 +322,9 @@ class DiagramConductor:
                 logger.error(f"Agent {strategy.method} generation failed: {error_msg}")
                 return None
 
-            # Verify content exists
-            if not result.get("content"):
+            # Verify content exists (content or url for PNG-based agents)
+            has_content = result.get("content") or result.get("url") or result.get("html_content")
+            if not has_content:
                 logger.error(f"Agent {strategy.method} returned empty content")
                 return None
 
@@ -368,14 +390,27 @@ class DiagramConductor:
             Updated result with URL and diagram ID
         """
 
-        url = ""
         diagram_id = str(uuid.uuid4())
 
         # Determine content type from result (v3.0 agents set this)
         content_type = result.get("content_type", "svg")
+        content = result.get("content", "")
+
+        # Check if agent already uploaded (GeminiImageAgent handles its own upload)
+        existing_url = result.get("url", "")
+        existing_html = result.get("html_content", "")
+
+        if existing_url:
+            # Agent already uploaded - just add diagram_id and preserve html_content
+            logger.info(f"Content already uploaded by agent: {existing_url[:60]}...")
+            result["diagram_id"] = diagram_id
+            result["content_delivery"] = "url"
+            # Preserve existing html_content if set by agent
+            if existing_html:
+                result["html_content"] = existing_html
+            return result
 
         # Debug logging for storage upload
-        content = result.get("content", "")
         logger.info(f"Storage upload debug: content_type={content_type}, content_size={len(content) if content else 0}, result_keys={list(result.keys())}")
 
         # HTML content type: Skip storage upload, deliver inline
@@ -389,9 +424,10 @@ class DiagramConductor:
             return result
 
         # Try to upload to storage (PNG/SVG only)
+        url = ""
         try:
             if not content:
-                logger.error("No content in result to upload!")
+                logger.warning("No content in result to upload - skipping storage")
             else:
                 url = await self.storage.upload_diagram(
                     svg_content=content,
@@ -461,15 +497,24 @@ class DiagramConductor:
         }
 
     def _estimate_v3_time(self, method: GenerationMethod) -> int:
-        """Estimate generation time for v3.0 methods in milliseconds"""
+        """Estimate generation time for v3.1 methods in milliseconds"""
         estimates = {
-            GenerationMethod.PLOTLY: 1500,         # Python + Kaleido rendering
-            GenerationMethod.D2: 800,              # D2 CLI subprocess
+            # PRIMARY: Gemini Image
+            GenerationMethod.GEMINI_IMAGE: 3000,   # Vertex AI image generation
+
+            # Playwright-based
             GenerationMethod.FRAPPE_GANTT: 2000,   # HTML + Playwright screenshot
             GenerationMethod.MARKMAP: 1500,        # HTML + Playwright screenshot
             GenerationMethod.KANBAN: 1500,         # Tailwind HTML + Playwright screenshot
+
+            # Fallback
+            GenerationMethod.MERMAID: 2000,        # LLM + Kroki rendering
+
+            # Legacy
+            GenerationMethod.PLOTLY: 1500,         # Python + Kaleido rendering
+            GenerationMethod.D2: 800,              # D2 CLI subprocess
         }
-        return estimates.get(method, 1500)
+        return estimates.get(method, 2000)
 
     def get_v3_routing_info(self) -> Dict[str, Any]:
         """Get v3.0 routing table for debugging"""

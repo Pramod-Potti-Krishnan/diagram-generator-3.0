@@ -45,12 +45,11 @@ from playbooks.mermaid_playbook_v3 import (
 
 logger = setup_logger(__name__)
 
-# Model escalation chain - retries with same model first, then escalates
+# Model escalation chain - start with Pro for better code quality
 MODEL_ESCALATION_CHAIN = [
-    "gemini-2.5-flash",      # Attempt 1: Fast, default
-    "gemini-2.5-flash",      # Attempt 2: Retry same model (might be transient)
-    "gemini-2.5-pro",        # Attempt 3: Escalate to more capable
-    "gemini-3-flash-preview" # Attempt 4: Last resort, highest quality
+    "gemini-2.5-pro",        # Attempt 1: Start with Pro for better code quality
+    "gemini-2.5-pro",        # Attempt 2: Retry same model (might be transient)
+    "gemini-2.5-flash",      # Attempt 3: Fallback to faster model
 ]
 RETRY_BASE_DELAY = 1.0  # seconds between retries
 

@@ -353,10 +353,11 @@ def get_mermaid_llm_service() -> VertexAIService:
     global _mermaid_service
 
     if _mermaid_service is None:
-        # Create service with LLM_DIAGRAM_MERMAID model if set, otherwise use default
+        # Create service with LLM_DIAGRAM_MERMAID model if set
+        # Default to gemini-2.5-pro for better Mermaid code quality
         project_id = os.getenv("GCP_PROJECT_ID")
         location = os.getenv("GEMINI_LOCATION")
-        model_name = os.getenv("LLM_DIAGRAM_MERMAID", os.getenv("LLM_DIAGRAM", "gemini-2.5-flash"))
+        model_name = os.getenv("LLM_DIAGRAM_MERMAID", "gemini-2.5-pro")
         _mermaid_service = VertexAIService(
             project_id=project_id,
             location=location,

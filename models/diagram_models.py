@@ -64,18 +64,23 @@ class DiagramType(str, Enum):
 class GenerationMethod(str, Enum):
     """Available generation methods"""
 
-    # Legacy methods
-    SVG_TEMPLATE = "svg_template"
-    MERMAID = "mermaid"
-    PYTHON_CHART = "python_chart"
-    CUSTOM = "custom"
+    # PRIMARY: Gemini Image (v3.1)
+    GEMINI_IMAGE = "gemini_image"  # Direct image generation via gemini-2.5-flash-image
 
-    # v3.0 Structured methods
-    PLOTLY = "plotly"              # Timeline, Quadrant, Journey
-    D2 = "d2"                      # Flowchart, ER, Architecture
+    # Playwright-based methods (interactive diagrams)
     FRAPPE_GANTT = "frappe_gantt"  # Gantt charts (C5 only)
     MARKMAP = "markmap"            # Mind maps
     KANBAN = "kanban"              # Kanban boards (C5 only)
+
+    # Fallback methods
+    MERMAID = "mermaid"            # LLM-generated Mermaid code + rendering
+    SVG_TEMPLATE = "svg_template"  # Simple SVG templates
+
+    # Legacy methods (kept for compatibility)
+    PLOTLY = "plotly"              # Timeline, Quadrant, Journey (deprecated)
+    D2 = "d2"                      # Flowchart, ER, Architecture (deprecated)
+    PYTHON_CHART = "python_chart"
+    CUSTOM = "custom"
 
 
 class DiagramSpec(BaseModel):
