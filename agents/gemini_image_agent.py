@@ -2,9 +2,9 @@
 Gemini Image Agent - Primary Diagram Generation via gemini-2.5-flash-image
 
 Uses Vertex AI's gemini-2.5-flash-image model for direct image generation.
-This is the primary diagram generation method - fast and produces high-quality diagrams.
+This is the primary diagram generation method for the core 9 types.
 
-Supports: architecture, microservice, er_diagram, flowchart, sequence, timeline, quadrant
+Supports: architecture, microservice, er_diagram, flowchart, sequence, timeline, mind_map
 """
 
 import os
@@ -135,21 +135,6 @@ Style: Clean corporate timeline, professional presentation style.
 Dimensions: {width}x{height} pixels
 """,
 
-    "quadrant": """Generate a professional 2x2 quadrant matrix chart:
-- Two labeled axes (X and Y)
-- Four labeled quadrants with distinct colors
-- Items/elements placed in appropriate quadrants
-- Clean grid lines
-- Legend if helpful
-- Professional business consulting style
-
-Quadrant specifications:
-{content}
-
-Style: Clean consulting-style matrix diagram.
-Dimensions: {width}x{height} pixels
-""",
-
     "mind_map": """Generate a mind map diagram with:
 - Central topic/theme in the center (prominent)
 - Main branches radiating outward from center
@@ -163,21 +148,6 @@ Mind map structure:
 {content}
 
 Style: Colorful, readable mind map with clear hierarchy.
-Dimensions: {width}x{height} pixels
-""",
-
-    "data_flow": """Generate a data flow diagram (DFD) showing:
-- External entities (rectangles)
-- Processes (circles or rounded rectangles)
-- Data stores (open-ended rectangles)
-- Data flows (arrows with labels)
-- Clear flow direction
-- Numbered processes if applicable
-
-Data flow to visualize:
-{content}
-
-Style: Standard DFD notation with clear labels.
 Dimensions: {width}x{height} pixels
 """,
 
@@ -284,11 +254,10 @@ class GeminiImageAgent(BaseAgent):
         self.enabled = False
         self.storage = DiagramStorage(settings)
 
-        # Diagram types this agent supports
+        # Core diagram types this agent supports (simplified v3.1)
         self.supported_types = [
-            "architecture", "microservice", "er_diagram", "data_flow",
-            "flowchart", "sequence", "timeline", "quadrant", "mind_map",
-            "network", "concept_map", "process_flow"
+            "architecture", "microservice", "er_diagram",
+            "flowchart", "sequence", "timeline", "mind_map"
         ]
 
         # Initialize Vertex AI

@@ -173,26 +173,15 @@ async def root():
             }
         },
         "supported_diagram_types": {
-            "svg_templates": [
-                "cycle_3_step", "cycle_4_step", "cycle_5_step",
-                "pyramid_3_level", "pyramid_4_level", "pyramid_5_level",
-                "venn_2_circle", "venn_3_circle",
-                "honeycomb_3_cell", "honeycomb_5_cell", "honeycomb_7_cell",
-                "hub_spoke_4", "hub_spoke_6", "hub_spoke_8",
-                "matrix_2x2", "matrix_3x3",
-                "funnel_3_stage", "funnel_4_stage", "funnel_5_stage",
-                "timeline_3_event", "timeline_5_event"
+            "gemini_image": [
+                "architecture", "microservice", "er_diagram",
+                "flowchart", "sequence", "timeline"
             ],
-            "mermaid": [
-                "flowchart", "sequence", "gantt", "state",
-                "erDiagram", "journey", "quadrantChart"
+            "playwright": [
+                "gantt", "kanban", "mind_map"
             ],
-            "python_charts": [
-                "pie", "bar", "line", "scatter", "network", "sankey"
-            ],
-            "layout_service": [
-                "flowchart", "sequence", "class", "state", "er",
-                "gantt", "userjourney", "gitgraph", "mindmap", "pie", "timeline"
+            "mermaid_fallback": [
+                "flowchart", "sequence", "gantt", "mindmap", "timeline"
             ]
         }
     }
@@ -275,10 +264,10 @@ async def debug_status():
         playwright_status = "failed"
         playwright_error = str(e)
 
-    # Test v3.0 agents
+    # Test v3.1 core agents
     agent_tests = {}
     if conductor:
-        for diagram_type in ["gantt", "kanban", "timeline", "mindmap", "flowchart"]:
+        for diagram_type in ["architecture", "flowchart", "gantt", "kanban", "mindmap"]:
             if diagram_type in conductor.v3_routing:
                 method, _ = conductor.v3_routing[diagram_type]
                 agent = conductor.agents.get(method)

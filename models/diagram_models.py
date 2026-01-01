@@ -8,79 +8,36 @@ from pydantic import BaseModel, Field
 
 
 class DiagramType(str, Enum):
-    """Supported diagram types"""
-    
-    # Cycle diagrams
-    CYCLE_3_STEP = "cycle_3_step"
-    CYCLE_4_STEP = "cycle_4_step"
-    CYCLE_5_STEP = "cycle_5_step"
-    
-    # Pyramid diagrams
-    PYRAMID_3_LEVEL = "pyramid_3_level"
-    PYRAMID_4_LEVEL = "pyramid_4_level"
-    PYRAMID_5_LEVEL = "pyramid_5_level"
-    
-    # Venn diagrams
-    VENN_2_CIRCLE = "venn_2_circle"
-    VENN_3_CIRCLE = "venn_3_circle"
-    
-    # Honeycomb patterns
-    HONEYCOMB_3 = "honeycomb_3"
-    HONEYCOMB_5 = "honeycomb_5"
-    HONEYCOMB_7 = "honeycomb_7"
-    
-    # Matrix layouts
-    MATRIX_2X2 = "matrix_2x2"
-    MATRIX_3X3 = "matrix_3x3"
-    SWOT = "swot"
-    QUADRANT = "quadrant"
-    
-    # Flow diagrams
-    FUNNEL = "funnel"
-    PROCESS_FLOW = "process_flow"
-    TIMELINE = "timeline"
-    JOURNEY_MAP = "journey_map"
-    
-    # Relationship diagrams
-    HUB_SPOKE = "hub_spoke"
-    NETWORK = "network"
-    MIND_MAP = "mind_map"
-    CONCEPT_MAP = "concept_map"
-    
-    # Technical diagrams
+    """Supported diagram types - Core 9 only"""
+
+    # Gemini Image types
+    ARCHITECTURE = "architecture"
+    MICROSERVICE = "microservice"
+    ER_DIAGRAM = "er_diagram"
     FLOWCHART = "flowchart"
     SEQUENCE = "sequence"
-    ARCHITECTURE = "architecture"
+    TIMELINE = "timeline"
+
+    # Playwright-based types
     GANTT = "gantt"
-    
-    # Data visualizations
-    PIE_CHART = "pie_chart"
-    BAR_CHART = "bar_chart"
-    LINE_CHART = "line_chart"
-    SCATTER_PLOT = "scatter_plot"
-    SANKEY = "sankey"
+    KANBAN = "kanban"
+    MIND_MAP = "mind_map"
 
 
 class GenerationMethod(str, Enum):
-    """Available generation methods"""
+    """Available generation methods - Simplified v3.1"""
 
-    # PRIMARY: Gemini Image (v3.1)
-    GEMINI_IMAGE = "gemini_image"  # Direct image generation via gemini-2.5-flash-image
+    # PRIMARY: Gemini Image
+    GEMINI_IMAGE = "gemini_image"
 
-    # Playwright-based methods (interactive diagrams)
-    FRAPPE_GANTT = "frappe_gantt"  # Gantt charts (C5 only)
-    MARKMAP = "markmap"            # Mind maps
-    KANBAN = "kanban"              # Kanban boards (C5 only)
+    # Playwright-based methods
+    FRAPPE_GANTT = "frappe_gantt"
+    MARKMAP = "markmap"
+    KANBAN = "kanban"
 
-    # Fallback methods
-    MERMAID = "mermaid"            # LLM-generated Mermaid code + rendering
-    SVG_TEMPLATE = "svg_template"  # Simple SVG templates
-
-    # Legacy methods (kept for compatibility)
-    PLOTLY = "plotly"              # Timeline, Quadrant, Journey (deprecated)
-    D2 = "d2"                      # Flowchart, ER, Architecture (deprecated)
-    PYTHON_CHART = "python_chart"
-    CUSTOM = "custom"
+    # Fallback
+    MERMAID = "mermaid"
+    SVG_TEMPLATE = "svg_template"
 
 
 class DiagramSpec(BaseModel):
@@ -206,22 +163,17 @@ class GenerationStrategy(BaseModel):
             reasoning=f"Fallback from {self.method} due to error or low confidence",
             fallback_chain=self.fallback_chain[1:],
             estimated_time_ms=self._estimate_time(next_method),
-            quality_estimate="medium" if next_method != GenerationMethod.PYTHON_CHART else "acceptable"
+            quality_estimate="medium"
         )
-    
+
     def _estimate_time(self, method: GenerationMethod) -> int:
         """Estimate generation time for method"""
         estimates = {
-            # Legacy methods
+            GenerationMethod.GEMINI_IMAGE: 3000,
+            GenerationMethod.FRAPPE_GANTT: 2000,
+            GenerationMethod.MARKMAP: 1500,
+            GenerationMethod.KANBAN: 1500,
+            GenerationMethod.MERMAID: 2000,
             GenerationMethod.SVG_TEMPLATE: 200,
-            GenerationMethod.MERMAID: 500,
-            GenerationMethod.PYTHON_CHART: 2000,
-            GenerationMethod.CUSTOM: 3000,
-            # v3.0 structured methods
-            GenerationMethod.PLOTLY: 1500,         # Python rendering
-            GenerationMethod.D2: 800,              # CLI subprocess
-            GenerationMethod.FRAPPE_GANTT: 2000,   # Playwright rendering
-            GenerationMethod.MARKMAP: 1500,        # Playwright rendering
-            GenerationMethod.KANBAN: 1500,         # Playwright rendering
         }
-        return estimates.get(method, 1000)
+        return estimates.get(method, 2000)

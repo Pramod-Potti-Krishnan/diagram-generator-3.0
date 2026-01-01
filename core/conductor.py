@@ -18,14 +18,12 @@ from models import DiagramRequest, GenerationStrategy, GenerationMethod
 from utils.logger import setup_logger
 from .unified_playbook import UnifiedPlaybook
 from agents import (
-    # PRIMARY: Gemini Image (v3.1)
+    # PRIMARY: Gemini Image
     GeminiImageAgent,
     # Playwright-based agents
     FrappeGanttAgent, MarkmapAgent, KanbanAgent,
     # Fallback agents
     MermaidAgent, SVGAgent,
-    # Legacy agents (kept for compatibility)
-    PlotlyAgent, D2Agent, PythonChartAgent
 )
 from storage import DiagramStorage, DiagramOperations, CacheManager, DiagramSessionManager
 
@@ -44,12 +42,12 @@ class DiagramConductor:
         self.settings = settings
         self.playbook = UnifiedPlaybook(settings)
         
-        # Initialize agents - v3.1 architecture with Gemini Image as primary
+        # Initialize agents - v3.1 simplified (core 9 types only)
         self.agents = {
-            # PRIMARY: Gemini Image (v3.1) - Direct image generation
+            # PRIMARY: Gemini Image
             GenerationMethod.GEMINI_IMAGE: GeminiImageAgent(settings),
 
-            # Playwright-based agents (interactive diagrams)
+            # Playwright-based agents
             GenerationMethod.FRAPPE_GANTT: FrappeGanttAgent(settings),
             GenerationMethod.MARKMAP: MarkmapAgent(settings),
             GenerationMethod.KANBAN: KanbanAgent(settings),
@@ -57,37 +55,21 @@ class DiagramConductor:
             # Fallback agents
             GenerationMethod.MERMAID: MermaidAgent(settings),
             GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
-
-            # Legacy agents (kept for compatibility)
-            GenerationMethod.PLOTLY: PlotlyAgent(settings),
-            GenerationMethod.D2: D2Agent(settings),
-            GenerationMethod.PYTHON_CHART: PythonChartAgent(settings),
         }
 
-        # v3.1 Routing table: diagram_type -> (method, allowed_layouts)
-        # Prioritizes Gemini Image for most diagram types, with Playwright for interactive
+        # v3.1 Routing table: Core 9 diagram types only
         self.v3_routing = {
-            # Playwright-based (C5 full-width layout)
-            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5", "V3"]),
-            "kanban": (GenerationMethod.KANBAN, ["C5", "V3"]),
-
-            # Gemini Image primary (works with any layout)
+            # Gemini Image types
             "architecture": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "microservice": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "er_diagram": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "entity_relationship": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "flowchart": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "sequence": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "timeline": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "quadrant": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "journey": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "journey_map": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "data_flow": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "network": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "concept_map": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
-            "process_flow": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
 
-            # Mind maps: prefer Markmap, fallback to Gemini Image
+            # Playwright-based types
+            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5", "V3"]),
+            "kanban": (GenerationMethod.KANBAN, ["C5", "V3"]),
             "mindmap": (GenerationMethod.MARKMAP, ["C5", "V3"]),
             "mind_map": (GenerationMethod.MARKMAP, ["C5", "V3"]),
         }
@@ -499,20 +481,12 @@ class DiagramConductor:
     def _estimate_v3_time(self, method: GenerationMethod) -> int:
         """Estimate generation time for v3.1 methods in milliseconds"""
         estimates = {
-            # PRIMARY: Gemini Image
-            GenerationMethod.GEMINI_IMAGE: 3000,   # Vertex AI image generation
-
-            # Playwright-based
-            GenerationMethod.FRAPPE_GANTT: 2000,   # HTML + Playwright screenshot
-            GenerationMethod.MARKMAP: 1500,        # HTML + Playwright screenshot
-            GenerationMethod.KANBAN: 1500,         # Tailwind HTML + Playwright screenshot
-
-            # Fallback
-            GenerationMethod.MERMAID: 2000,        # LLM + Kroki rendering
-
-            # Legacy
-            GenerationMethod.PLOTLY: 1500,         # Python + Kaleido rendering
-            GenerationMethod.D2: 800,              # D2 CLI subprocess
+            GenerationMethod.GEMINI_IMAGE: 3000,
+            GenerationMethod.FRAPPE_GANTT: 2000,
+            GenerationMethod.MARKMAP: 1500,
+            GenerationMethod.KANBAN: 1500,
+            GenerationMethod.MERMAID: 2000,
+            GenerationMethod.SVG_TEMPLATE: 200,
         }
         return estimates.get(method, 2000)
 

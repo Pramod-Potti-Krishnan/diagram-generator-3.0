@@ -15,63 +15,27 @@ DEFAULT_THEME: Dict[str, Any] = {
     "style": "professional"
 }
 
-# Supported diagram types by method
+# Supported diagram types by method - v3.1 Simplified (Core 9 only)
 SUPPORTED_DIAGRAM_TYPES: Dict[str, List[str]] = {
-    # Legacy methods
-    "svg_template": [
-        "cycle_3_step", "cycle_4_step", "cycle_5_step",
-        "pyramid_3_level", "pyramid_4_level", "pyramid_5_level",
-        "venn_2_circle", "venn_3_circle",
-        "honeycomb_3", "honeycomb_5", "honeycomb_7",
-        "matrix_2x2", "matrix_3x3", "swot",
-        "funnel", "hub_spoke", "process_flow"
+    "gemini_image": [
+        "architecture", "microservice", "er_diagram",
+        "flowchart", "sequence", "timeline"
     ],
+    "frappe_gantt": ["gantt"],
+    "markmap": ["mindmap", "mind_map"],
+    "kanban": ["kanban"],
     "mermaid": [
-        # Kept for fallback only
-        "flowchart", "erDiagram", "journey", "pie",
-        "mindmap", "timeline", "kanban", "gantt", "quadrantChart"
-    ],
-    "python_chart": [
-        "pie_chart", "bar_chart", "line_chart",
-        "scatter_plot", "sankey", "network", "funnel"
-    ],
-    # v3.0 Structured methods (PRIMARY for these types)
-    "plotly": [
-        "timeline",        # Chronological events
-        "quadrant",        # 2x2 matrix plots
-        "journey",         # User journey with satisfaction scores
-        "journey_map"      # Alternative name for journey
-    ],
-    "d2": [
-        "flowchart",       # Process flows and decision trees
-        "er_diagram",      # Entity relationship diagrams
-        "architecture"     # System architecture diagrams
-    ],
-    "frappe_gantt": [
-        "gantt"            # Project timelines with dependencies (C5 only)
-    ],
-    "markmap": [
-        "mindmap",         # Hierarchical mind maps
-        "mind_map"         # Alternative name
-    ],
-    "kanban": [
-        "kanban"           # Kanban boards (C5 only)
+        "flowchart", "sequence", "gantt", "mindmap", "timeline"  # Fallback only
     ]
 }
 
-# Method selection priorities (lower is better)
+# Method selection priorities (lower is better) - v3.1 Simplified
 METHOD_PRIORITIES: Dict[str, int] = {
-    # v3.0 structured methods (highest priority)
-    "plotly": 1,
-    "d2": 1,
+    "gemini_image": 1,
     "frappe_gantt": 1,
     "markmap": 1,
     "kanban": 1,
-    # Legacy methods (fallback)
-    "svg_template": 2,
-    "mermaid": 3,
-    "python_chart": 4,
-    "custom": 5
+    "mermaid": 2
 }
 
 # Cache key prefixes
@@ -87,19 +51,13 @@ WS_MAX_MESSAGE_SIZE = 10 * 1024 * 1024  # 10MB
 WS_PING_INTERVAL = 30  # seconds
 WS_PING_TIMEOUT = 10  # seconds
 
-# Generation timeouts (milliseconds)
+# Generation timeouts (milliseconds) - v3.1 Simplified
 GENERATION_TIMEOUTS = {
-    # Legacy methods
-    "svg_template": 1000,
-    "mermaid": 3000,
-    "python_chart": 5000,
-    "custom": 10000,
-    # v3.0 structured methods
-    "plotly": 5000,         # Python + Kaleido rendering
-    "d2": 3000,             # D2 CLI subprocess
-    "frappe_gantt": 8000,   # HTML + Playwright screenshot
-    "markmap": 5000,        # HTML + Playwright screenshot
-    "kanban": 5000          # Tailwind HTML + Playwright screenshot
+    "gemini_image": 10000,
+    "frappe_gantt": 8000,
+    "markmap": 5000,
+    "kanban": 5000,
+    "mermaid": 5000
 }
 
 # Quality thresholds
@@ -138,33 +96,23 @@ STATUS_MESSAGES = {
 
 # ============== LAYOUT SERVICE INTEGRATION ==============
 
-# Diagram types supported by Layout Service endpoint (11 types)
+# Diagram types supported by Layout Service endpoint - v3.1 Core types
 LAYOUT_SERVICE_DIAGRAM_TYPES: List[str] = [
     "flowchart",
     "sequence",
-    "class",
-    "state",
     "er",
     "gantt",
-    "userjourney",
-    "gitgraph",
     "mindmap",
-    "pie",
     "timeline"
 ]
 
-# Map Layout Service type names to internal Mermaid syntax types
+# Map Layout Service type names to internal Mermaid syntax types - v3.1 Core types
 LAYOUT_SERVICE_TYPE_MAP: Dict[str, str] = {
     "flowchart": "flowchart",
     "sequence": "sequenceDiagram",
-    "class": "classDiagram",
-    "state": "stateDiagram-v2",
     "er": "erDiagram",
     "gantt": "gantt",
-    "userjourney": "journey",
-    "gitgraph": "gitGraph",
     "mindmap": "mindmap",
-    "pie": "pie",
     "timeline": "timeline"
 }
 
@@ -172,63 +120,40 @@ LAYOUT_SERVICE_TYPE_MAP: Dict[str, str] = {
 MERMAID_TO_LAYOUT_TYPE_MAP: Dict[str, str] = {
     "flowchart": "flowchart",
     "sequenceDiagram": "sequence",
-    "classDiagram": "class",
-    "stateDiagram-v2": "state",
     "erDiagram": "er",
     "gantt": "gantt",
-    "journey": "userjourney",
-    "gitGraph": "gitgraph",
     "mindmap": "mindmap",
-    "pie": "pie",
     "timeline": "timeline"
 }
 
-# Minimum grid sizes per diagram type (width x height)
-# Layout Service will enforce these - users cannot shrink below threshold
+# Minimum grid sizes per diagram type (width x height) - v3.1 Core types
 MIN_GRID_SIZES: Dict[str, Dict[str, int]] = {
-    "flowchart": {"width": 3, "height": 2},    # Need width for branching
-    "sequence": {"width": 4, "height": 3},     # Participants need width
-    "class": {"width": 4, "height": 3},        # OOP diagrams need space
-    "state": {"width": 3, "height": 3},        # State machines roughly square
-    "er": {"width": 4, "height": 3},           # Entities need width
-    "gantt": {"width": 6, "height": 2},        # Timeline horizontal
-    "userjourney": {"width": 4, "height": 2},  # Journey horizontal
-    "gitgraph": {"width": 4, "height": 2},     # Git flows horizontal
-    "mindmap": {"width": 4, "height": 4},      # Radiates outward
-    "pie": {"width": 3, "height": 3},          # Circular/square
-    "timeline": {"width": 5, "height": 2}      # Timeline horizontal
+    "flowchart": {"width": 3, "height": 2},
+    "sequence": {"width": 4, "height": 3},
+    "er": {"width": 4, "height": 3},
+    "gantt": {"width": 6, "height": 2},
+    "mindmap": {"width": 4, "height": 4},
+    "timeline": {"width": 5, "height": 2}
 }
 
-# Optimal directions per diagram type
-# Some types have fixed directions, others can adapt
+# Optimal directions per diagram type - v3.1 Core types
 OPTIMAL_DIRECTIONS: Dict[str, Dict[str, Any]] = {
     "flowchart": {"default": "TD", "wide": "LR", "tall": "TD", "fixed": False},
-    "sequence": {"default": "TB", "fixed": True},      # Always top-bottom (participants)
-    "class": {"default": "TB", "wide": "LR", "tall": "TB", "fixed": False},
-    "state": {"default": "TB", "wide": "LR", "tall": "TB", "fixed": False},
+    "sequence": {"default": "TB", "fixed": True},
     "er": {"default": "TB", "wide": "LR", "tall": "TB", "fixed": False},
-    "gantt": {"default": "LR", "fixed": True},         # Always horizontal (time axis)
-    "userjourney": {"default": "LR", "fixed": True},   # Always horizontal (journey)
-    "gitgraph": {"default": "TB", "fixed": True},      # Always top-bottom
+    "gantt": {"default": "LR", "fixed": True},
     "mindmap": {"default": "TB", "wide": "LR", "tall": "TB", "fixed": False},
-    "pie": {"default": "TB", "fixed": True},           # Not applicable
     "timeline": {"default": "TB", "wide": "LR", "tall": "TB", "fixed": False}
 }
 
-# Node limits based on grid area size tier
-# Size tiers: small (area ≤ 16), medium (area ≤ 48), large (area > 48)
+# Node limits based on grid area size tier - v3.1 Core types
 NODE_LIMITS: Dict[str, Dict[str, int]] = {
     "flowchart": {"small": 6, "medium": 12, "large": 20},
-    "sequence": {"small": 4, "medium": 8, "large": 12},     # Participants
-    "class": {"small": 3, "medium": 6, "large": 10},        # Classes
-    "state": {"small": 5, "medium": 10, "large": 15},       # States
-    "er": {"small": 4, "medium": 8, "large": 12},           # Entities
-    "gantt": {"small": 8, "medium": 16, "large": 30},       # Tasks
-    "userjourney": {"small": 6, "medium": 12, "large": 20}, # Tasks
-    "gitgraph": {"small": 6, "medium": 12, "large": 20},    # Commits
-    "mindmap": {"small": 7, "medium": 15, "large": 25},     # Nodes
-    "pie": {"small": 4, "medium": 6, "large": 8},           # Slices
-    "timeline": {"small": 5, "medium": 10, "large": 20}     # Events
+    "sequence": {"small": 4, "medium": 8, "large": 12},
+    "er": {"small": 4, "medium": 8, "large": 12},
+    "gantt": {"small": 8, "medium": 16, "large": 30},
+    "mindmap": {"small": 7, "medium": 15, "large": 25},
+    "timeline": {"small": 5, "medium": 10, "large": 20}
 }
 
 # Mermaid themes supported
@@ -267,74 +192,70 @@ COMPLEXITY_MULTIPLIERS: Dict[str, float] = {
 # ============== DIRECTOR COORDINATION ==============
 # Used by Director Agent for service coordination (SERVICE_CAPABILITIES_SPEC.md)
 
-# Diagram type signals for content matching
+# Diagram type signals for content matching - v3.1 Core types
 DIAGRAM_TYPE_SIGNALS: Dict[str, Dict[str, Any]] = {
     "flowchart": {
         "best_for": ["process", "workflow", "decision tree", "steps"],
         "keywords": ["flow", "process", "steps", "if/then", "decision", "workflow", "procedure", "algorithm"],
         "ideal_topic_count": {"min": 3, "max": 10}
     },
+    "sequence": {
+        "best_for": ["interactions", "API calls", "message flow", "communication"],
+        "keywords": ["sequence", "interaction", "message", "call", "request", "response", "actor", "participant"],
+        "ideal_topic_count": {"min": 2, "max": 8}
+    },
     "erDiagram": {
         "best_for": ["data models", "relationships", "database schema", "entities"],
         "keywords": ["entity", "relationship", "database", "model", "schema", "table", "foreign key", "primary key"],
         "ideal_topic_count": {"min": 2, "max": 8}
-    },
-    "journey": {
-        "best_for": ["user journey", "customer experience", "satisfaction"],
-        "keywords": ["journey", "experience", "user", "customer", "satisfaction", "touchpoint", "persona"],
-        "ideal_topic_count": {"min": 3, "max": 7}
     },
     "gantt": {
         "best_for": ["project timeline", "scheduling", "milestones"],
         "keywords": ["timeline", "project", "schedule", "gantt", "milestones", "deadline", "phase", "task", "duration"],
         "ideal_topic_count": {"min": 3, "max": 15}
     },
-    "quadrantChart": {
-        "best_for": ["priority matrix", "risk assessment", "positioning"],
-        "keywords": ["quadrant", "matrix", "priority", "risk", "assessment", "high/low", "impact", "effort"],
-        "ideal_topic_count": {"min": 4, "max": 12}
+    "kanban": {
+        "best_for": ["task management", "workflow status", "board"],
+        "keywords": ["kanban", "board", "tasks", "todo", "progress", "status", "backlog", "doing", "done"],
+        "ideal_topic_count": {"min": 3, "max": 12}
+    },
+    "mindmap": {
+        "best_for": ["brainstorming", "concepts", "hierarchies", "organization"],
+        "keywords": ["mindmap", "brainstorm", "ideas", "concepts", "hierarchy", "categories", "structure", "branches"],
+        "ideal_topic_count": {"min": 4, "max": 15}
     },
     "timeline": {
         "best_for": ["historical events", "milestones", "chronology"],
         "keywords": ["timeline", "history", "events", "milestones", "year", "date", "chronological"],
         "ideal_topic_count": {"min": 3, "max": 10}
     },
-    "kanban": {
-        "best_for": ["task management", "workflow status", "board"],
-        "keywords": ["kanban", "board", "tasks", "todo", "progress", "status", "backlog", "doing", "done"],
+    "architecture": {
+        "best_for": ["system architecture", "cloud infrastructure", "service design"],
+        "keywords": ["architecture", "system", "cloud", "infrastructure", "service", "component", "layer"],
         "ideal_topic_count": {"min": 3, "max": 12}
     },
-    "pie": {
-        "best_for": ["distribution", "proportions", "market share", "composition"],
-        "keywords": ["pie", "percentage", "share", "distribution", "breakdown", "portion", "composition", "ratio"],
-        "ideal_topic_count": {"min": 3, "max": 8}
-    },
-    "mindmap": {
-        "best_for": ["brainstorming", "concepts", "hierarchies", "organization"],
-        "keywords": ["mindmap", "brainstorm", "ideas", "concepts", "hierarchy", "categories", "structure", "branches"],
-        "ideal_topic_count": {"min": 4, "max": 15}
+    "microservice": {
+        "best_for": ["microservices", "distributed systems", "service mesh"],
+        "keywords": ["microservice", "service", "api", "container", "distributed", "mesh", "gateway"],
+        "ideal_topic_count": {"min": 3, "max": 15}
     }
 }
 
-# Content signals for diagram service - tells Director what this service handles
+# Content signals for diagram service - v3.1 Core types
 DIAGRAM_CONTENT_SIGNALS: Dict[str, Any] = {
     "handles_well": [
-        "processes", "workflows", "decision_trees", "system_architecture",
-        "relationships", "sequences", "timelines", "project_schedules",
-        "user_journeys", "data_models", "task_boards",
-        "pie_charts", "distributions", "proportions", "market_share",
-        "mindmaps", "brainstorming", "concept_hierarchies"
+        "processes", "workflows", "system_architecture", "microservices",
+        "sequences", "timelines", "project_schedules", "data_models",
+        "task_boards", "mindmaps", "brainstorming", "concept_hierarchies"
     ],
     "handles_poorly": [
-        "pure_data", "bullet_lists", "comparisons_without_flow",
-        "numerical_charts", "bar_graphs", "scatter_plots"
+        "pure_data", "bullet_lists", "numerical_charts", "bar_graphs"
     ],
     "keywords": [
-        "flow", "process", "workflow", "architecture", "components",
+        "flow", "process", "workflow", "architecture", "microservice",
         "sequence", "interaction", "diagram", "entity", "relationship",
-        "timeline", "gantt", "schedule", "journey", "kanban", "board",
+        "timeline", "gantt", "schedule", "kanban", "board",
         "steps", "decision", "database", "schema",
-        "pie", "percentage", "share", "distribution",
-        "mindmap", "brainstorm", "hierarchy", "concepts"
+        "mindmap", "brainstorm", "hierarchy"
     ]
 }
