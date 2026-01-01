@@ -485,7 +485,7 @@ class PlotlyRenderer(BaseRenderer):
                 titlefont=dict(size=14, color='#6B7280'),
                 range=[0.5, 6],
                 tickvals=[1, 2, 3, 4, 5],
-                ticktext=["😞 Very Low", "😐 Low", "😊 Neutral", "😃 High", "🎉 Very High"],
+                ticktext=["Very Low", "Low", "Neutral", "High", "Very High"],
                 showgrid=True,
                 gridcolor='#E5E7EB',
                 gridwidth=1,
