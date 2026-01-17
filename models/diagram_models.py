@@ -29,17 +29,21 @@ class DiagramType(str, Enum):
 
 
 class GenerationMethod(str, Enum):
-    """Available generation methods - v3.1 with HTML agents"""
+    """Available generation methods - v3.2 with Standard V3"""
 
-    # PRIMARY: Gemini Image
+    # PRIMARY: Gemini Image (for image-based diagrams)
     GEMINI_IMAGE = "gemini_image"
+
+    # PRIMARY: Standard V3 (for HTML diagrams: gantt, kanban, chevron, code_display)
+    # Uses standard_v3/DiagramService with pre-rendered HTML
+    STANDARD_V3 = "standard_v3"
 
     # Playwright-based methods (SECONDARY for gantt/kanban)
     FRAPPE_GANTT = "frappe_gantt"
     MARKMAP = "markmap"
     KANBAN = "kanban"
 
-    # HTML-based methods (PRIMARY for gantt/kanban, NEW for code/chevron)
+    # HTML-based methods (SECONDARY fallback for gantt/kanban/code/chevron)
     GANTT_HTML = "gantt_html"
     KANBAN_HTML = "kanban_html"
     CODE_DISPLAY = "code_display"
@@ -180,6 +184,7 @@ class GenerationStrategy(BaseModel):
         """Estimate generation time for method"""
         estimates = {
             GenerationMethod.GEMINI_IMAGE: 3000,
+            GenerationMethod.STANDARD_V3: 3000,  # Standard V3 with LLM parsing
             GenerationMethod.FRAPPE_GANTT: 2000,
             GenerationMethod.MARKMAP: 1500,
             GenerationMethod.KANBAN: 1500,

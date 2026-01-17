@@ -337,11 +337,10 @@ pre[class*="language-"]{padding:1em;margin:.5em 0;overflow:auto;border-radius:0.
         # Apply syntax highlighting
         highlighted_code = self._highlight_code(escaped_code, language)
 
+        # NOTE: No diagram-label here - Layout Service handles title/subtitle
+        # Code display fills the chart_html area (1080x840 for V2-chart-text layout)
         body_content = f'''
         <div class="slide-container">
-            <div class="diagram-label" style="--label-accent: var(--accent-6-dark);">
-                <span id="diagram-name">{html_escape.escape(diagram_name)}</span>
-            </div>
             <div class="code-display-wrapper">
                 <div class="code-wrapper lang-{language}" id="code-wrapper">
                     <div class="code-header">
@@ -600,8 +599,9 @@ pre[class*="language-"]{padding:1em;margin:.5em 0;overflow:auto;border-radius:0.
 .card-tag { font-size: 10px; margin-top: 8px; padding: 2px 6px; background: var(--accent-4-dark); color: #000; border-radius: 4px; display: inline-block; }
 """
         elif diagram_type == "code_display":
+            # No height adjustment needed - no diagram-label, Layout Service handles title
             return """
-.code-display-wrapper { height: calc(100% - 50px); }
+.code-display-wrapper { height: 100%; }
 .code-wrapper { height: 100%; background: var(--bg-secondary); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
 .code-header { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--bg-tertiary); }
 .filename { font-size: 13px; color: var(--text-secondary); }

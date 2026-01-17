@@ -18,11 +18,13 @@ from models import DiagramRequest, GenerationStrategy, GenerationMethod
 from utils.logger import setup_logger
 from .unified_playbook import UnifiedPlaybook
 from agents import (
-    # PRIMARY: Gemini Image
+    # PRIMARY: Gemini Image (for image-based diagrams)
     GeminiImageAgent,
+    # PRIMARY: Standard V3 (for HTML diagrams - gantt, kanban, chevron, code_display)
+    StandardV3Agent,
     # Playwright-based agents (SECONDARY for gantt/kanban)
     FrappeGanttAgent, MarkmapAgent, KanbanAgent,
-    # HTML-based agents (PRIMARY for gantt/kanban, NEW for code/chevron)
+    # HTML-based agents (SECONDARY fallback for gantt/kanban/code/chevron)
     GanttHtmlAgent, KanbanHtmlAgent, CodeDisplayAgent, ChevronAgent,
     # Fallback agents
     MermaidAgent, SVGAgent,
@@ -44,17 +46,20 @@ class DiagramConductor:
         self.settings = settings
         self.playbook = UnifiedPlaybook(settings)
         
-        # Initialize agents - v3.1 with HTML agents
+        # Initialize agents - v3.2 with Standard V3 as PRIMARY for HTML diagrams
         self.agents = {
-            # PRIMARY: Gemini Image
+            # PRIMARY: Gemini Image (for image-based diagrams)
             GenerationMethod.GEMINI_IMAGE: GeminiImageAgent(settings),
+
+            # PRIMARY: Standard V3 (for HTML diagrams - gantt, kanban, chevron, code_display)
+            GenerationMethod.STANDARD_V3: StandardV3Agent(settings),
 
             # Playwright-based agents (SECONDARY for gantt/kanban)
             GenerationMethod.FRAPPE_GANTT: FrappeGanttAgent(settings),
             GenerationMethod.MARKMAP: MarkmapAgent(settings),
             GenerationMethod.KANBAN: KanbanAgent(settings),
 
-            # HTML-based agents (PRIMARY for gantt/kanban, NEW for code/chevron)
+            # HTML-based agents (SECONDARY fallback for gantt/kanban/code/chevron)
             GenerationMethod.GANTT_HTML: GanttHtmlAgent(settings),
             GenerationMethod.KANBAN_HTML: KanbanHtmlAgent(settings),
             GenerationMethod.CODE_DISPLAY: CodeDisplayAgent(settings),
@@ -65,10 +70,10 @@ class DiagramConductor:
             GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
         }
 
-        # v3.1 Routing table: Core 9 + HTML types
-        # HTML agents are PRIMARY, Playwright agents are SECONDARY (fallbacks)
+        # v3.2 Routing table: Standard V3 as PRIMARY for HTML diagrams
+        # Standard V3 uses standard_v3/DiagramService with pre-rendered HTML
         self.v3_routing = {
-            # Gemini Image types
+            # Gemini Image types (image-based diagrams)
             "architecture": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "microservice": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "er_diagram": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
@@ -76,27 +81,37 @@ class DiagramConductor:
             "sequence": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "timeline": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
 
-            # Gantt: HTML PRIMARY, Frappe SECONDARY
-            "gantt": (GenerationMethod.GANTT_HTML, ["C5", "V3"]),
+            # Gantt: Standard V3 PRIMARY, HTML agent SECONDARY, Frappe/Mermaid fallback
+            "gantt": (GenerationMethod.STANDARD_V3, ["C5", "V3"]),
 
-            # Kanban: HTML PRIMARY, existing SECONDARY
-            "kanban": (GenerationMethod.KANBAN_HTML, ["C5", "V3"]),
+            # Kanban: Standard V3 PRIMARY, HTML agent SECONDARY, Mermaid fallback
+            "kanban": (GenerationMethod.STANDARD_V3, ["C5", "V3"]),
 
-            # Mind map: Markmap (unchanged)
+            # Mind map: Markmap (unchanged - no HTML version)
             "mindmap": (GenerationMethod.MARKMAP, ["C5", "V3"]),
             "mind_map": (GenerationMethod.MARKMAP, ["C5", "V3"]),
 
-            # NEW: Code Display
-            "code_display": (GenerationMethod.CODE_DISPLAY, ["V3-text", "C5"]),
-            "code": (GenerationMethod.CODE_DISPLAY, ["V3-text", "C5"]),
+            # Code Display: Standard V3 PRIMARY, HTML agent SECONDARY
+            "code_display": (GenerationMethod.STANDARD_V3, ["V3-text", "C5"]),
+            "code": (GenerationMethod.STANDARD_V3, ["V3-text", "C5"]),
 
-            # NEW: Chevron roadmap
-            "chevron": (GenerationMethod.CHEVRON, ["C5", "V3"]),
-            "roadmap": (GenerationMethod.CHEVRON, ["C5", "V3"]),
+            # Chevron roadmap: Standard V3 PRIMARY, HTML agent SECONDARY
+            "chevron": (GenerationMethod.STANDARD_V3, ["C5", "V3"]),
+            "roadmap": (GenerationMethod.STANDARD_V3, ["C5", "V3"]),
         }
 
-        # Fallback chains for HTML-based agents
+        # Fallback chains: Standard V3 -> HTML agents -> Playwright/Mermaid
         self.fallback_chains = {
+            # Standard V3 fallback to HTML agents, then to Playwright/Mermaid
+            GenerationMethod.STANDARD_V3: {
+                "gantt": [GenerationMethod.GANTT_HTML, GenerationMethod.FRAPPE_GANTT, GenerationMethod.MERMAID],
+                "kanban": [GenerationMethod.KANBAN_HTML, GenerationMethod.KANBAN, GenerationMethod.MERMAID],
+                "chevron": [GenerationMethod.CHEVRON, GenerationMethod.MERMAID],
+                "roadmap": [GenerationMethod.CHEVRON, GenerationMethod.MERMAID],
+                "code_display": [GenerationMethod.CODE_DISPLAY, GenerationMethod.MERMAID],
+                "code": [GenerationMethod.CODE_DISPLAY, GenerationMethod.MERMAID],
+            },
+            # Legacy HTML agent fallbacks
             GenerationMethod.GANTT_HTML: [GenerationMethod.FRAPPE_GANTT, GenerationMethod.MERMAID],
             GenerationMethod.KANBAN_HTML: [GenerationMethod.KANBAN, GenerationMethod.MERMAID],
             GenerationMethod.CODE_DISPLAY: [GenerationMethod.MERMAID],
@@ -190,19 +205,26 @@ class DiagramConductor:
                 cached["metadata"]["cache_hit"] = True
                 return cached
 
-            # v3.0 Direct routing for new structured agents
+            # v3.2 Direct routing for structured agents
             diagram_type_lower = request.diagram_type.lower()
             if diagram_type_lower in self.v3_routing:
                 method, allowed_layouts = self.v3_routing[diagram_type_lower]
-                logger.info(f"v3.0 routing: {diagram_type_lower} -> {method.value}")
+                logger.info(f"v3.2 routing: {diagram_type_lower} -> {method.value}")
 
                 # Get appropriate fallback chain for this method
-                fallback_chain = self.fallback_chains.get(method, [GenerationMethod.MERMAID])
+                # STANDARD_V3 uses a dict keyed by diagram type, others use a list
+                method_fallbacks = self.fallback_chains.get(method, [GenerationMethod.MERMAID])
+                if isinstance(method_fallbacks, dict):
+                    # STANDARD_V3 case: lookup by diagram type
+                    fallback_chain = method_fallbacks.get(diagram_type_lower, [GenerationMethod.MERMAID])
+                else:
+                    # Other agents: direct list
+                    fallback_chain = method_fallbacks
 
                 strategy = GenerationStrategy(
                     method=method,
                     confidence=0.95,
-                    reasoning=f"v3.0 structured agent for {diagram_type_lower}",
+                    reasoning=f"v3.2 structured agent for {diagram_type_lower}",
                     fallback_chain=fallback_chain,
                     estimated_time_ms=self._estimate_v3_time(method),
                     quality_estimate="high"
@@ -511,9 +533,10 @@ class DiagramConductor:
         }
 
     def _estimate_v3_time(self, method: GenerationMethod) -> int:
-        """Estimate generation time for v3.1 methods in milliseconds"""
+        """Estimate generation time for v3.2 methods in milliseconds"""
         estimates = {
             GenerationMethod.GEMINI_IMAGE: 3000,
+            GenerationMethod.STANDARD_V3: 3000,  # Standard V3 with LLM parsing
             GenerationMethod.FRAPPE_GANTT: 2000,
             GenerationMethod.MARKMAP: 1500,
             GenerationMethod.KANBAN: 1500,
