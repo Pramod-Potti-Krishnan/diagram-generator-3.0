@@ -1,9 +1,10 @@
 """
-Diagram Generation Agents - v3.1 Simplified
+Diagram Generation Agents - v3.1 with HTML Agents
 
-Core 9 diagram types only:
+Core types:
 - PRIMARY: GeminiImageAgent (architecture, microservice, er_diagram, flowchart, sequence, timeline)
-- Playwright: FrappeGanttAgent (gantt), MarkmapAgent (mind_map), KanbanAgent (kanban)
+- HTML PRIMARY: GanttHtmlAgent (gantt), KanbanHtmlAgent (kanban), CodeDisplayAgent (code), ChevronAgent (roadmap)
+- Playwright SECONDARY: FrappeGanttAgent (gantt), KanbanAgent (kanban), MarkmapAgent (mind_map)
 - Fallback: MermaidAgent
 """
 
@@ -13,7 +14,13 @@ from .structured_base_agent import StructuredBaseAgent
 # PRIMARY: Gemini Image generation
 from .gemini_image_agent import GeminiImageAgent
 
-# Playwright-based agents
+# HTML-based agents (PRIMARY for gantt/kanban, NEW for code/chevron)
+from .gantt_html_agent import GanttHtmlAgent
+from .kanban_html_agent import KanbanHtmlAgent
+from .code_display_agent import CodeDisplayAgent
+from .chevron_agent import ChevronAgent
+
+# Playwright-based agents (SECONDARY for gantt/kanban)
 from .frappe_gantt_agent import FrappeGanttAgent
 from .markmap_agent import MarkmapAgent
 from .kanban_agent import KanbanAgent
@@ -26,9 +33,16 @@ __all__ = [
     'BaseAgent',
     'StructuredBaseAgent',
     'GeminiImageAgent',
+    # HTML-based agents (PRIMARY)
+    'GanttHtmlAgent',
+    'KanbanHtmlAgent',
+    'CodeDisplayAgent',
+    'ChevronAgent',
+    # Playwright-based agents (SECONDARY)
     'FrappeGanttAgent',
     'MarkmapAgent',
     'KanbanAgent',
+    # Fallback
     'MermaidAgent',
     'SVGAgent',
 ]

@@ -1,0 +1,138 @@
+/**
+ * Kanban Board Styles
+ */
+
+.kanban-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding-top: var(--space-lg);
+    overflow: hidden;
+}
+
+.kanban-board {
+    flex: 1;
+    display: flex;
+    gap: var(--space-lg);
+    height: 100%;
+    overflow-x: auto;
+    padding-bottom: var(--space-md);
+}
+
+.kanban-column {
+    flex: 1;
+    min-width: 200px;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.column-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-color);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.column-count {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 0.2rem 0.6rem;
+    background: var(--border-color);
+    border-radius: var(--radius-full);
+    color: var(--text-secondary);
+}
+
+.cards-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    overflow-y: auto;
+}
+
+.kanban-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kanban-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.card-text {
+    font-size: 14px;
+    font-weight: 400;
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.card-tag {
+    display: inline-block;
+    margin-top: var(--space-sm);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+/* Column color accents */
+.kanban-column:nth-child(6n+1) .column-header { border-left: 3px solid var(--accent-2-dark); }
+.kanban-column:nth-child(6n+2) .column-header { border-left: 3px solid var(--accent-4-dark); }
+.kanban-column:nth-child(6n+3) .column-header { border-left: 3px solid var(--accent-5-dark); }
+.kanban-column:nth-child(6n+4) .column-header { border-left: 3px solid var(--accent-1-dark); }
+.kanban-column:nth-child(6n+5) .column-header { border-left: 3px solid var(--accent-7-dark); }
+.kanban-column:nth-child(6n+6) .column-header { border-left: 3px solid var(--accent-6-dark); }
+
+/* Card tag colors based on priority */
+.card-tag:contains("HIGH"),
+.card-tag[class*="high"] {
+    background: var(--accent-3-pastel);
+    color: var(--accent-3-dark);
+}
+
+.card-tag:contains("MED"),
+.card-tag[class*="med"] {
+    background: var(--accent-5-pastel);
+    color: var(--accent-5-dark);
+}
+
+.card-tag:contains("LOW"),
+.card-tag[class*="low"] {
+    background: var(--accent-4-pastel);
+    color: var(--accent-4-dark);
+}
+
+/* Default tag color */
+.card-tag {
+    background: var(--accent-2-pastel);
+    color: var(--accent-2-dark);
+}
+
+/* Light mode */
+.theme-light-mode .kanban-card,
+.theme-light .kanban-card {
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.theme-light-mode .column-header,
+.theme-light .column-header {
+    background: rgba(0, 0, 0, 0.02);
+}

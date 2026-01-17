@@ -1,0 +1,175 @@
+/**
+ * Diagram Generator Service - Base Styles
+ * 10-Accent Color System aligned with COLOR_SYSTEM.md
+ */
+
+:root {
+    /* === LAYOUT DEFAULTS === */
+    --bg-color: transparent;
+    --glass-bg: rgba(255, 255, 255, 0.03);
+    --glass-blur: 12px;
+    --border-color: rgba(255, 255, 255, 0.1);
+
+    /* === TEXT COLORS === */
+    --text-primary: #ffffff;
+    --text-secondary: #94a3b8;
+    --text-on-dark: #ffffff;
+
+    /* === LEGACY COMPAT === */
+    --text-main: var(--text-primary);
+    --text-dim: var(--text-secondary);
+    --accent-primary: var(--accent-2-dark);
+    --accent-secondary: var(--accent-10-dark);
+
+    /* === 10-ACCENT DARK VARIANTS === */
+    --accent-1-dark: #805AA0;   /* Purple */
+    --accent-2-dark: #2980B9;   /* Blue */
+    --accent-3-dark: #C0392B;   /* Red */
+    --accent-4-dark: #27AE60;   /* Green */
+    --accent-5-dark: #D39E1E;   /* Yellow/Gold */
+    --accent-6-dark: #0097A7;   /* Cyan */
+    --accent-7-dark: #E65100;   /* Orange */
+    --accent-8-dark: #00796B;   /* Teal */
+    --accent-9-dark: #C2185B;   /* Pink/Magenta */
+    --accent-10-dark: #3949AB;  /* Indigo */
+
+    /* === 10-ACCENT PASTEL VARIANTS === */
+    --accent-1-pastel: rgba(232, 215, 241, 0.6);
+    --accent-2-pastel: rgba(189, 224, 249, 0.6);
+    --accent-3-pastel: rgba(254, 226, 226, 0.6);
+    --accent-4-pastel: rgba(212, 237, 218, 0.6);
+    --accent-5-pastel: rgba(253, 230, 138, 0.6);
+    --accent-6-pastel: rgba(195, 241, 247, 0.6);
+    --accent-7-pastel: rgba(255, 224, 178, 0.6);
+    --accent-8-pastel: rgba(178, 223, 219, 0.6);
+    --accent-9-pastel: rgba(225, 213, 246, 0.6);
+    --accent-10-pastel: rgba(197, 202, 233, 0.6);
+
+    /* === 10-ACCENT LIGHT PASTEL === */
+    --accent-1-light: #E6D2F5;
+    --accent-2-light: #B4DCFF;
+    --accent-3-light: #FFC8C3;
+    --accent-4-light: #B4F5D2;
+    --accent-5-light: #FFF0BE;
+    --accent-6-light: #B2EBF2;
+    --accent-7-light: #FFCCBC;
+    --accent-8-light: #B2DFDB;
+    --accent-9-light: #F8BBD9;
+    --accent-10-light: #C5CAE9;
+
+    /* === DIAGRAM LABEL === */
+    --diagram-label-size: 11px;
+    --diagram-label-weight: 600;
+    --diagram-label-spacing: 0.08em;
+
+    /* === SHADOWS === */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+    /* === SPACING === */
+    --space-xs: 0.25rem;
+    --space-sm: 0.5rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+
+    /* === BORDERS === */
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-full: 9999px;
+}
+
+/* === DARK MODE === */
+.theme-dark-mode,
+.theme-dark {
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+}
+
+/* === LIGHT MODE === */
+.theme-light-mode,
+.theme-light {
+    --text-primary: #374151;
+    --text-secondary: #6B7280;
+    --glass-bg: rgba(0, 0, 0, 0.02);
+    --border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* === BASE STYLES === */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+.diagram-container {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+}
+
+.slide-container {
+    width: 100%;
+    height: 100%;
+    padding: var(--space-xl);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+/* === DIAGRAM LABEL === */
+.diagram-label {
+    position: absolute;
+    top: var(--space-sm);
+    left: var(--space-lg);
+    font-size: var(--diagram-label-size);
+    font-weight: var(--diagram-label-weight);
+    letter-spacing: var(--diagram-label-spacing);
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+}
+
+.diagram-label::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 2px;
+    background: var(--label-accent, var(--accent-2-dark));
+}
+
+/* === GLASSMORPHISM === */
+.glass-panel {
+    background: var(--glass-bg);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* === ANIMATIONS === */
+.fade-in-stagger {
+    animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    animation-delay: calc(var(--stagger-index, 0) * 0.08s);
+    opacity: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

@@ -20,8 +20,10 @@ from .unified_playbook import UnifiedPlaybook
 from agents import (
     # PRIMARY: Gemini Image
     GeminiImageAgent,
-    # Playwright-based agents
+    # Playwright-based agents (SECONDARY for gantt/kanban)
     FrappeGanttAgent, MarkmapAgent, KanbanAgent,
+    # HTML-based agents (PRIMARY for gantt/kanban, NEW for code/chevron)
+    GanttHtmlAgent, KanbanHtmlAgent, CodeDisplayAgent, ChevronAgent,
     # Fallback agents
     MermaidAgent, SVGAgent,
 )
@@ -42,22 +44,29 @@ class DiagramConductor:
         self.settings = settings
         self.playbook = UnifiedPlaybook(settings)
         
-        # Initialize agents - v3.1 simplified (core 9 types only)
+        # Initialize agents - v3.1 with HTML agents
         self.agents = {
             # PRIMARY: Gemini Image
             GenerationMethod.GEMINI_IMAGE: GeminiImageAgent(settings),
 
-            # Playwright-based agents
+            # Playwright-based agents (SECONDARY for gantt/kanban)
             GenerationMethod.FRAPPE_GANTT: FrappeGanttAgent(settings),
             GenerationMethod.MARKMAP: MarkmapAgent(settings),
             GenerationMethod.KANBAN: KanbanAgent(settings),
+
+            # HTML-based agents (PRIMARY for gantt/kanban, NEW for code/chevron)
+            GenerationMethod.GANTT_HTML: GanttHtmlAgent(settings),
+            GenerationMethod.KANBAN_HTML: KanbanHtmlAgent(settings),
+            GenerationMethod.CODE_DISPLAY: CodeDisplayAgent(settings),
+            GenerationMethod.CHEVRON: ChevronAgent(settings),
 
             # Fallback agents
             GenerationMethod.MERMAID: MermaidAgent(settings),
             GenerationMethod.SVG_TEMPLATE: SVGAgent(settings),
         }
 
-        # v3.1 Routing table: Core 9 diagram types only
+        # v3.1 Routing table: Core 9 + HTML types
+        # HTML agents are PRIMARY, Playwright agents are SECONDARY (fallbacks)
         self.v3_routing = {
             # Gemini Image types
             "architecture": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
@@ -67,11 +76,31 @@ class DiagramConductor:
             "sequence": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
             "timeline": (GenerationMethod.GEMINI_IMAGE, ["C5", "V3"]),
 
-            # Playwright-based types
-            "gantt": (GenerationMethod.FRAPPE_GANTT, ["C5", "V3"]),
-            "kanban": (GenerationMethod.KANBAN, ["C5", "V3"]),
+            # Gantt: HTML PRIMARY, Frappe SECONDARY
+            "gantt": (GenerationMethod.GANTT_HTML, ["C5", "V3"]),
+
+            # Kanban: HTML PRIMARY, existing SECONDARY
+            "kanban": (GenerationMethod.KANBAN_HTML, ["C5", "V3"]),
+
+            # Mind map: Markmap (unchanged)
             "mindmap": (GenerationMethod.MARKMAP, ["C5", "V3"]),
             "mind_map": (GenerationMethod.MARKMAP, ["C5", "V3"]),
+
+            # NEW: Code Display
+            "code_display": (GenerationMethod.CODE_DISPLAY, ["V3-text", "C5"]),
+            "code": (GenerationMethod.CODE_DISPLAY, ["V3-text", "C5"]),
+
+            # NEW: Chevron roadmap
+            "chevron": (GenerationMethod.CHEVRON, ["C5", "V3"]),
+            "roadmap": (GenerationMethod.CHEVRON, ["C5", "V3"]),
+        }
+
+        # Fallback chains for HTML-based agents
+        self.fallback_chains = {
+            GenerationMethod.GANTT_HTML: [GenerationMethod.FRAPPE_GANTT, GenerationMethod.MERMAID],
+            GenerationMethod.KANBAN_HTML: [GenerationMethod.KANBAN, GenerationMethod.MERMAID],
+            GenerationMethod.CODE_DISPLAY: [GenerationMethod.MERMAID],
+            GenerationMethod.CHEVRON: [GenerationMethod.MERMAID],
         }
         
         # Initialize storage components
@@ -167,11 +196,14 @@ class DiagramConductor:
                 method, allowed_layouts = self.v3_routing[diagram_type_lower]
                 logger.info(f"v3.0 routing: {diagram_type_lower} -> {method.value}")
 
+                # Get appropriate fallback chain for this method
+                fallback_chain = self.fallback_chains.get(method, [GenerationMethod.MERMAID])
+
                 strategy = GenerationStrategy(
                     method=method,
                     confidence=0.95,
                     reasoning=f"v3.0 structured agent for {diagram_type_lower}",
-                    fallback_chain=[GenerationMethod.MERMAID],  # Mermaid as fallback
+                    fallback_chain=fallback_chain,
                     estimated_time_ms=self._estimate_v3_time(method),
                     quality_estimate="high"
                 )
@@ -487,6 +519,11 @@ class DiagramConductor:
             GenerationMethod.KANBAN: 1500,
             GenerationMethod.MERMAID: 2000,
             GenerationMethod.SVG_TEMPLATE: 200,
+            # HTML-based methods
+            GenerationMethod.GANTT_HTML: 3000,
+            GenerationMethod.KANBAN_HTML: 2000,
+            GenerationMethod.CODE_DISPLAY: 3000,
+            GenerationMethod.CHEVRON: 3000,
         }
         return estimates.get(method, 2000)
 

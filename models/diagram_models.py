@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class DiagramType(str, Enum):
-    """Supported diagram types - Core 9 only"""
+    """Supported diagram types - Core 9 + HTML types"""
 
     # Gemini Image types
     ARCHITECTURE = "architecture"
@@ -23,17 +23,27 @@ class DiagramType(str, Enum):
     KANBAN = "kanban"
     MIND_MAP = "mind_map"
 
+    # HTML-based types (new)
+    CODE_DISPLAY = "code_display"
+    CHEVRON = "chevron"
+
 
 class GenerationMethod(str, Enum):
-    """Available generation methods - Simplified v3.1"""
+    """Available generation methods - v3.1 with HTML agents"""
 
     # PRIMARY: Gemini Image
     GEMINI_IMAGE = "gemini_image"
 
-    # Playwright-based methods
+    # Playwright-based methods (SECONDARY for gantt/kanban)
     FRAPPE_GANTT = "frappe_gantt"
     MARKMAP = "markmap"
     KANBAN = "kanban"
+
+    # HTML-based methods (PRIMARY for gantt/kanban, NEW for code/chevron)
+    GANTT_HTML = "gantt_html"
+    KANBAN_HTML = "kanban_html"
+    CODE_DISPLAY = "code_display"
+    CHEVRON = "chevron"
 
     # Fallback
     MERMAID = "mermaid"
@@ -175,5 +185,10 @@ class GenerationStrategy(BaseModel):
             GenerationMethod.KANBAN: 1500,
             GenerationMethod.MERMAID: 2000,
             GenerationMethod.SVG_TEMPLATE: 200,
+            # HTML-based methods
+            GenerationMethod.GANTT_HTML: 3000,
+            GenerationMethod.KANBAN_HTML: 2000,
+            GenerationMethod.CODE_DISPLAY: 3000,
+            GenerationMethod.CHEVRON: 3000,
         }
         return estimates.get(method, 2000)

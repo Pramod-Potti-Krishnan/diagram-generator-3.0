@@ -15,27 +15,39 @@ DEFAULT_THEME: Dict[str, Any] = {
     "style": "professional"
 }
 
-# Supported diagram types by method - v3.1 Simplified (Core 9 only)
+# Supported diagram types by method - v3.1 with HTML agents
 SUPPORTED_DIAGRAM_TYPES: Dict[str, List[str]] = {
     "gemini_image": [
         "architecture", "microservice", "er_diagram",
         "flowchart", "sequence", "timeline"
     ],
+    # Playwright-based (SECONDARY for gantt/kanban)
     "frappe_gantt": ["gantt"],
     "markmap": ["mindmap", "mind_map"],
     "kanban": ["kanban"],
+    # HTML-based (PRIMARY for gantt/kanban, NEW for code/chevron)
+    "gantt_html": ["gantt"],
+    "kanban_html": ["kanban"],
+    "code_display": ["code_display", "code"],
+    "chevron": ["chevron", "roadmap"],
+    # Fallback
     "mermaid": [
         "flowchart", "sequence", "gantt", "mindmap", "timeline"  # Fallback only
     ]
 }
 
-# Method selection priorities (lower is better) - v3.1 Simplified
+# Method selection priorities (lower is better) - v3.1 with HTML agents
+# HTML agents are PRIMARY (1), Playwright agents are SECONDARY (2), Mermaid is fallback (3)
 METHOD_PRIORITIES: Dict[str, int] = {
     "gemini_image": 1,
-    "frappe_gantt": 1,
+    "gantt_html": 1,      # PRIMARY for gantt
+    "kanban_html": 1,     # PRIMARY for kanban
+    "code_display": 1,    # NEW
+    "chevron": 1,         # NEW
+    "frappe_gantt": 2,    # SECONDARY for gantt
     "markmap": 1,
-    "kanban": 1,
-    "mermaid": 2
+    "kanban": 2,          # SECONDARY for kanban
+    "mermaid": 3          # Fallback
 }
 
 # Cache key prefixes
@@ -51,13 +63,18 @@ WS_MAX_MESSAGE_SIZE = 10 * 1024 * 1024  # 10MB
 WS_PING_INTERVAL = 30  # seconds
 WS_PING_TIMEOUT = 10  # seconds
 
-# Generation timeouts (milliseconds) - v3.1 Simplified
+# Generation timeouts (milliseconds) - v3.1 with HTML agents
 GENERATION_TIMEOUTS = {
     "gemini_image": 10000,
     "frappe_gantt": 8000,
     "markmap": 5000,
     "kanban": 5000,
-    "mermaid": 5000
+    "mermaid": 5000,
+    # HTML-based agents
+    "gantt_html": 8000,
+    "kanban_html": 5000,
+    "code_display": 8000,
+    "chevron": 8000
 }
 
 # Quality thresholds
@@ -238,15 +255,26 @@ DIAGRAM_TYPE_SIGNALS: Dict[str, Dict[str, Any]] = {
         "best_for": ["microservices", "distributed systems", "service mesh"],
         "keywords": ["microservice", "service", "api", "container", "distributed", "mesh", "gateway"],
         "ideal_topic_count": {"min": 3, "max": 15}
+    },
+    "code_display": {
+        "best_for": ["code examples", "programming tutorials", "API demonstrations", "syntax examples"],
+        "keywords": ["code", "snippet", "function", "class", "programming", "syntax", "example", "script", "implementation"],
+        "ideal_topic_count": {"min": 1, "max": 1}
+    },
+    "chevron": {
+        "best_for": ["roadmaps", "strategic plans", "phased initiatives", "quarterly planning"],
+        "keywords": ["roadmap", "phases", "strategy", "milestones", "quarters", "timeline", "initiative", "plan", "strategic"],
+        "ideal_topic_count": {"min": 3, "max": 6}
     }
 }
 
-# Content signals for diagram service - v3.1 Core types
+# Content signals for diagram service - v3.1 with HTML types
 DIAGRAM_CONTENT_SIGNALS: Dict[str, Any] = {
     "handles_well": [
         "processes", "workflows", "system_architecture", "microservices",
         "sequences", "timelines", "project_schedules", "data_models",
-        "task_boards", "mindmaps", "brainstorming", "concept_hierarchies"
+        "task_boards", "mindmaps", "brainstorming", "concept_hierarchies",
+        "code_examples", "programming_tutorials", "roadmaps", "strategic_plans"
     ],
     "handles_poorly": [
         "pure_data", "bullet_lists", "numerical_charts", "bar_graphs"
@@ -256,6 +284,8 @@ DIAGRAM_CONTENT_SIGNALS: Dict[str, Any] = {
         "sequence", "interaction", "diagram", "entity", "relationship",
         "timeline", "gantt", "schedule", "kanban", "board",
         "steps", "decision", "database", "schema",
-        "mindmap", "brainstorm", "hierarchy"
+        "mindmap", "brainstorm", "hierarchy",
+        "code", "snippet", "function", "syntax", "programming",
+        "roadmap", "phases", "strategy", "milestones", "initiative"
     ]
 }

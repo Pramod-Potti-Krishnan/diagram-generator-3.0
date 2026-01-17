@@ -1,0 +1,135 @@
+/**
+ * Code Display Styles
+ */
+
+.code-display-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    padding-top: var(--space-lg);
+}
+
+.code-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--glass-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md) var(--space-lg);
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.filename {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--space-md);
+}
+
+.language-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    background: var(--accent-6-dark);
+    color: white;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.copy-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.8rem;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.copy-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--text-secondary);
+}
+
+.copy-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.copy-btn.copied {
+    background: var(--accent-4-dark);
+    border-color: var(--accent-4-dark);
+    color: white;
+}
+
+.code-content {
+    flex: 1;
+    padding: var(--space-lg);
+    overflow: auto;
+}
+
+.code-content pre {
+    margin: 0;
+    background: transparent;
+}
+
+.code-content code {
+    font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text-primary);
+    tab-size: 4;
+}
+
+/* Light mode code background */
+.theme-light-mode .code-wrapper,
+.theme-light .code-wrapper {
+    background: #f8f9fa;
+}
+
+.theme-light-mode .code-header,
+.theme-light .code-header {
+    background: #f1f3f4;
+}
+
+.theme-light-mode .code-content,
+.theme-light .code-content {
+    background: #ffffff;
+}
+
+/* Language-specific badge colors */
+.lang-python .language-badge { background: #3776AB; }
+.lang-javascript .language-badge { background: #F7DF1E; color: #000; }
+.lang-typescript .language-badge { background: #3178C6; }
+.lang-go .language-badge { background: #00ADD8; }
+.lang-rust .language-badge { background: #CE422B; }
+.lang-java .language-badge { background: #007396; }
+.lang-sql .language-badge { background: #CC2927; }
+.lang-bash .language-badge { background: #4EAA25; }
