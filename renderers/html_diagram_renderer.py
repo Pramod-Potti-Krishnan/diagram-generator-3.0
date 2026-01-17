@@ -599,16 +599,23 @@ pre[class*="language-"]{padding:1em;margin:.5em 0;overflow:auto;border-radius:0.
 .card-tag { font-size: 10px; margin-top: 8px; padding: 2px 6px; background: var(--accent-4-dark); color: #000; border-radius: 4px; display: inline-block; }
 """
         elif diagram_type == "code_display":
-            # No height adjustment needed - no diagram-label, Layout Service handles title
+            # No diagram-label - Layout Service handles title
+            # Reduced padding for embedded use in V2-chart-text layout
             return """
-.code-display-wrapper { height: 100%; }
-.code-wrapper { height: 100%; background: var(--bg-secondary); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
-.code-header { display: flex; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--bg-tertiary); }
-.filename { font-size: 13px; color: var(--text-secondary); }
-.language-badge { font-size: 11px; padding: 2px 8px; background: var(--accent-6-dark); color: #000; border-radius: 4px; }
+/* Override slide-container padding for code display - minimal padding for embedded use */
+.slide-container:has(.code-display-wrapper) { padding: 8px; }
+.code-display-wrapper { flex: 1; display: flex; flex-direction: column; width: 100%; height: 100%; }
+.code-wrapper { flex: 1; display: flex; flex-direction: column; background: var(--bg-secondary); border-radius: 8px; overflow: hidden; }
+.code-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--bg-tertiary); }
+.filename { font-size: 13px; color: var(--text-secondary); font-family: 'Fira Code', monospace; }
+.language-badge { font-size: 11px; padding: 4px 8px; background: var(--accent-6-dark); color: white; border-radius: 4px; font-weight: 600; }
 .code-content { flex: 1; overflow: auto; padding: 16px; }
-pre { margin: 0; }
-code { font-size: 13px; line-height: 1.6; }
+pre { margin: 0; background: transparent; }
+code { font-size: 14px; line-height: 1.6; font-family: 'Fira Code', 'JetBrains Mono', Consolas, monospace; }
+/* Light mode */
+.theme-light-mode .code-wrapper { background: #f8f9fa; }
+.theme-light-mode .code-header { background: #f1f3f4; }
+.theme-light-mode .code-content { background: #ffffff; }
 """
         elif diagram_type == "chevron":
             return """

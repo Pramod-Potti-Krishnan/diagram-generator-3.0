@@ -1,13 +1,22 @@
 /**
  * Code Display Styles
+ *
+ * NOTE: For embedded use in Layout Service (V2-chart-text layout):
+ * - No extra padding needed - Layout Service handles positioning
+ * - Content fills the chart_html area (1080x840px)
  */
+
+/* Override slide-container padding for code display - minimal padding for embedded use */
+.slide-container:has(.code-display-wrapper) {
+    padding: var(--space-sm);
+}
 
 .code-display-wrapper {
     flex: 1;
     display: flex;
     flex-direction: column;
     width: 100%;
-    padding-top: var(--space-lg);
+    height: 100%;
 }
 
 .code-wrapper {

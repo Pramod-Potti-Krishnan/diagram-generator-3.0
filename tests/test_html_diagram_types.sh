@@ -66,6 +66,14 @@ for item in "${TESTS[@]}"; do
   echo "[$SLIDE_NUM/$TOTAL_TESTS] $diagram_type ($layout)"
   echo "       Title: $title"
 
+  # Determine dimensions based on layout type
+  # V2-chart-text uses 1080px width (left side only), C5-diagram uses 1800px (full width)
+  if [ "$layout" = "V2-chart-text" ]; then
+    MAX_WIDTH=1080
+  else
+    MAX_WIDTH=1800
+  fi
+
   # 1. Submit diagram generation
   RESPONSE=$(curl -s -X POST "$DIAGRAM_SERVICE/generate" \
     -H "Content-Type: application/json" \
@@ -73,7 +81,8 @@ for item in "${TESTS[@]}"; do
       --arg content "$content" \
       --arg diagram_type "$diagram_type" \
       --argjson theme "$THEME" \
-      '{content: $content, diagram_type: $diagram_type, theme: $theme, constraints: {maxWidth: 1800, maxHeight: 840}}')")
+      --argjson maxWidth "$MAX_WIDTH" \
+      '{content: $content, diagram_type: $diagram_type, theme: $theme, constraints: {maxWidth: $maxWidth, maxHeight: 840}}')")
 
   JOB_ID=$(echo "$RESPONSE" | jq -r '.job_id')
 
