@@ -251,7 +251,12 @@ def _get_unified_box_css(theme: str) -> str:
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.7.2: Unified Code Box Layout - fix spacing and remove shadow line */
+/* v3.7.3: Unified Code Box Layout - fix spacing and remove shadow line */
+.diagram-container {
+    width: 100% !important;  /* v3.7.3: Fill grid cell, override inline style */
+    height: 100% !important;
+}
+
 .slide-container {
     display: flex;
     justify-content: flex-start;
@@ -689,7 +694,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.2"
+                "version": "3.7.3"
             }
         )
 
@@ -714,7 +719,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.2",
+        "version": "3.7.3",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
