@@ -251,7 +251,7 @@ def _get_unified_box_css(theme: str) -> str:
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.6: Unified Code Box Layout - reduced width, no A+/A- buttons, improved spacing */
+/* v3.7: Unified Code Box Layout - 10px edge spacing, no extra shadow */
 .slide-container {
     display: flex;
     justify-content: flex-start;
@@ -263,7 +263,7 @@ def _get_unified_box_css(theme: str) -> str:
 .code-unified-box {
     display: flex;
     flex-direction: column;
-    width: calc(100% - 20px);  /* v3.6: Reduce width to end at shadow */
+    width: 100%;               /* v3.7: Full width, no extra space */
     height: 100%;
     border-radius: 12px;
     overflow: hidden;
@@ -274,7 +274,7 @@ def _get_unified_box_css(theme: str) -> str:
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 15px;  /* v3.6: 15px padding on sides */
+    padding: 16px 10px;  /* v3.7: 10px padding on sides */
     min-height: 72px;
     border-bottom: 1px solid rgba(128, 128, 128, 0.2);
 }
@@ -286,15 +286,15 @@ def _get_unified_box_css(theme: str) -> str:
     letter-spacing: 0.08em;
     padding: 11px 28px;  /* v3.6: 5% wider padding */
     border-radius: 4px;  /* v3.6: More squarish (was 8px) */
-    margin-left: 15px;   /* v3.6: 15px left margin */
+    margin-left: 0;      /* v3.7: Remove margin, header padding handles it */
 }
 
-/* v3.6: Copy controls container only (A+/A- removed) */
+/* v3.7: Copy controls container only (A+/A- removed) */
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-right: 15px;  /* v3.6: 15px right margin */
+    margin-right: 0;     /* v3.7: Remove margin, header padding handles it */
     pointer-events: auto !important;
 }
 
@@ -689,7 +689,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.6"
+                "version": "3.7"
             }
         )
 
@@ -714,7 +714,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.6",
+        "version": "3.7",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
