@@ -10,7 +10,7 @@ This uses the v3.5 unified box format with working A+/A- font size controls.
 import re
 import html as html_escape
 import logging
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,22 @@ router = APIRouter(prefix="/api/code-explainer", tags=["Code Explainer"])
 
 
 # ============== REQUEST/RESPONSE MODELS ==============
+
+class KeyConceptBullet(BaseModel):
+    """Model for a single key concept bullet."""
+    phrase: str = Field(
+        ...,
+        description="3-word bold phrase (e.g., 'Type Safety First')",
+        min_length=5,
+        max_length=30
+    )
+    description: str = Field(
+        ...,
+        description="Description text (~70 characters)",
+        min_length=20,
+        max_length=100
+    )
+
 
 class CodeExplainerRequest(BaseModel):
     """Request model for code explainer generation."""
@@ -48,6 +64,21 @@ class CodeExplainerRequest(BaseModel):
         default=840,
         description="Container height in pixels"
     )
+    # v3.6: Key Concepts bullets (optional)
+    key_concepts: Optional[List[KeyConceptBullet]] = Field(
+        default=None,
+        description="Optional list of key concepts (7 bullets max). Each has 3-word phrase + ~70 char description."
+    )
+    key_concepts_title: Optional[str] = Field(
+        default="Key Concepts",
+        description="Title for the key concepts section"
+    )
+    num_bullets: Optional[int] = Field(
+        default=7,
+        ge=1,
+        le=10,
+        description="Number of bullets to show (default: 7)"
+    )
 
     class Config:
         json_schema_extra = {
@@ -57,7 +88,11 @@ class CodeExplainerRequest(BaseModel):
                 "variant": "dark",
                 "concept": "FastAPI Endpoint",
                 "width": 1080,
-                "height": 840
+                "height": 840,
+                "key_concepts": [
+                    {"phrase": "Type Safety First", "description": "Strong typing ensures compile-time error detection"},
+                    {"phrase": "Clean Code Design", "description": "Well-organized modules with clear responsibilities"}
+                ]
             }
         }
 
@@ -66,12 +101,42 @@ class CodeExplainerResponse(BaseModel):
     """Response model for code explainer generation."""
     success: bool
     chart_html: str = Field(description="The HTML snippet for embedding")
+    explanation_html: Optional[str] = Field(default=None, description="Optional key concepts HTML")
     language: str
     variant: str
     metadata: dict = Field(default_factory=dict)
 
 
 # ============== HELPER FUNCTIONS ==============
+
+def _generate_key_concepts_html(
+    bullets: List[KeyConceptBullet],
+    title: str = "Key Concepts",
+    num_bullets: int = 7
+) -> str:
+    """
+    Generate Key Concepts HTML with specified format.
+
+    v3.6:
+    - Heading: 24px (20% bigger than 20px), bold
+    - Each bullet: 3-word bold phrase + colon + ~70 chars description
+    - Parameterized number of bullets (default: 7)
+    """
+    # Limit to num_bullets
+    bullets_to_render = bullets[:num_bullets]
+
+    # Build bullet list HTML
+    bullets_html = ""
+    for bullet in bullets_to_render:
+        phrase = html_escape.escape(bullet.phrase)
+        description = html_escape.escape(bullet.description)
+        bullets_html += f'<li><strong>{phrase}:</strong> {description}</li>'
+
+    # Build complete HTML with v3.6 styling
+    html = f'''<h3 style="color: #3b82f6; margin-bottom: 16px; font-size: 24px; font-weight: 700;">{html_escape.escape(title)}</h3><ul style="list-style: disc; padding-left: 24px; line-height: 2;">{bullets_html}</ul>'''
+
+    return html
+
 
 def _highlight_code(code: str, language: str) -> str:
     """Apply basic syntax highlighting with span tags."""
@@ -182,11 +247,11 @@ def _highlight_code(code: str, language: str) -> str:
 
 
 def _get_unified_box_css(theme: str) -> str:
-    """Get CSS for v3.5 unified code box layout."""
+    """Get CSS for v3.6 unified code box layout."""
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.5: Unified Code Box Layout - 100% width, reduced header, fixed controls */
+/* v3.6: Unified Code Box Layout - reduced width, no A+/A- buttons, improved spacing */
 .slide-container {
     display: flex;
     justify-content: flex-start;
@@ -198,7 +263,7 @@ def _get_unified_box_css(theme: str) -> str:
 .code-unified-box {
     display: flex;
     flex-direction: column;
-    width: 100%;
+    width: calc(100% - 20px);  /* v3.6: Reduce width to end at shadow */
     height: 100%;
     border-radius: 12px;
     overflow: hidden;
@@ -209,7 +274,7 @@ def _get_unified_box_css(theme: str) -> str:
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 26px;
+    padding: 16px 15px;  /* v3.6: 15px padding on sides */
     min-height: 72px;
     border-bottom: 1px solid rgba(128, 128, 128, 0.2);
 }
@@ -219,40 +284,28 @@ def _get_unified_box_css(theme: str) -> str:
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 11px 26px;
-    border-radius: 8px;
+    padding: 11px 28px;  /* v3.6: 5% wider padding */
+    border-radius: 4px;  /* v3.6: More squarish (was 8px) */
+    margin-left: 15px;   /* v3.6: 15px left margin */
 }
 
-/* v3.5: Font size and copy controls container - pointer-events for present mode */
+/* v3.6: Copy controls container only (A+/A- removed) */
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
-    pointer-events: auto !important;
-}
-
-.font-size-btn {
-    padding: 12px 16px;
-    border-radius: 6px;
-    border: 1px solid rgba(128, 128, 128, 0.3);
-    background: transparent;
-    cursor: pointer;
-    font-size: 18px;
-    font-weight: 700;
-    transition: all 0.15s ease;
-    min-width: 48px;
+    margin-right: 15px;  /* v3.6: 15px right margin */
     pointer-events: auto !important;
 }
 
 .code-copy-btn {
-    padding: 14px 28px;
+    padding: 15px 15px;  /* v3.6: Equal padding on all sides */
     border-radius: 8px;
     border: none;
     cursor: pointer;
     font-size: 16px;
     font-weight: 700;
     transition: all 0.15s ease;
-    min-width: 110px;
     pointer-events: auto !important;
 }
 
@@ -309,16 +362,6 @@ def _get_unified_box_css(theme: str) -> str:
 
 .code-slide-light .code-copy-btn:hover {
     background: rgba(0, 0, 0, 0.1);
-    color: #1f2937;
-}
-
-.code-slide-light .font-size-btn {
-    color: #4b5563;
-    border-color: rgba(0, 0, 0, 0.15);
-}
-
-.code-slide-light .font-size-btn:hover {
-    background: rgba(0, 0, 0, 0.06);
     color: #1f2937;
 }
 
@@ -432,16 +475,6 @@ def _get_unified_box_css(theme: str) -> str:
     color: #c9d1d9;
 }
 
-.code-slide-dark .font-size-btn {
-    color: #8b949e;
-    border-color: rgba(255, 255, 255, 0.15);
-}
-
-.code-slide-dark .font-size-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #c9d1d9;
-}
-
 .code-slide-dark .code-box-content {
     background: #0d1117;
 }
@@ -533,7 +566,7 @@ def _generate_code_display_html(
     width: int,
     height: int
 ) -> str:
-    """Generate the complete code display HTML with v3.5 unified box format."""
+    """Generate the complete code display HTML with v3.6 unified box format."""
 
     # Escape code for HTML
     escaped_code = html_escape.escape(code)
@@ -551,7 +584,7 @@ def _generate_code_display_html(
     # Container style
     container_style = f"width:{width}px;height:{height}px;"
 
-    # v3.5: Unified box with fixed font size controls (A-, A+) - using .call(this) pattern
+    # v3.6: Simplified - removed A+/A- buttons, improved spacing
     html = f"""<div class="diagram-container {theme_class}" style="{container_style}">
 <style>
 {css}
@@ -561,8 +594,6 @@ def _generate_code_display_html(
         <div class="code-box-header">
             <span class="code-lang-badge">{language.upper()}</span>
             <div class="code-controls">
-                <button class="font-size-btn" onclick="(function(btn){{var cb=document.getElementById('code-block');var cs=parseInt(window.getComputedStyle(cb).fontSize);cb.style.fontSize=Math.max(10,cs-2)+'px';}}).call(this);">A-</button>
-                <button class="font-size-btn" onclick="(function(btn){{var cb=document.getElementById('code-block');var cs=parseInt(window.getComputedStyle(cb).fontSize);cb.style.fontSize=Math.min(20,cs+2)+'px';}}).call(this);">A+</button>
                 <button class="code-copy-btn" onclick="(function(btn){{var code=document.getElementById('code-block').innerText;navigator.clipboard.writeText(code).then(function(){{btn.innerText='Copied!';btn.classList.add('copied');setTimeout(function(){{btn.innerText='Copy';btn.classList.remove('copied');}},2000);}}).catch(function(err){{console.error('Copy failed:',err);}});}}).call(this,this);">Copy</button>
             </div>
         </div>
@@ -625,7 +656,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
         }
         language = language_aliases.get(language, language)
 
-        # Generate HTML
+        # Generate code display HTML
         html_content = _generate_code_display_html(
             code=request.code,
             language=language,
@@ -634,11 +665,22 @@ async def generate_code_explainer(request: CodeExplainerRequest):
             height=request.height or 840
         )
 
+        # Generate key concepts HTML if provided
+        explanation_html = None
+        if request.key_concepts:
+            explanation_html = _generate_key_concepts_html(
+                bullets=request.key_concepts,
+                title=request.key_concepts_title or "Key Concepts",
+                num_bullets=request.num_bullets or 7
+            )
+            logger.info(f"Generated key concepts HTML: {len(explanation_html)} chars")
+
         logger.info(f"Generated code explainer HTML: {len(html_content)} chars")
 
         return CodeExplainerResponse(
             success=True,
             chart_html=html_content,
+            explanation_html=explanation_html,
             language=language,
             variant=request.variant,
             metadata={
@@ -646,7 +688,8 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "height": request.height,
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
-                "version": "3.5"
+                "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
+                "version": "3.6"
             }
         )
 
@@ -671,7 +714,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.5",
+        "version": "3.6",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"

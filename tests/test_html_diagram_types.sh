@@ -1,14 +1,14 @@
 #!/bin/bash
 #
 # Test HTML Diagram Types with Layout Service Preview
-# Tests: Gantt, Kanban, Chevron (C5-diagram), CodeDisplay (V2-chart-text)
+# Tests: Gantt, Kanban, Chevron (C5-diagram), CodeDisplay (V3-diagram-text)
 #
 # Key differences from SVG tests:
 # - HTML content is returned directly in status response as 'html_content'
 # - No need to fetch from diagram_url - content is inline
 # - Layout field mapping:
 #   - C5-diagram uses 'diagram_html' field (1800x840px)
-#   - V2-chart-text uses 'chart_html' field (1080x840px left side)
+#   - V3-diagram-text uses 'diagram_html' field (1080x840px left side)
 #     PLUS 'body' field for text explanation (generated via TEXT_BOX atomic endpoint)
 #
 
@@ -33,7 +33,7 @@ declare -a TESTS=(
   "gantt|Q1 2025 Product Roadmap|Phase 1 Planning: Jan 1-15. Development Sprint 1: Jan 15-Feb 15. Testing: Feb 15-Mar 1. Launch: Mar 1-15|C5-diagram|diagram_html"
   "kanban|Sprint Board|Backlog: API Design, Database Schema, Auth Flow. In Progress: User Dashboard, API Integration. Review: Login Page. Done: Project Setup, CI/CD Pipeline|C5-diagram|diagram_html"
   "chevron|2025 Strategic Roadmap|Q1: Foundation - Setup infrastructure. Q2: Growth - Scale operations. Q3: Expansion - Enter new markets. Q4: Optimization - Improve efficiency|C5-diagram|diagram_html"
-  "code_display|Python FastAPI Example|Create a simple FastAPI endpoint that returns user data with authentication|V2-chart-text|chart_html"
+  "code_display|Python FastAPI Example|Create a simple FastAPI endpoint that returns user data with authentication|V3-diagram-text|diagram_html"
 )
 
 echo "=============================================="
@@ -47,7 +47,7 @@ echo "Testing 4 HTML-based diagram types:"
 echo "  - Gantt (C5-diagram layout)"
 echo "  - Kanban (C5-diagram layout)"
 echo "  - Chevron (C5-diagram layout)"
-echo "  - Code Display (V2-chart-text layout)"
+echo "  - Code Display (V3-diagram-text layout)"
 echo ""
 
 # Collect slides
@@ -67,8 +67,8 @@ for item in "${TESTS[@]}"; do
   echo "       Title: $title"
 
   # Determine dimensions based on layout type
-  # V2-chart-text uses 1080px width (left side only), C5-diagram uses 1800px (full width)
-  if [ "$layout" = "V2-chart-text" ]; then
+  # V3-diagram-text uses 1080px width (left side only), C5-diagram uses 1800px (full width)
+  if [ "$layout" = "V3-diagram-text" ]; then
     MAX_WIDTH=1080
   else
     MAX_WIDTH=1800
@@ -164,7 +164,7 @@ for item in "${TESTS[@]}"; do
         }
       }')
   else
-    # V2-chart-text uses chart_html (left side) + body (right side)
+    # V3-diagram-text uses diagram_html (left side) + body (right side)
     # Generate explanation text via TEXT_BOX atomic endpoint
     echo "       Generating explanation text via TEXT_BOX..."
 
@@ -201,14 +201,14 @@ for item in "${TESTS[@]}"; do
     SLIDE_JSON=$(jq -n \
       --arg title "$title" \
       --arg subtitle "Code Example" \
-      --argjson chart_html "$HTML_ESCAPED" \
+      --argjson diagram_html "$HTML_ESCAPED" \
       --argjson body "$BODY_ESCAPED" \
       '{
-        layout: "V2-chart-text",
+        layout: "V3-diagram-text",
         content: {
           slide_title: $title,
           subtitle: $subtitle,
-          chart_html: $chart_html,
+          diagram_html: $diagram_html,
           body: $body,
           presentation_name: "HTML Diagram Test",
           logo: " "
@@ -292,7 +292,7 @@ echo "  Layout Mapping:"
 echo "    - Gantt     → C5-diagram (diagram_html)"
 echo "    - Kanban    → C5-diagram (diagram_html)"
 echo "    - Chevron   → C5-diagram (diagram_html)"
-echo "    - CodeDisplay → V2-chart-text (chart_html)"
+echo "    - CodeDisplay → V3-diagram-text (diagram_html)"
 echo ""
 
 # Open in browser (macOS)

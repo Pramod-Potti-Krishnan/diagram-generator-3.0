@@ -111,7 +111,7 @@ class StandardV3Agent(BaseAgent):
 
             # Set appropriate width based on diagram type
             if diagram_type == "code_display":
-                width = width or 1080  # V2-chart-text layout
+                width = width or 1080  # V3-diagram-text layout
             else:
                 width = width or 1800  # C5-diagram layout
 
