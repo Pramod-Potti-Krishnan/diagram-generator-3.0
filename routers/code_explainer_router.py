@@ -250,9 +250,9 @@ def _get_unified_box_css(theme: str) -> str:
     """Get CSS for v3.6 unified code box layout."""
 
     # Base CSS (shared between themes)
-    # v3.7.5: Simplified structure - just 2 boxes (header + code), no nesting
+    # v3.7.6: Fixed styling - padding, button border, rounded corners
     base_css = """
-/* v3.7.5: Simple two-box layout - header box + code box */
+/* v3.7.6: Simple two-box layout with proper styling */
 .diagram-container {
     width: 100% !important;
     height: 100% !important;
@@ -264,7 +264,7 @@ def _get_unified_box_css(theme: str) -> str:
     flex-direction: column;
 }
 
-/* Main container - holds header and code */
+/* Main container - holds header and code, with rounded corners */
 [class^="code-slide-"] {
     display: flex;
     flex-direction: column;
@@ -272,8 +272,8 @@ def _get_unified_box_css(theme: str) -> str:
     height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
+    border-radius: 12px;  /* v3.7.6: Rounded corners on overall window */
+    overflow: hidden;     /* v3.7.6: Clip children to rounded corners */
 }
 
 /* Header box */
@@ -281,7 +281,7 @@ def _get_unified_box_css(theme: str) -> str:
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 16px 24px;   /* v3.7.6: More horizontal padding */
     min-height: 72px;
     flex-shrink: 0;
 }
@@ -293,34 +293,38 @@ def _get_unified_box_css(theme: str) -> str:
     letter-spacing: 0.08em;
     padding: 11px 28px;
     border-radius: 4px;
+    margin-left: 8px;     /* v3.7.6: Slight left margin */
 }
 
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
+    margin-right: 8px;    /* v3.7.6: Slight right margin */
 }
 
 .code-copy-btn {
-    padding: 12px 24px;
-    border-radius: 8px;
-    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: 1px solid rgba(0, 0, 0, 0.15);  /* v3.7.6: Visible border */
     cursor: pointer;
-    font-size: 16px;
-    font-weight: 700;
+    font-size: 14px;
+    font-weight: 600;
     transition: all 0.15s ease;
+    pointer-events: auto !important;  /* v3.7.6: Ensure clickable */
 }
 
 .code-copy-btn.copied {
     background: #22c55e !important;
     color: white !important;
+    border-color: #22c55e !important;
 }
 
 /* Code box - the pre element IS the box, no wrapper */
 pre.code-box-content {
     flex: 1;
     margin: 0 !important;
-    padding: 20px !important;
+    padding: 20px 24px !important;  /* v3.7.6: Match header padding */
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
@@ -353,13 +357,15 @@ pre.code-box-content code {
 }
 
 .code-slide-light .code-copy-btn {
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(0, 0, 0, 0.04);
     color: #4b5563;
+    border: 1px solid rgba(0, 0, 0, 0.12);  /* v3.7.6: Visible border */
 }
 
 .code-slide-light .code-copy-btn:hover {
-    background: rgba(0, 0, 0, 0.1);
+    background: rgba(0, 0, 0, 0.08);
     color: #1f2937;
+    border-color: rgba(0, 0, 0, 0.2);
 }
 
 .code-slide-light pre.code-box-content {
@@ -462,13 +468,15 @@ pre.code-box-content code {
 }
 
 .code-slide-dark .code-copy-btn {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.06);
     color: #8b949e;
+    border: 1px solid rgba(255, 255, 255, 0.15);  /* v3.7.6: Visible border */
 }
 
 .code-slide-dark .code-copy-btn:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.1);
     color: #c9d1d9;
+    border-color: rgba(255, 255, 255, 0.25);
 }
 
 .code-slide-dark pre.code-box-content {
@@ -682,7 +690,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.5"
+                "version": "3.7.6"
             }
         )
 
@@ -707,7 +715,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.5",
+        "version": "3.7.6",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
