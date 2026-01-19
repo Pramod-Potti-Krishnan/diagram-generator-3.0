@@ -252,28 +252,29 @@ def _get_unified_box_css(theme: str) -> str:
     # Base CSS (shared between themes)
     # v3.7.6: Fixed styling - padding, button border, rounded corners
     base_css = """
-/* v3.7.8: Simple two-box layout - 20px margins for badge/button */
+/* v3.7.9: Add padding to stay within Layout Service bounds */
 .diagram-container {
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-    box-shadow: none !important;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 8px;              /* v3.7.9: Space for Layout Service UI */
+    border: none;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
+    box-sizing: border-box;    /* v3.7.9: Include padding in size */
 }
 
 /* Main container - holds header and code, with rounded corners */
 [class^="code-slide-"] {
     display: flex;
     flex-direction: column;
-    width: 100% !important;
-    height: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border-radius: 12px;  /* v3.7.6: Rounded corners on overall window */
-    overflow: hidden;     /* v3.7.6: Clip children to rounded corners */
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border-radius: 12px;
+    overflow: hidden;
 }
 
 /* Header box */
@@ -690,7 +691,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.8"
+                "version": "3.7.9"
             }
         )
 
@@ -715,7 +716,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.8",
+        "version": "3.7.9",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
