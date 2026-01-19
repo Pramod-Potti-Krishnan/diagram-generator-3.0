@@ -251,10 +251,14 @@ def _get_unified_box_css(theme: str) -> str:
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.7.3: Unified Code Box Layout - fix spacing and remove shadow line */
+/* v3.7.4: Unified Code Box Layout - remove ALL gaps and borders */
 .diagram-container {
-    width: 100% !important;  /* v3.7.3: Fill grid cell, override inline style */
+    width: 100% !important;
     height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
 }
 
 .slide-container {
@@ -263,16 +267,21 @@ def _get_unified_box_css(theme: str) -> str:
     align-items: flex-start;
     width: 100%;
     height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
 }
 
 .code-unified-box {
     display: flex;
     flex-direction: column;
-    width: 100% !important;    /* v3.7.1: Force full width */
-    height: 100%;
-    border-radius: 12px;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;  /* v3.7.4: Remove rounded corners - they cause gaps */
+    box-shadow: none !important;
     overflow: hidden;
-    box-shadow: none !important;  /* v3.7.2: Remove shadow causing vertical line */
 }
 
 .code-box-header {
@@ -344,10 +353,18 @@ def _get_unified_box_css(theme: str) -> str:
 
     if theme == "light":
         return base_css + """
-/* v3.7.2: Light Mode - Off-white/Ivory Code Window, no border */
+/* v3.7.4: Light Mode - match backgrounds across all containers */
+.diagram-container.theme-light-mode {
+    background: #faf9f7 !important;
+}
+
+.code-slide-light {
+    background: #faf9f7 !important;
+}
+
 .code-slide-light .code-unified-box {
     background: #faf9f7;
-    border: none !important;  /* v3.7.2: Remove border causing vertical line */
+    border: none !important;
 }
 
 .code-slide-light .code-box-header {
@@ -454,10 +471,18 @@ def _get_unified_box_css(theme: str) -> str:
 """
     else:
         return base_css + """
-/* v3.7.2: Dark Mode - Black Code Window, no border */
+/* v3.7.4: Dark Mode - match backgrounds across all containers */
+.diagram-container.theme-dark-mode {
+    background: #0d1117 !important;
+}
+
+.code-slide-dark {
+    background: #0d1117 !important;
+}
+
 .code-slide-dark .code-unified-box {
     background: #0d1117;
-    border: none !important;  /* v3.7.2: Remove border causing vertical line */
+    border: none !important;
 }
 
 .code-slide-dark .code-box-header {
@@ -694,7 +719,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.3"
+                "version": "3.7.4"
             }
         )
 
@@ -719,7 +744,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.3",
+        "version": "3.7.4",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
