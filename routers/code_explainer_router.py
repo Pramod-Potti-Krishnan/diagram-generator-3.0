@@ -78,10 +78,10 @@ class CodeExplainerRequest(BaseModel):
         description="Title for the key concepts section"
     )
     num_bullets: Optional[int] = Field(
-        default=7,
+        default=10,
         ge=1,
-        le=10,
-        description="Number of bullets to show (default: 7)"
+        le=15,
+        description="Number of bullets to show (default: 10)"
     )
     # v3.8.0: Text Service integration
     explanation_prompt: Optional[str] = Field(
@@ -105,7 +105,7 @@ class CodeExplainerRequest(BaseModel):
                 "explanation_prompt": "Key concepts about this Python FastAPI code including: routing patterns, type safety, async handling, REST API design, and dependency injection",
                 "use_text_service": True,
                 "key_concepts_title": "Key Concepts",
-                "num_bullets": 7,
+                "num_bullets": 10,
                 "key_concepts": [
                     {"phrase": "Type Safety First", "description": "Strong typing ensures compile-time error detection"},
                     {"phrase": "Clean Code Design", "description": "Well-organized modules with clear responsibilities"}
@@ -129,7 +129,7 @@ class CodeExplainerResponse(BaseModel):
 async def _call_text_service_text_box(
     prompt: str,
     title: str = "Key Concepts",
-    num_bullets: int = 7,
+    num_bullets: int = 10,
     grid_width: int = 12,
     grid_height: int = 14
 ) -> Optional[str]:
@@ -167,7 +167,7 @@ async def _call_text_service_text_box(
                 "content_align": "left",
                 "title_min_chars": 10,
                 "title_max_chars": 30,
-                "item_min_chars": 40,
+                "item_min_chars": 80,
                 "item_max_chars": 100,
                 "context": {
                     "slide_title": title
@@ -345,17 +345,17 @@ def _get_unified_box_css(theme: str) -> str:
     # Base CSS (shared between themes)
     # v3.7.6: Fixed styling - padding, button border, rounded corners
     base_css = """
-/* v3.7.9: Add padding to stay within Layout Service bounds */
+/* v3.8.1: Add 10px external padding for visual spacing */
 .diagram-container {
     width: 100%;
     height: 100%;
     margin: 0;
-    padding: 8px;              /* v3.7.9: Space for Layout Service UI */
+    padding: 10px;             /* v3.8.1: 10px external padding */
     border: none;
     box-shadow: none;
     display: flex;
     flex-direction: column;
-    box-sizing: border-box;    /* v3.7.9: Include padding in size */
+    box-sizing: border-box;    /* Include padding in size */
 }
 
 /* Main container - holds header and code, with rounded corners */
@@ -803,7 +803,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
                 "explanation_source": explanation_source,
-                "version": "3.8.0"
+                "version": "3.8.1"
             }
         )
 
@@ -828,7 +828,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.8.0",
+        "version": "3.8.1",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
