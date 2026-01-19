@@ -251,7 +251,7 @@ def _get_unified_box_css(theme: str) -> str:
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.7.1: Unified Code Box Layout - !important for Layout Service override */
+/* v3.7.2: Unified Code Box Layout - fix spacing and remove shadow line */
 .slide-container {
     display: flex;
     justify-content: flex-start;
@@ -267,14 +267,14 @@ def _get_unified_box_css(theme: str) -> str:
     height: 100%;
     border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: none !important;  /* v3.7.2: Remove shadow causing vertical line */
 }
 
 .code-box-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 10px !important;  /* v3.7.1: Force 10px side padding */
+    padding: 16px 20px 16px 10px !important;  /* v3.7.2: 10px left, 20px right */
     min-height: 72px;
     border-bottom: 1px solid rgba(128, 128, 128, 0.2);
 }
@@ -299,7 +299,7 @@ def _get_unified_box_css(theme: str) -> str:
 }
 
 .code-copy-btn {
-    padding: 15px 15px;  /* v3.6: Equal padding on all sides */
+    padding: 12px 24px !important;  /* v3.7.2: More horizontal padding for text breathing room */
     border-radius: 8px;
     border: none;
     cursor: pointer;
@@ -339,10 +339,10 @@ def _get_unified_box_css(theme: str) -> str:
 
     if theme == "light":
         return base_css + """
-/* v3.5: Light Mode - Off-white/Ivory Code Window */
+/* v3.7.2: Light Mode - Off-white/Ivory Code Window, no border */
 .code-slide-light .code-unified-box {
     background: #faf9f7;
-    border: 1px solid #e5e2de;
+    border: none !important;  /* v3.7.2: Remove border causing vertical line */
 }
 
 .code-slide-light .code-box-header {
@@ -449,10 +449,10 @@ def _get_unified_box_css(theme: str) -> str:
 """
     else:
         return base_css + """
-/* v3.5: Dark Mode - Black Code Window with Light Syntax */
+/* v3.7.2: Dark Mode - Black Code Window, no border */
 .code-slide-dark .code-unified-box {
     background: #0d1117;
-    border: 1px solid #30363d;
+    border: none !important;  /* v3.7.2: Remove border causing vertical line */
 }
 
 .code-slide-dark .code-box-header {
@@ -689,7 +689,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.1"
+                "version": "3.7.2"
             }
         )
 
@@ -714,7 +714,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.1",
+        "version": "3.7.2",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
