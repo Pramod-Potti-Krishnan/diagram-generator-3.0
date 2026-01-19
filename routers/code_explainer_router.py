@@ -586,8 +586,8 @@ def _generate_code_display_html(
     theme_suffix = "dark" if variant == "dark" else "light"
     theme_class = "theme-dark-mode" if variant == "dark" else "theme-light-mode"
 
-    # Container style
-    container_style = f"width:{width}px;height:{height}px;"
+    # Container style - v3.7.3: Use 100% to fill grid cell (not fixed px)
+    container_style = "width:100%;height:100%;"
 
     # v3.6: Simplified - removed A+/A- buttons, improved spacing
     html = f"""<div class="diagram-container {theme_class}" style="{container_style}">
