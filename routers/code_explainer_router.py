@@ -250,8 +250,9 @@ def _get_unified_box_css(theme: str) -> str:
     """Get CSS for v3.6 unified code box layout."""
 
     # Base CSS (shared between themes)
+    # v3.7.5: Simplified structure - just 2 boxes (header + code), no nesting
     base_css = """
-/* v3.7.4: Unified Code Box Layout - remove ALL gaps and borders */
+/* v3.7.5: Simple two-box layout - header box + code box */
 .diagram-container {
     width: 100% !important;
     height: 100% !important;
@@ -259,19 +260,12 @@ def _get_unified_box_css(theme: str) -> str:
     padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
-}
-
-.slide-container {
     display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    width: 100%;
-    height: 100%;
-    margin: 0 !important;
-    padding: 0 !important;
+    flex-direction: column;
 }
 
-.code-unified-box {
+/* Main container - holds header and code */
+[class^="code-slide-"] {
     display: flex;
     flex-direction: column;
     width: 100% !important;
@@ -279,18 +273,17 @@ def _get_unified_box_css(theme: str) -> str:
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
-    border-radius: 0 !important;  /* v3.7.4: Remove rounded corners - they cause gaps */
     box-shadow: none !important;
-    overflow: hidden;
 }
 
+/* Header box */
 .code-box-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px 16px 10px !important;  /* v3.7.2: 10px left, 20px right */
+    padding: 16px 20px;
     min-height: 72px;
-    border-bottom: 1px solid rgba(128, 128, 128, 0.2);
+    flex-shrink: 0;
 }
 
 .code-lang-badge {
@@ -298,29 +291,24 @@ def _get_unified_box_css(theme: str) -> str:
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 11px 28px !important;  /* v3.7.1: Force badge padding */
-    border-radius: 4px;  /* v3.6: More squarish (was 8px) */
-    margin-left: 0 !important;      /* v3.7.1: Force no extra margin */
+    padding: 11px 28px;
+    border-radius: 4px;
 }
 
-/* v3.7.1: Copy controls container only (A+/A- removed) */
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-right: 0 !important;     /* v3.7.1: Force no extra margin */
-    pointer-events: auto !important;
 }
 
 .code-copy-btn {
-    padding: 12px 24px !important;  /* v3.7.2: More horizontal padding for text breathing room */
+    padding: 12px 24px;
     border-radius: 8px;
     border: none;
     cursor: pointer;
     font-size: 16px;
     font-weight: 700;
     transition: all 0.15s ease;
-    pointer-events: auto !important;
 }
 
 .code-copy-btn.copied {
@@ -328,23 +316,19 @@ def _get_unified_box_css(theme: str) -> str:
     color: white !important;
 }
 
-.code-box-content {
+/* Code box - the pre element IS the box, no wrapper */
+pre.code-box-content {
     flex: 1;
-    overflow: auto;
-    padding: 0 !important;  /* v3.7.1: Force no padding on container */
-}
-
-.code-box-content pre {
     margin: 0 !important;
     padding: 20px !important;
-    height: 100%;
-    min-height: 400px;
-    border-radius: 0 !important;
-    background: transparent !important;
     border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: auto;
+    min-height: 0;
 }
 
-.code-box-content code {
+pre.code-box-content code {
     font-family: 'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, monospace !important;
     font-size: 14px !important;
     line-height: 1.6 !important;
@@ -353,23 +337,14 @@ def _get_unified_box_css(theme: str) -> str:
 
     if theme == "light":
         return base_css + """
-/* v3.7.4: Light Mode - match backgrounds across all containers */
-.diagram-container.theme-light-mode {
-    background: #faf9f7 !important;
-}
-
+/* v3.7.5: Light Mode - simple two-box styling */
+.diagram-container.theme-light-mode,
 .code-slide-light {
     background: #faf9f7 !important;
 }
 
-.code-slide-light .code-unified-box {
-    background: #faf9f7;
-    border: none !important;
-}
-
 .code-slide-light .code-box-header {
     background: #f5f3f0;
-    border-bottom: 1px solid #e5e2de;
 }
 
 .code-slide-light .code-lang-badge {
@@ -387,7 +362,7 @@ def _get_unified_box_css(theme: str) -> str:
     color: #1f2937;
 }
 
-.code-slide-light .code-box-content {
+.code-slide-light pre.code-box-content {
     background: #faf9f7;
 }
 
@@ -471,23 +446,14 @@ def _get_unified_box_css(theme: str) -> str:
 """
     else:
         return base_css + """
-/* v3.7.4: Dark Mode - match backgrounds across all containers */
-.diagram-container.theme-dark-mode {
-    background: #0d1117 !important;
-}
-
+/* v3.7.5: Dark Mode - simple two-box styling */
+.diagram-container.theme-dark-mode,
 .code-slide-dark {
     background: #0d1117 !important;
 }
 
-.code-slide-dark .code-unified-box {
-    background: #0d1117;
-    border: none !important;
-}
-
 .code-slide-dark .code-box-header {
     background: #161b22;
-    border-bottom: 1px solid #30363d;
 }
 
 .code-slide-dark .code-lang-badge {
@@ -505,7 +471,7 @@ def _get_unified_box_css(theme: str) -> str:
     color: #c9d1d9;
 }
 
-.code-slide-dark .code-box-content {
+.code-slide-dark pre.code-box-content {
     background: #0d1117;
 }
 
@@ -614,23 +580,20 @@ def _generate_code_display_html(
     # Container style - v3.7.3: Use 100% to fill grid cell (not fixed px)
     container_style = "width:100%;height:100%;"
 
-    # v3.6: Simplified - removed A+/A- buttons, improved spacing
+    # v3.7.5: Simplified HTML - removed nested box-within-box
+    # Structure: header box + code box (pre directly, no wrapper div)
     html = f"""<div class="diagram-container {theme_class}" style="{container_style}">
 <style>
 {css}
 </style>
-<div class="slide-container code-slide-{theme_suffix}">
-    <div class="code-unified-box lang-{language}">
-        <div class="code-box-header">
-            <span class="code-lang-badge">{language.upper()}</span>
-            <div class="code-controls">
-                <button class="code-copy-btn" onclick="(function(btn){{var code=document.getElementById('code-block').innerText;navigator.clipboard.writeText(code).then(function(){{btn.innerText='Copied!';btn.classList.add('copied');setTimeout(function(){{btn.innerText='Copy';btn.classList.remove('copied');}},2000);}}).catch(function(err){{console.error('Copy failed:',err);}});}}).call(this,this);">Copy</button>
-            </div>
-        </div>
-        <div class="code-box-content">
-            <pre><code class="language-{language}" id="code-block">{highlighted_code}</code></pre>
+<div class="code-slide-{theme_suffix}">
+    <div class="code-box-header">
+        <span class="code-lang-badge">{language.upper()}</span>
+        <div class="code-controls">
+            <button class="code-copy-btn" onclick="(function(btn){{var code=document.getElementById('code-block').innerText;navigator.clipboard.writeText(code).then(function(){{btn.innerText='Copied!';btn.classList.add('copied');setTimeout(function(){{btn.innerText='Copy';btn.classList.remove('copied');}},2000);}}).catch(function(err){{console.error('Copy failed:',err);}});}}).call(this,this);">Copy</button>
         </div>
     </div>
+    <pre class="code-box-content"><code class="language-{language}" id="code-block">{highlighted_code}</code></pre>
 </div>
 </div>"""
 
@@ -719,7 +682,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.4"
+                "version": "3.7.5"
             }
         )
 
@@ -744,7 +707,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.4",
+        "version": "3.7.5",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
