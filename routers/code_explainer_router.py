@@ -252,7 +252,7 @@ def _get_unified_box_css(theme: str) -> str:
     # Base CSS (shared between themes)
     # v3.7.6: Fixed styling - padding, button border, rounded corners
     base_css = """
-/* v3.7.6: Simple two-box layout with proper styling */
+/* v3.7.8: Simple two-box layout - 20px margins for badge/button */
 .diagram-container {
     width: 100% !important;
     height: 100% !important;
@@ -293,14 +293,14 @@ def _get_unified_box_css(theme: str) -> str:
     letter-spacing: 0.08em;
     padding: 11px 28px;
     border-radius: 4px;
-    margin-left: 16px;    /* v3.7.7: Space from left border */
+    margin-left: 20px !important;    /* v3.7.8: 20px from left border */
 }
 
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-right: 16px;   /* v3.7.7: Space from right border */
+    margin-right: 20px !important;   /* v3.7.8: 20px from right border */
 }
 
 .code-copy-btn {
@@ -690,7 +690,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.7"
+                "version": "3.7.8"
             }
         )
 
@@ -715,7 +715,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.7",
+        "version": "3.7.8",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
