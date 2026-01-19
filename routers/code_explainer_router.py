@@ -251,7 +251,7 @@ def _get_unified_box_css(theme: str) -> str:
 
     # Base CSS (shared between themes)
     base_css = """
-/* v3.7: Unified Code Box Layout - 10px edge spacing, no extra shadow */
+/* v3.7.1: Unified Code Box Layout - !important for Layout Service override */
 .slide-container {
     display: flex;
     justify-content: flex-start;
@@ -263,7 +263,7 @@ def _get_unified_box_css(theme: str) -> str:
 .code-unified-box {
     display: flex;
     flex-direction: column;
-    width: 100%;               /* v3.7: Full width, no extra space */
+    width: 100% !important;    /* v3.7.1: Force full width */
     height: 100%;
     border-radius: 12px;
     overflow: hidden;
@@ -274,7 +274,7 @@ def _get_unified_box_css(theme: str) -> str:
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 10px;  /* v3.7: 10px padding on sides */
+    padding: 16px 10px !important;  /* v3.7.1: Force 10px side padding */
     min-height: 72px;
     border-bottom: 1px solid rgba(128, 128, 128, 0.2);
 }
@@ -284,17 +284,17 @@ def _get_unified_box_css(theme: str) -> str:
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
-    padding: 11px 28px;  /* v3.6: 5% wider padding */
+    padding: 11px 28px !important;  /* v3.7.1: Force badge padding */
     border-radius: 4px;  /* v3.6: More squarish (was 8px) */
-    margin-left: 0;      /* v3.7: Remove margin, header padding handles it */
+    margin-left: 0 !important;      /* v3.7.1: Force no extra margin */
 }
 
-/* v3.7: Copy controls container only (A+/A- removed) */
+/* v3.7.1: Copy controls container only (A+/A- removed) */
 .code-controls {
     display: flex;
     align-items: center;
     gap: 12px;
-    margin-right: 0;     /* v3.7: Remove margin, header padding handles it */
+    margin-right: 0 !important;     /* v3.7.1: Force no extra margin */
     pointer-events: auto !important;
 }
 
@@ -317,7 +317,7 @@ def _get_unified_box_css(theme: str) -> str:
 .code-box-content {
     flex: 1;
     overflow: auto;
-    padding: 0;
+    padding: 0 !important;  /* v3.7.1: Force no padding on container */
 }
 
 .code-box-content pre {
@@ -689,7 +689,7 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7"
+                "version": "3.7.1"
             }
         )
 
@@ -714,7 +714,7 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7",
+        "version": "3.7.1",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
