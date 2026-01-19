@@ -78,10 +78,10 @@ class CodeExplainerRequest(BaseModel):
         description="Title for the key concepts section"
     )
     num_bullets: Optional[int] = Field(
-        default=10,
+        default=7,
         ge=1,
-        le=15,
-        description="Number of bullets to show (default: 10)"
+        le=10,
+        description="Number of bullets to show (default: 7, Text Service max: 7)"
     )
     # v3.8.0: Text Service integration
     explanation_prompt: Optional[str] = Field(
@@ -105,7 +105,7 @@ class CodeExplainerRequest(BaseModel):
                 "explanation_prompt": "Key concepts about this Python FastAPI code including: routing patterns, type safety, async handling, REST API design, and dependency injection",
                 "use_text_service": True,
                 "key_concepts_title": "Key Concepts",
-                "num_bullets": 10,
+                "num_bullets": 7,
                 "key_concepts": [
                     {"phrase": "Type Safety First", "description": "Strong typing ensures compile-time error detection"},
                     {"phrase": "Clean Code Design", "description": "Well-organized modules with clear responsibilities"}
@@ -129,7 +129,7 @@ class CodeExplainerResponse(BaseModel):
 async def _call_text_service_text_box(
     prompt: str,
     title: str = "Key Concepts",
-    num_bullets: int = 10,
+    num_bullets: int = 7,  # Text Service max is 7
     grid_width: int = 12,
     grid_height: int = 14
 ) -> Optional[str]:
@@ -767,10 +767,12 @@ async def generate_code_explainer(request: CodeExplainerRequest):
         # Option 1: Call Text Service (if enabled and prompt provided)
         if request.use_text_service and request.explanation_prompt:
             logger.info(f"Attempting Text Service call with prompt: {request.explanation_prompt[:100]}...")
+            # Text Service TEXT_BOX supports max 7 bullets
+            text_service_bullets = min(request.num_bullets or 7, 7)
             explanation_html = await _call_text_service_text_box(
                 prompt=request.explanation_prompt,
                 title=request.key_concepts_title or "Key Concepts",
-                num_bullets=request.num_bullets or 7
+                num_bullets=text_service_bullets
             )
             if explanation_html:
                 explanation_source = "text_service"
