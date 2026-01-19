@@ -13,8 +13,12 @@ import logging
 from typing import Optional, Literal, List
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+import httpx
 
 logger = logging.getLogger(__name__)
+
+# Text Service Configuration
+TEXT_SERVICE_URL = "https://web-production-5daf.up.railway.app"
 
 # Router instance
 router = APIRouter(prefix="/api/code-explainer", tags=["Code Explainer"])
@@ -79,6 +83,15 @@ class CodeExplainerRequest(BaseModel):
         le=10,
         description="Number of bullets to show (default: 7)"
     )
+    # v3.8.0: Text Service integration
+    explanation_prompt: Optional[str] = Field(
+        default=None,
+        description="Prompt for generating explanation via Text Service TEXT_BOX endpoint"
+    )
+    use_text_service: bool = Field(
+        default=True,
+        description="Use Text Service for explanation generation (default: True)"
+    )
 
     class Config:
         json_schema_extra = {
@@ -89,6 +102,10 @@ class CodeExplainerRequest(BaseModel):
                 "concept": "FastAPI Endpoint",
                 "width": 1080,
                 "height": 840,
+                "explanation_prompt": "Key concepts about this Python FastAPI code including: routing patterns, type safety, async handling, REST API design, and dependency injection",
+                "use_text_service": True,
+                "key_concepts_title": "Key Concepts",
+                "num_bullets": 7,
                 "key_concepts": [
                     {"phrase": "Type Safety First", "description": "Strong typing ensures compile-time error detection"},
                     {"phrase": "Clean Code Design", "description": "Well-organized modules with clear responsibilities"}
@@ -108,6 +125,82 @@ class CodeExplainerResponse(BaseModel):
 
 
 # ============== HELPER FUNCTIONS ==============
+
+async def _call_text_service_text_box(
+    prompt: str,
+    title: str = "Key Concepts",
+    num_bullets: int = 7,
+    grid_width: int = 12,
+    grid_height: int = 14
+) -> Optional[str]:
+    """
+    Call Text Service TEXT_BOX atomic endpoint.
+
+    v3.8.0: Integrates with Text Service for explanation generation.
+
+    Args:
+        prompt: The content prompt for generating explanation text
+        title: Title for the text box (default: "Key Concepts")
+        num_bullets: Number of bullet items to generate (default: 7)
+        grid_width: Grid width for layout (default: 12)
+        grid_height: Grid height for layout (default: 14)
+
+    Returns:
+        HTML string from Text Service, or None on failure.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            payload = {
+                "prompt": prompt,
+                "gridWidth": grid_width,
+                "gridHeight": grid_height,
+                "count": 1,
+                "items_per_box": num_bullets,
+                "background_style": "transparent",
+                "list_style": "bullets",
+                "title_style": "plain",
+                "color_variant": "blue",
+                "border": False,
+                "show_title": True,
+                "theme_mode": "light",
+                "heading_align": "left",
+                "content_align": "left",
+                "title_min_chars": 10,
+                "title_max_chars": 30,
+                "item_min_chars": 40,
+                "item_max_chars": 100,
+                "context": {
+                    "slide_title": title
+                }
+            }
+
+            logger.info(f"Calling Text Service TEXT_BOX: {TEXT_SERVICE_URL}/v1.2/atomic/TEXT_BOX")
+
+            response = await client.post(
+                f"{TEXT_SERVICE_URL}/v1.2/atomic/TEXT_BOX",
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get("success"):
+                html = data.get("html")
+                logger.info(f"Text Service returned HTML: {len(html) if html else 0} chars")
+                return html
+            else:
+                logger.warning(f"Text Service returned success=false: {data}")
+                return None
+
+    except httpx.TimeoutException as e:
+        logger.warning(f"Text Service timeout: {e}")
+        return None
+    except httpx.HTTPStatusError as e:
+        logger.warning(f"Text Service HTTP error: {e.response.status_code} - {e.response.text[:200]}")
+        return None
+    except Exception as e:
+        logger.warning(f"Text Service call failed: {e}")
+        return None
+
 
 def _generate_key_concepts_html(
     bullets: List[KeyConceptBullet],
@@ -667,15 +760,33 @@ async def generate_code_explainer(request: CodeExplainerRequest):
             height=request.height or 840
         )
 
-        # Generate key concepts HTML if provided
+        # v3.8.0: Generate explanation HTML with Text Service integration
         explanation_html = None
-        if request.key_concepts:
+        explanation_source = None
+
+        # Option 1: Call Text Service (if enabled and prompt provided)
+        if request.use_text_service and request.explanation_prompt:
+            logger.info(f"Attempting Text Service call with prompt: {request.explanation_prompt[:100]}...")
+            explanation_html = await _call_text_service_text_box(
+                prompt=request.explanation_prompt,
+                title=request.key_concepts_title or "Key Concepts",
+                num_bullets=request.num_bullets or 7
+            )
+            if explanation_html:
+                explanation_source = "text_service"
+                logger.info(f"Text Service returned explanation HTML: {len(explanation_html)} chars")
+            else:
+                logger.warning("Text Service call failed, checking for local fallback")
+
+        # Option 2: Fallback to local generation if Text Service fails or key_concepts provided
+        if not explanation_html and request.key_concepts:
             explanation_html = _generate_key_concepts_html(
                 bullets=request.key_concepts,
                 title=request.key_concepts_title or "Key Concepts",
                 num_bullets=request.num_bullets or 7
             )
-            logger.info(f"Generated key concepts HTML: {len(explanation_html)} chars")
+            explanation_source = "local"
+            logger.info(f"Generated local key concepts HTML: {len(explanation_html)} chars")
 
         logger.info(f"Generated code explainer HTML: {len(html_content)} chars")
 
@@ -691,7 +802,8 @@ async def generate_code_explainer(request: CodeExplainerRequest):
                 "concept": request.concept,
                 "code_lines": len(request.code.split('\n')),
                 "num_key_concepts": len(request.key_concepts) if request.key_concepts else 0,
-                "version": "3.7.9"
+                "explanation_source": explanation_source,
+                "version": "3.8.0"
             }
         )
 
@@ -716,9 +828,13 @@ async def health_check():
     return {
         "status": "healthy",
         "service": "code_explainer",
-        "version": "3.7.9",
+        "version": "3.8.0",
         "supported_languages": [
             "python", "javascript", "typescript", "java", "go", "rust",
             "bash", "sql", "csharp", "cpp"
-        ]
+        ],
+        "features": {
+            "text_service_integration": True,
+            "text_service_url": TEXT_SERVICE_URL
+        }
     }
