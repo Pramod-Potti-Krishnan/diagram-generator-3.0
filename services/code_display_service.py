@@ -16,6 +16,11 @@ v1.0.0: Initial implementation following atomic endpoint pattern
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 v1.2.2: Fixed sizing - use explicit pixel dimensions (gridWidth*60, gridHeight*60) instead of 100%
+v1.2.3: Fixed element box sizing and footer protection
+        - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX pattern
+        - Outer wrapper has padding:0, inner container applies the margin as padding
+        - Footer protection: end_row clamped to max 17 (row 18 reserved for footer)
+        - Position presets updated to gridHeight=13 (was 14) for footer safety
 """
 
 import re
@@ -288,10 +293,10 @@ class CodeDisplayGenerator:
                     generation_time_ms=generation_time_ms,
                     grid_dimensions={"width": request.gridWidth, "height": request.gridHeight},
                     pixel_dimensions={
-                        "width": request.gridWidth * 60,
-                        "height": request.gridHeight * 60
+                        "width": (request.gridWidth * 60) - (2 * request.external_margin),
+                        "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.2"
+                    version="1.2.3"
                 ),
                 grid_position=position_data
             )
@@ -447,19 +452,26 @@ class CodeDisplayGenerator:
     </div>'''
 
         # Build container styles
-        # v1.2.2: Use explicit pixel dimensions for correct sizing in Layout Service
-        # Grid units are 60px each, so multiply grid dimensions to get pixels
-        pixel_width = grid_width * 60
-        pixel_height = grid_height * 60
+        # v1.2.3: Calculate ELEMENT dimensions (grid pixels minus outer margins on both sides)
+        # This matches the TEXT_BOX pattern from Text Service:
+        #   element_width = (grid_width * 60) - (2 * outer_padding)
+        #   element_height = (grid_height * 60) - (2 * outer_padding)
+        # The outer wrapper is the element box boundary with NO padding.
+        # The inner container applies the external_margin as its padding.
+        element_width = (grid_width * 60) - (2 * external_margin)
+        element_height = (grid_height * 60) - (2 * external_margin)
 
+        # Outer wrapper has NO padding - it's the element box boundary
         outer_style = (
-            f"width:{pixel_width}px;"
-            f"height:{pixel_height}px;"
-            f"padding:{external_margin}px;"
-            f"box-sizing:border-box;"
+            f"width:{element_width}px;"
+            f"height:{element_height}px;"
+            f"padding:0;"
             f"margin:0;"
+            f"box-sizing:border-box;"
+            f"overflow:hidden;"
         )
 
+        # Inner container gets the external_margin as internal padding
         inner_style = (
             f"background:{theme['bg']};"
             f"border-radius:{border_radius}px;"
@@ -468,6 +480,8 @@ class CodeDisplayGenerator:
             f"width:100%;"
             f"height:100%;"
             f"overflow:hidden;"
+            f"padding:{external_margin}px;"
+            f"box-sizing:border-box;"
         )
 
         pre_style = (
@@ -902,6 +916,10 @@ echo "Deployment complete!"'''
         """
         Calculate grid position from request.
 
+        v1.2.3: Added footer protection - row 18 is reserved for footer,
+        so end_row is clamped to max 17. The actual_height may be less
+        than requested if the element would encroach on the footer.
+
         Args:
             request: Request with optional position fields
 
@@ -916,15 +934,19 @@ echo "Deployment complete!"'''
         width = request.gridWidth
         height = request.gridHeight
 
-        # Calculate end positions (CSS Grid uses exclusive end)
-        end_row = min(start_row + height, 19)
+        # v1.2.3: FOOTER PROTECTION - Row 18 is reserved for footer
+        # Clamp end_row to never exceed 17 (CSS Grid uses exclusive end)
+        end_row = min(start_row + height, 17)
         end_col = min(start_col + width, 33)
+
+        # Recalculate actual height if clamped
+        actual_height = end_row - start_row
 
         return {
             "start_col": start_col,
             "start_row": start_row,
             "width": width,
-            "height": height,
+            "height": actual_height,  # May be less than requested if clamped
             "grid_row": f"{start_row}/{end_row}",
             "grid_column": f"{start_col}/{end_col}"
         }

@@ -9,6 +9,9 @@ v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, vertical scrolling,
         prompt-based code generation, line number options, header options
 v1.2.0: Added border_radius and corner_style fields, refactored to inline styles
+v1.2.3: Fixed element box sizing and footer protection
+        - POSITION_PRESETS heights adjusted from 14 to 13 (row 18 reserved for footer)
+        - top_half/bottom_half adjusted from 7 to 6 rows for symmetry
 """
 
 from typing import Dict, List, Optional, Any, Literal
@@ -19,15 +22,18 @@ from pydantic import BaseModel, Field, model_validator
 # Position Preset Definitions
 # =============================================================================
 
+# v1.2.3: All heights adjusted to avoid footer (row 18)
+# Row 18 is reserved for footer, so max end_row = 17
+# With start_row=4, max height = 17 - 4 = 13 rows
 POSITION_PRESETS = {
-    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
-    "left_half": {"start_col": 2, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
-    "right_half": {"start_col": 17, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
-    "left_third": {"start_col": 2, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
-    "center_third": {"start_col": 12, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
-    "right_third": {"start_col": 22, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
-    "top_half": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 7},
-    "bottom_half": {"start_col": 2, "start_row": 11, "gridWidth": 30, "gridHeight": 7},
+    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 13},
+    "left_half": {"start_col": 2, "start_row": 4, "gridWidth": 15, "gridHeight": 13},
+    "right_half": {"start_col": 17, "start_row": 4, "gridWidth": 15, "gridHeight": 13},
+    "left_third": {"start_col": 2, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
+    "center_third": {"start_col": 12, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
+    "right_third": {"start_col": 22, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
+    "top_half": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 6},
+    "bottom_half": {"start_col": 2, "start_row": 11, "gridWidth": 30, "gridHeight": 6},
 }
 
 # Color theme type definition
@@ -530,8 +536,8 @@ class CodeDisplayAtomicResponse(BaseModel):
                 "metadata": {
                     "generation_time_ms": 15,
                     "grid_dimensions": {"width": 28, "height": 12},
-                    "pixel_dimensions": {"width": 1680, "height": 720},
-                    "version": "1.2.0"
+                    "pixel_dimensions": {"width": 1660, "height": 700},
+                    "version": "1.2.3"
                 },
                 "grid_position": {
                     "start_col": 2,

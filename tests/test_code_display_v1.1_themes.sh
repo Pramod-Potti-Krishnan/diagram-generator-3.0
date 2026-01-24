@@ -1,15 +1,20 @@
 #!/bin/bash
 #
-# Test Script: CODE_DISPLAY v1.2.2 - Sizing & Position Preset Showcase
-# Version: 1.2.2
+# Test Script: CODE_DISPLAY v1.2.3 - Sizing & Position Preset Showcase
+# Version: 1.2.3
 # Tests: 5 different configurations showcasing position presets and sizing fixes
 #
-# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.2) and publishes
+# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.3) and publishes
 # code blocks with different position presets and sizes to Layout Service.
+#
+# v1.2.3 Changes:
+# - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX
+# - Footer protection: end_row clamped to 17 (row 18 reserved for footer)
+# - Position presets use gridHeight=13 (not 14) for footer safety
 #
 # Features Tested:
 # - 5 position presets: full_content, left_half, right_half, left_third, right_third
-# - Pixel-based sizing (gridWidth*60, gridHeight*60)
+# - Element-based sizing: (gridWidth*60)-(2*margin), (gridHeight*60)-(2*margin)
 # - 5 color themes: github_dark, github_light, monokai, solarized_dark, dracula
 # - External margin configuration
 # - Custom headers and filenames
@@ -34,8 +39,8 @@ NC='\033[0m' # No Color
 
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.2 - Sizing & Preset Test"
-echo "  Testing Position Presets with Pixel Sizing"
+echo "  CODE_DISPLAY v1.2.3 - Sizing & Preset Test"
+echo "  Testing Position Presets with Element Sizing"
 echo "=============================================="
 echo "Diagram Service: $DIAGRAM_URL"
 echo "Layout Service:  $LAYOUT_URL"
@@ -85,8 +90,8 @@ echo ""
 # Tests position presets with different sizes
 # ============================================
 
-# Configuration 1: GitHub Dark - full_content (1800x840px = 30x14 grid)
-CONFIG_1_NAME="Full Content (1800x840)"
+# Configuration 1: GitHub Dark - full_content (1780x760 element = 30x13 grid - 2*10px margin)
+CONFIG_1_NAME="Full Content (1780x760)"
 CONFIG_1_THEME="github_dark"
 CONFIG_1_LANG="python"
 CONFIG_1_MARGIN=10
@@ -110,8 +115,8 @@ async def get_user(user_id: int) -> User:
         raise HTTPException(status_code=400, detail="Invalid ID")
     return User(id=user_id, name="John Doe", email="john@example.com")'
 
-# Configuration 2: Monokai - left_half (900x840px = 15x14 grid)
-CONFIG_2_NAME="Left Half (900x840)"
+# Configuration 2: Monokai - left_half (870x750 element = 15x13 grid - 2*15px margin)
+CONFIG_2_NAME="Left Half (870x750)"
 CONFIG_2_THEME="monokai"
 CONFIG_2_LANG="javascript"
 CONFIG_2_MARGIN=15
@@ -139,8 +144,8 @@ function useLocalStorage(key, initialValue) {
   return [storedValue, setValue];
 }'
 
-# Configuration 3: Dracula - right_half (900x840px = 15x14 grid)
-CONFIG_3_NAME="Right Half (900x840)"
+# Configuration 3: Dracula - right_half (880x760 element = 15x13 grid - 2*10px margin)
+CONFIG_3_NAME="Right Half (880x760)"
 CONFIG_3_THEME="dracula"
 CONFIG_3_LANG="typescript"
 CONFIG_3_MARGIN=10
@@ -169,8 +174,8 @@ async function fetchUsers(): Promise<ApiResponse<User[]>> {
   return { success: true, data, timestamp: new Date() };
 }'
 
-# Configuration 4: Solarized Dark - left_third (600x840px = 10x14 grid)
-CONFIG_4_NAME="Left Third (600x840)"
+# Configuration 4: Solarized Dark - left_third (576x756 element = 10x13 grid - 2*12px margin)
+CONFIG_4_NAME="Left Third (576x756)"
 CONFIG_4_THEME="solarized_dark"
 CONFIG_4_LANG="go"
 CONFIG_4_MARGIN=12
@@ -204,8 +209,8 @@ func main() {
     log.Fatal(http.ListenAndServe(":8080", nil))
 }'
 
-# Configuration 5: GitHub Light - right_third (600x840px = 10x14 grid)
-CONFIG_5_NAME="Right Third (600x840)"
+# Configuration 5: GitHub Light - right_third (580x760 element = 10x13 grid - 2*10px margin)
+CONFIG_5_NAME="Right Third (580x760)"
 CONFIG_5_THEME="github_light"
 CONFIG_5_LANG="sql"
 CONFIG_5_MARGIN=10
@@ -249,13 +254,13 @@ generate_slide() {
     local preset=$9
     local width=${10}
 
-    # Calculate expected pixel dimensions
-    local pixel_width=$((width * 60))
-    local pixel_height=$((14 * 60))  # Height is always 14 grid units = 840px
+    # Calculate expected element dimensions (v1.2.3: grid pixels minus 2*margin)
+    local element_width=$((width * 60 - 2 * margin))
+    local element_height=$((13 * 60 - 2 * margin))  # Height is 13 grid units (footer protection)
 
     echo -e "${BLUE}[$num/5] $name${NC}"
     echo "  Theme: $theme | Language: $lang | Preset: $preset"
-    echo "  Size: ${width}x14 grid = ${pixel_width}x${pixel_height}px | Margin: ${margin}px"
+    echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
     # Build JSON payload with position_preset and correct gridWidth
     local json_payload
@@ -276,7 +281,7 @@ generate_slide() {
                 filename: $filename,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 14,
+                gridHeight: 13,
                 show_line_numbers: true,
                 show_copy_button: true
             }')
@@ -297,7 +302,7 @@ generate_slide() {
                 header_text: $header,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 14,
+                gridHeight: 13,
                 show_line_numbers: true,
                 show_copy_button: true
             }')
@@ -316,7 +321,7 @@ generate_slide() {
                 external_margin: $margin,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 14,
+                gridHeight: 13,
                 show_line_numbers: true,
                 show_copy_button: true
             }')
@@ -345,11 +350,11 @@ generate_slide() {
         echo "  Returned Pixel Size: ${RETURNED_WIDTH}x${RETURNED_HEIGHT}px"
         echo "  Lines: $LINE_COUNT | Generation: ${GEN_TIME}ms"
 
-        # Verify pixel dimensions match expected
-        if [ "$RETURNED_WIDTH" = "$pixel_width" ] && [ "$RETURNED_HEIGHT" = "$pixel_height" ]; then
-            echo -e "  ${GREEN}Pixel dimensions: MATCH${NC}"
+        # Verify element dimensions match expected
+        if [ "$RETURNED_WIDTH" = "$element_width" ] && [ "$RETURNED_HEIGHT" = "$element_height" ]; then
+            echo -e "  ${GREEN}Element dimensions: MATCH${NC}"
         else
-            echo -e "  ${YELLOW}Pixel dimensions: MISMATCH (expected ${pixel_width}x${pixel_height})${NC}"
+            echo -e "  ${YELLOW}Element dimensions: MISMATCH (expected ${element_width}x${element_height})${NC}"
         fi
 
         # Save code HTML
@@ -364,9 +369,9 @@ generate_slide() {
             \"layout\": \"C1-text\",
             \"content\": {
                 \"slide_title\": \"$NAME_ESCAPED\",
-                \"subtitle\": \"Preset: $preset | Grid: ${width}x14 = ${pixel_width}x${pixel_height}px | Theme: $theme\",
+                \"subtitle\": \"Preset: $preset | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
                 \"body\": $CODE_ESCAPED,
-                \"footer_text\": \"CODE_DISPLAY v1.2.2 Sizing Test\",
+                \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
                 \"logo\": \" \"
             }
         }"
@@ -402,7 +407,7 @@ generate_slide 5 "$CONFIG_5_NAME" "$CONFIG_5_THEME" "$CONFIG_5_LANG" "$CONFIG_5_
 echo "--- Creating Presentation via Layout Service ---"
 
 C1_REQUEST="{
-    \"title\": \"CODE_DISPLAY v1.2.2 - Sizing Fix Test - $TIMESTAMP\",
+    \"title\": \"CODE_DISPLAY v1.2.3 - Sizing Fix Test - $TIMESTAMP\",
     \"template_id\": \"L25\",
     \"slides\": [$C1_SLIDES]
 }"
@@ -439,7 +444,7 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CODE_DISPLAY v1.2.2 - Sizing & Position Presets</title>
+    <title>CODE_DISPLAY v1.2.3 - Sizing & Position Presets</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -556,8 +561,8 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
 </head>
 <body>
     <div class="header">
-        <h1>CODE_DISPLAY<span class="version-badge">v1.2.2</span></h1>
-        <p class="subtitle">Sizing Fix - Position Presets with Pixel-Based Dimensions</p>
+        <h1>CODE_DISPLAY<span class="version-badge">v1.2.3</span></h1>
+        <p class="subtitle">Sizing Fix - Element Dimensions = (Grid*60) - (2*Margin)</p>
         <a href="$C1_URL" target="_blank" class="presentation-link">View Full Presentation</a>
     </div>
 
@@ -567,8 +572,8 @@ EOF
 # Add each theme card with preset/size info
 themes=("github_dark" "monokai" "dracula" "solarized_dark" "github_light")
 presets=("full_content" "left_half" "right_half" "left_third" "right_third")
-sizes=("1800x840" "900x840" "900x840" "600x840" "600x840")
-grids=("30x14" "15x14" "15x14" "10x14" "10x14")
+sizes=("1780x760" "870x750" "880x760" "576x756" "580x760")
+grids=("30x13" "15x13" "15x13" "10x13" "10x13")
 langs=("python" "javascript" "typescript" "go" "sql")
 
 for i in 1 2 3 4 5; do
@@ -616,14 +621,15 @@ echo "--- Generating Test Report ---"
 cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "test_name": "code_display_v1.2.2_sizing",
+    "test_name": "code_display_v1.2.3_sizing",
     "version": "1.2.2",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
-    "pixel_dimensions_tested": ["1800x840", "900x840", "900x840", "600x840", "600x840"],
+    "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760"],
     "themes_tested": ["github_dark", "monokai", "dracula", "solarized_dark", "github_light"],
     "features_tested": [
         "position_preset configuration",
-        "pixel-based sizing (gridWidth*60, gridHeight*60)",
+        "element-based sizing: (grid*60)-(2*margin)",
+        "footer protection: end_row clamped to 17",
         "color_theme configuration",
         "external_margin configuration",
         "custom header_text",
@@ -655,15 +661,15 @@ echo "Test Report: $OUTPUT_DIR/test_report.json"
 # ============================================
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.2 SIZING TEST RESULTS"
+echo "  CODE_DISPLAY v1.2.3 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
-echo "Position Presets Tested:"
-echo -e "  ${CYAN}1. full_content${NC}  - 30x14 grid = 1800x840px (Python/FastAPI)"
-echo -e "  ${MAGENTA}2. left_half${NC}     - 15x14 grid = 900x840px  (JavaScript/React)"
-echo -e "  ${MAGENTA}3. right_half${NC}    - 15x14 grid = 900x840px  (TypeScript)"
-echo -e "  ${BLUE}4. left_third${NC}    - 10x14 grid = 600x840px  (Go/HTTP Server)"
-echo -e "  ${YELLOW}5. right_third${NC}   - 10x14 grid = 600x840px  (SQL/Analytics)"
+echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"
+echo -e "  ${CYAN}1. full_content${NC}  - 30x13 grid → 1780x760 element (Python/FastAPI)"
+echo -e "  ${MAGENTA}2. left_half${NC}     - 15x13 grid → 870x750 element  (JavaScript/React)"
+echo -e "  ${MAGENTA}3. right_half${NC}    - 15x13 grid → 880x760 element  (TypeScript)"
+echo -e "  ${BLUE}4. left_third${NC}    - 10x13 grid → 576x756 element  (Go/HTTP Server)"
+echo -e "  ${YELLOW}5. right_third${NC}   - 10x13 grid → 580x760 element  (SQL/Analytics)"
 echo ""
 echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 5 success"
 if [ $FAIL_COUNT -gt 0 ]; then
