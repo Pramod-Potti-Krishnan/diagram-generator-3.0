@@ -16,7 +16,7 @@ from job_manager import JobManager
 from dependencies import DiagramDependencies
 from agent import process_diagram_direct
 from core.conductor import DiagramConductor
-from routers import layout_service_router, director_router, code_explainer_router
+from routers import layout_service_router, director_router, code_explainer_router, atomic_router
 from routers.layout_service_router import set_dependencies as set_layout_dependencies
 
 logger = logging.getLogger(__name__)
@@ -46,8 +46,11 @@ app.include_router(director_router)
 # Include Layout Service router
 app.include_router(layout_service_router)
 
-# Include Code Explainer router
+# Include Code Explainer router (legacy endpoint - deprecated)
 app.include_router(code_explainer_router)
+
+# Include Atomic Component router (v1.2 standard)
+app.include_router(atomic_router)
 
 # Initialize global managers
 job_manager = JobManager(cleanup_hours=getattr(settings, 'job_cleanup_hours', 1))
@@ -175,8 +178,13 @@ async def root():
                 "health": "GET /api/ai/diagram/health"
             },
             "code_explainer": {
-                "generate": "POST /api/code-explainer/generate",
+                "generate": "POST /api/code-explainer/generate (deprecated)",
                 "health": "GET /api/code-explainer/health"
+            },
+            "atomic_components": {
+                "CODE_DISPLAY": "POST /v1.2/atomic/CODE_DISPLAY",
+                "health": "GET /v1.2/atomic/health",
+                "components": "GET /v1.2/atomic/components"
             }
         },
         "supported_diagram_types": {

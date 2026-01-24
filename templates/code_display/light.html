@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Code Display - Light Theme</title>
+    <style>
+        /* Atomic CODE_DISPLAY Light Theme Template */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        .diagram-container {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 10px;
+            border: none;
+            box-shadow: none;
+            display: flex;
+            flex-direction: column;
+            box-sizing: border-box;
+        }
+
+        .diagram-container.theme-light-mode,
+        .code-slide-light {
+            background: #faf9f7 !important;
+        }
+
+        [class^="code-slide-"] {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .code-box-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            min-height: 72px;
+            flex-shrink: 0;
+            background: #f5f3f0;
+        }
+
+        .code-lang-badge {
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            padding: 11px 28px;
+            border-radius: 4px;
+            margin-left: 20px !important;
+            background: #3b82f6;
+            color: white;
+        }
+
+        .code-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-right: 20px !important;
+        }
+
+        .code-copy-btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.15s ease;
+            pointer-events: auto !important;
+            background: rgba(0, 0, 0, 0.04);
+            color: #4b5563;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+        }
+
+        .code-copy-btn:hover {
+            background: rgba(0, 0, 0, 0.08);
+            color: #1f2937;
+            border-color: rgba(0, 0, 0, 0.2);
+        }
+
+        .code-copy-btn.copied {
+            background: #22c55e !important;
+            color: white !important;
+            border-color: #22c55e !important;
+        }
+
+        pre.code-box-content {
+            flex: 1;
+            margin: 0 !important;
+            padding: 20px 24px !important;
+            border: none !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            overflow: auto;
+            min-height: 0;
+            background: #faf9f7;
+        }
+
+        pre.code-box-content code {
+            font-family: 'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, monospace !important;
+            font-size: 14px !important;
+            line-height: 1.6 !important;
+            color: #24292f;
+            background: transparent;
+        }
+
+        /* Syntax Highlighting - Light Theme */
+        .token.comment { color: #6a737d; font-style: italic; }
+        .token.keyword { color: #cf222e; font-weight: 500; }
+        .token.string { color: #116329; }
+        .token.number { color: #0550ae; }
+        .token.function { color: #8250df; }
+        .token.variable { color: #953800; }
+    </style>
+</head>
+<body>
+    <div class="diagram-container theme-light-mode">
+        <div class="code-slide-light">
+            <div class="code-box-header">
+                <span class="code-lang-badge">{language}</span>
+                <div class="code-controls">
+                    <button class="code-copy-btn" onclick="copyCode(this)">Copy</button>
+                </div>
+            </div>
+            <pre class="code-box-content"><code class="language-{language}" id="code-block">{code_content}</code></pre>
+        </div>
+    </div>
+    <script>
+        function copyCode(btn) {
+            const code = document.getElementById('code-block').innerText;
+            navigator.clipboard.writeText(code).then(function() {
+                btn.innerText = 'Copied!';
+                btn.classList.add('copied');
+                setTimeout(function() {
+                    btn.innerText = 'Copy';
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Copy failed:', err);
+            });
+        }
+    </script>
+</body>
+</html>

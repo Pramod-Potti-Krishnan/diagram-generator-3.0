@@ -4,6 +4,15 @@ Models for Diagram Generator v3.
 Exposes all model classes for easy importing.
 """
 
+from .atomic_models import (
+    AtomicContext,
+    AtomicMetadata,
+    CodeDisplayAtomicRequest,
+    CodeDisplayAtomicResponse,
+    normalize_language,
+    LANGUAGE_ALIASES
+)
+
 from .diagram_models import (
     DiagramSpec,
     DiagramType,
@@ -49,6 +58,13 @@ from .layout_service_models import (
 )
 
 __all__ = [
+    # Atomic component models
+    "AtomicContext",
+    "AtomicMetadata",
+    "CodeDisplayAtomicRequest",
+    "CodeDisplayAtomicResponse",
+    "normalize_language",
+    "LANGUAGE_ALIASES",
     # Existing exports
     "DiagramRequest",
     "DiagramSpec",
