@@ -86,9 +86,14 @@ echo "Available Presets: $PRESETS"
 echo ""
 
 # ============================================
-# Test Configurations (5 variants)
+# Test Configurations (7 variants)
 # Tests position presets with different sizes
 # ============================================
+
+# Arrays to track right-positioned slides for element API insertion
+# Format: "slide_index:start_col:width:height"
+declare -a RIGHT_POSITIONED_SLIDES
+declare -a RIGHT_POSITIONED_HTML
 
 # Configuration 1: GitHub Dark - full_content (1780x760 element = 30x13 grid - 2*10px margin)
 CONFIG_1_NAME="Full Content (1780x760)"
@@ -232,10 +237,133 @@ GROUP BY 1, 2
 HAVING SUM(o.total_amount) > 10000
 ORDER BY month DESC, revenue DESC;'
 
+# Configuration 6: Monokai - Right Two-Thirds (custom: start_col=12, gridWidth=20)
+# Element = (20*60)-(2*10) = 1180px wide
+CONFIG_6_NAME="Right Two-Thirds (1180x760)"
+CONFIG_6_THEME="monokai"
+CONFIG_6_LANG="rust"
+CONFIG_6_MARGIN=10
+CONFIG_6_HEADER="Rust CLI Parser"
+CONFIG_6_PRESET=""
+CONFIG_6_WIDTH=20
+CONFIG_6_START_COL=12
+CONFIG_6_CODE='use clap::{Arg, Command};
+
+fn main() {
+    let matches = Command::new("myapp")
+        .version("1.0")
+        .author("Dev Team")
+        .about("A sample CLI application")
+        .arg(
+            Arg::new("config")
+                .short('\''c'\'')
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file"),
+        )
+        .arg(
+            Arg::new("verbose")
+                .short('\''v'\'')
+                .long("verbose")
+                .help("Enable verbose output"),
+        )
+        .get_matches();
+
+    if let Some(config) = matches.get_one::<String>("config") {
+        println!("Using config: {}", config);
+    }
+}'
+
+# Configuration 7: Dracula - Narrow Right Column (custom: start_col=24, gridWidth=8)
+# Element = (8*60)-(2*8) = 464px wide
+CONFIG_7_NAME="Narrow Right (464x764)"
+CONFIG_7_THEME="dracula"
+CONFIG_7_LANG="bash"
+CONFIG_7_MARGIN=8
+CONFIG_7_HEADER="Deploy Script"
+CONFIG_7_PRESET=""
+CONFIG_7_WIDTH=8
+CONFIG_7_START_COL=24
+CONFIG_7_CODE='#!/bin/bash
+set -e
+
+# Deploy to prod
+echo "Deploying..."
+
+# Pull latest
+git pull origin main
+
+# Build
+npm run build
+
+# Restart
+pm2 restart all
+
+echo "Done!"'
+
+# ============================================
+# Function: Add positioned element via Layout Service element API
+# This allows proper grid positioning for right-side elements
+# ============================================
+add_positioned_element() {
+    local pres_id=$1
+    local slide_idx=$2
+    local html=$3
+    local start_col=$4
+    local width=$5
+    local height=${6:-13}
+    local start_row=${7:-4}
+
+    # Escape HTML for JSON using jq
+    local escaped_html=$(echo "$html" | jq -Rs .)
+
+    local element_payload="{
+        \"element_type\": \"TEXT_BOX\",
+        \"html\": $escaped_html,
+        \"start_row\": $start_row,
+        \"start_col\": $start_col,
+        \"width\": $width,
+        \"height\": $height,
+        \"draggable\": true,
+        \"resizable\": true
+    }"
+
+    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/elements" \
+        -H "Content-Type: application/json" \
+        -d "$element_payload")
+
+    local success=$(echo "$response" | jq -r '.success // .id // "null"')
+    if [ "$success" != "null" ] && [ -n "$success" ]; then
+        echo -e "    ${GREEN}Element added at grid position ($start_col, $start_row)${NC}"
+        return 0
+    else
+        echo -e "    ${RED}Failed to add element: $(echo "$response" | jq -r '.detail // .error // "Unknown error"')${NC}"
+        return 1
+    fi
+}
+
+# Helper function to check if a position is right-side (needs element API)
+is_right_side_position() {
+    local preset=$1
+    local start_col=$2
+
+    # Right-side presets
+    if [ "$preset" = "right_half" ] || [ "$preset" = "right_third" ]; then
+        return 0
+    fi
+
+    # Custom right-side positioning (start_col >= 12 is right of center)
+    if [ -n "$start_col" ] && [ "$start_col" -ge 12 ]; then
+        return 0
+    fi
+
+    return 1
+}
+
 # ============================================
 # Generate Atomic CODE_DISPLAY Components
 # ============================================
-echo "--- Generating CODE_DISPLAY Slides (5 Themes) ---"
+echo "--- Generating CODE_DISPLAY Slides (7 Configs) ---"
 echo ""
 
 SUCCESS_COUNT=0
@@ -253,18 +381,46 @@ generate_slide() {
     local code=$8
     local preset=$9
     local width=${10}
+    local start_col=${11:-""}  # Optional custom start_col for right-side positioning
 
     # Calculate expected element dimensions (v1.2.3: grid pixels minus 2*margin)
     local element_width=$((width * 60 - 2 * margin))
     local element_height=$((13 * 60 - 2 * margin))  # Height is 13 grid units (footer protection)
 
-    echo -e "${BLUE}[$num/5] $name${NC}"
-    echo "  Theme: $theme | Language: $lang | Preset: $preset"
+    echo -e "${BLUE}[$num/7] $name${NC}"
+    if [ -n "$start_col" ]; then
+        echo "  Theme: $theme | Language: $lang | Custom Position: start_col=$start_col"
+    else
+        echo "  Theme: $theme | Language: $lang | Preset: $preset"
+    fi
     echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
-    # Build JSON payload with position_preset and correct gridWidth
+    # Build JSON payload - use start_col if provided, otherwise use preset
     local json_payload
-    if [ -n "$filename" ]; then
+    if [ -n "$start_col" ]; then
+        # Custom positioning with start_col (for right-side placement)
+        json_payload=$(jq -n \
+            --arg code "$code" \
+            --arg lang "$lang" \
+            --arg theme "$theme" \
+            --argjson margin "$margin" \
+            --arg header "$header" \
+            --argjson width "$width" \
+            --argjson start_col "$start_col" \
+            '{
+                code: $code,
+                language: $lang,
+                color_theme: $theme,
+                external_margin: $margin,
+                header_text: $header,
+                start_col: $start_col,
+                start_row: 4,
+                gridWidth: $width,
+                gridHeight: 13,
+                show_line_numbers: true,
+                show_copy_button: true
+            }')
+    elif [ -n "$filename" ]; then
         json_payload=$(jq -n \
             --arg code "$code" \
             --arg lang "$lang" \
@@ -364,17 +520,61 @@ generate_slide() {
         CODE_ESCAPED=$(echo "$CODE_HTML" | jq -Rs .)
         NAME_ESCAPED=$(echo "$name" | jq -Rs . | sed 's/^"//;s/"$//')
 
+        # Build position info for subtitle
+        local position_info
+        local actual_start_col
+        if [ -n "$start_col" ]; then
+            position_info="Custom: start_col=$start_col"
+            actual_start_col=$start_col
+        else
+            position_info="Preset: $preset"
+            # Map preset to start_col for right-side positions
+            case "$preset" in
+                "right_half") actual_start_col=17 ;;
+                "right_third") actual_start_col=22 ;;
+                *) actual_start_col="" ;;
+            esac
+        fi
+
+        # Check if this is a right-side position that needs element API
+        local is_right_side=false
+        if is_right_side_position "$preset" "$start_col"; then
+            is_right_side=true
+            echo -e "  ${CYAN}Position: RIGHT-SIDE (will use element API)${NC}"
+        fi
+
         # Build C1-text slide JSON
-        C1_SLIDE="{
-            \"layout\": \"C1-text\",
-            \"content\": {
-                \"slide_title\": \"$NAME_ESCAPED\",
-                \"subtitle\": \"Preset: $preset | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
-                \"body\": $CODE_ESCAPED,
-                \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
-                \"logo\": \" \"
-            }
-        }"
+        # For right-side positions, use empty body - element will be added via API
+        if [ "$is_right_side" = true ]; then
+            C1_SLIDE="{
+                \"layout\": \"C1-text\",
+                \"content\": {
+                    \"slide_title\": \"$NAME_ESCAPED\",
+                    \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
+                    \"body\": \"\",
+                    \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
+                    \"logo\": \" \"
+                }
+            }"
+
+            # Track for later element API insertion
+            # Calculate 0-based slide index (num-1)
+            local slide_idx=$((num - 1))
+            RIGHT_POSITIONED_SLIDES+=("$slide_idx:$actual_start_col:$width:13")
+            RIGHT_POSITIONED_HTML+=("$CODE_HTML")
+        else
+            # Left-side or full-width: use body content directly
+            C1_SLIDE="{
+                \"layout\": \"C1-text\",
+                \"content\": {
+                    \"slide_title\": \"$NAME_ESCAPED\",
+                    \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
+                    \"body\": $CODE_ESCAPED,
+                    \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
+                    \"logo\": \" \"
+                }
+            }"
+        fi
 
         # Append to slides array
         if [ -z "$C1_SLIDES" ]; then
@@ -394,12 +594,15 @@ generate_slide() {
     echo ""
 }
 
-# Generate all 5 slides with different position presets and sizes
+# Generate all 7 slides with different position presets and custom right-side positions
 generate_slide 1 "$CONFIG_1_NAME" "$CONFIG_1_THEME" "$CONFIG_1_LANG" "$CONFIG_1_MARGIN" "" "" "$CONFIG_1_CODE" "$CONFIG_1_PRESET" "$CONFIG_1_WIDTH"
 generate_slide 2 "$CONFIG_2_NAME" "$CONFIG_2_THEME" "$CONFIG_2_LANG" "$CONFIG_2_MARGIN" "$CONFIG_2_HEADER" "" "$CONFIG_2_CODE" "$CONFIG_2_PRESET" "$CONFIG_2_WIDTH"
 generate_slide 3 "$CONFIG_3_NAME" "$CONFIG_3_THEME" "$CONFIG_3_LANG" "$CONFIG_3_MARGIN" "" "$CONFIG_3_FILENAME" "$CONFIG_3_CODE" "$CONFIG_3_PRESET" "$CONFIG_3_WIDTH"
 generate_slide 4 "$CONFIG_4_NAME" "$CONFIG_4_THEME" "$CONFIG_4_LANG" "$CONFIG_4_MARGIN" "$CONFIG_4_HEADER" "" "$CONFIG_4_CODE" "$CONFIG_4_PRESET" "$CONFIG_4_WIDTH"
 generate_slide 5 "$CONFIG_5_NAME" "$CONFIG_5_THEME" "$CONFIG_5_LANG" "$CONFIG_5_MARGIN" "$CONFIG_5_HEADER" "" "$CONFIG_5_CODE" "$CONFIG_5_PRESET" "$CONFIG_5_WIDTH"
+# Custom right-side positioned configs (using start_col instead of preset)
+generate_slide 6 "$CONFIG_6_NAME" "$CONFIG_6_THEME" "$CONFIG_6_LANG" "$CONFIG_6_MARGIN" "$CONFIG_6_HEADER" "" "$CONFIG_6_CODE" "$CONFIG_6_PRESET" "$CONFIG_6_WIDTH" "$CONFIG_6_START_COL"
+generate_slide 7 "$CONFIG_7_NAME" "$CONFIG_7_THEME" "$CONFIG_7_LANG" "$CONFIG_7_MARGIN" "$CONFIG_7_HEADER" "" "$CONFIG_7_CODE" "$CONFIG_7_PRESET" "$CONFIG_7_WIDTH" "$CONFIG_7_START_COL"
 
 # ============================================
 # Create Presentation via Layout Service
@@ -428,6 +631,36 @@ if [ -n "$C1_PRES_ID" ] && [ "$C1_PRES_ID" != "null" ]; then
     echo -e "${GREEN}Presentation Created: SUCCESS${NC}"
     echo "  ID: $C1_PRES_ID"
     echo "  URL: $C1_URL"
+
+    # ============================================
+    # Add Right-Positioned Elements via Element API
+    # ============================================
+    if [ ${#RIGHT_POSITIONED_SLIDES[@]} -gt 0 ]; then
+        echo ""
+        echo "--- Adding Right-Positioned Elements via Element API ---"
+        echo "  ${#RIGHT_POSITIONED_SLIDES[@]} elements to add..."
+        echo ""
+
+        ELEMENT_SUCCESS=0
+        ELEMENT_FAIL=0
+
+        for i in "${!RIGHT_POSITIONED_SLIDES[@]}"; do
+            # Parse slide info: "slide_idx:start_col:width:height"
+            IFS=':' read -r slide_idx start_col width height <<< "${RIGHT_POSITIONED_SLIDES[$i]}"
+            html="${RIGHT_POSITIONED_HTML[$i]}"
+
+            echo -e "  ${BLUE}Adding element to slide $((slide_idx + 1))${NC} (grid-column: $start_col/$(($start_col + $width)))"
+
+            if add_positioned_element "$C1_PRES_ID" "$slide_idx" "$html" "$start_col" "$width" "$height" 4; then
+                ELEMENT_SUCCESS=$((ELEMENT_SUCCESS + 1))
+            else
+                ELEMENT_FAIL=$((ELEMENT_FAIL + 1))
+            fi
+        done
+
+        echo ""
+        echo -e "  Element insertion: ${GREEN}$ELEMENT_SUCCESS${NC} success, ${RED}$ELEMENT_FAIL${NC} failed"
+    fi
 else
     echo -e "${RED}Presentation Creation: FAILED${NC}"
     echo "$C1_RESPONSE" | jq .
@@ -569,19 +802,21 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
     <div class="theme-grid">
 EOF
 
-# Add each theme card with preset/size info
-themes=("github_dark" "monokai" "dracula" "solarized_dark" "github_light")
-presets=("full_content" "left_half" "right_half" "left_third" "right_third")
-sizes=("1780x760" "870x750" "880x760" "576x756" "580x760")
-grids=("30x13" "15x13" "15x13" "10x13" "10x13")
-langs=("python" "javascript" "typescript" "go" "sql")
+# Add each theme card with preset/size info (now 7 configs including right-side custom positions)
+themes=("github_dark" "monokai" "dracula" "solarized_dark" "github_light" "monokai" "dracula")
+presets=("full_content" "left_half" "right_half" "left_third" "right_third" "right_two_thirds" "narrow_right")
+sizes=("1780x760" "870x750" "880x760" "576x756" "580x760" "1180x760" "464x764")
+grids=("30x13" "15x13" "15x13" "10x13" "10x13" "20x13" "8x13")
+langs=("python" "javascript" "typescript" "go" "sql" "rust" "bash")
+positions=("preset" "preset" "preset" "preset" "preset" "start_col=12" "start_col=24")
 
-for i in 1 2 3 4 5; do
+for i in 1 2 3 4 5 6 7; do
     theme="${themes[$((i-1))]}"
     preset="${presets[$((i-1))]}"
     size="${sizes[$((i-1))]}"
     grid="${grids[$((i-1))]}"
     lang="${langs[$((i-1))]}"
+    position="${positions[$((i-1))]}"
     html_file="${i}_${theme}_code.html"
 
     if [ -f "$OUTPUT_DIR/$html_file" ]; then
@@ -594,9 +829,9 @@ for i in 1 2 3 4 5; do
             </div>
             <iframe class="code-frame" srcdoc="$CHART_CONTENT"></iframe>
             <div class="theme-meta">
-                <div class="meta-item">Preset: <span class="meta-value">$preset</span></div>
+                <div class="meta-item">Position: <span class="meta-value">$position</span></div>
                 <div class="meta-item">Grid: <span class="meta-value">$grid</span></div>
-                <div class="meta-item">Pixels: <span class="meta-value">${size}px</span></div>
+                <div class="meta-item">Element: <span class="meta-value">${size}px</span></div>
                 <div class="meta-item">Theme: <span class="meta-value">$theme</span></div>
             </div>
         </div>
@@ -622,12 +857,14 @@ cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "test_name": "code_display_v1.2.3_sizing",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
-    "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760"],
+    "custom_positions_tested": ["start_col=12 (right 2/3)", "start_col=24 (narrow right)"],
+    "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760", "1180x760", "464x764"],
     "themes_tested": ["github_dark", "monokai", "dracula", "solarized_dark", "github_light"],
     "features_tested": [
         "position_preset configuration",
+        "custom start_col positioning (right-side)",
         "element-based sizing: (grid*60)-(2*margin)",
         "footer protection: end_row clamped to 17",
         "color_theme configuration",
@@ -665,15 +902,19 @@ echo "  CODE_DISPLAY v1.2.3 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
 echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"
-echo -e "  ${CYAN}1. full_content${NC}  - 30x13 grid → 1780x760 element (Python/FastAPI)"
-echo -e "  ${MAGENTA}2. left_half${NC}     - 15x13 grid → 870x750 element  (JavaScript/React)"
-echo -e "  ${MAGENTA}3. right_half${NC}    - 15x13 grid → 880x760 element  (TypeScript)"
-echo -e "  ${BLUE}4. left_third${NC}    - 10x13 grid → 576x756 element  (Go/HTTP Server)"
-echo -e "  ${YELLOW}5. right_third${NC}   - 10x13 grid → 580x760 element  (SQL/Analytics)"
+echo -e "  ${CYAN}1. full_content${NC}    - 30x13 grid → 1780x760 element (Python/FastAPI)"
+echo -e "  ${MAGENTA}2. left_half${NC}       - 15x13 grid → 870x750 element  (JavaScript/React)"
+echo -e "  ${MAGENTA}3. right_half${NC}      - 15x13 grid → 880x760 element  (TypeScript) [RIGHT]"
+echo -e "  ${BLUE}4. left_third${NC}      - 10x13 grid → 576x756 element  (Go/HTTP Server)"
+echo -e "  ${YELLOW}5. right_third${NC}     - 10x13 grid → 580x760 element  (SQL/Analytics) [RIGHT]"
 echo ""
-echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 5 success"
+echo "Custom Right-Side Positions:"
+echo -e "  ${GREEN}6. right_two_thirds${NC} - start_col=12, 20x13 grid → 1180x760 element (Rust) [RIGHT]"
+echo -e "  ${GREEN}7. narrow_right${NC}     - start_col=24, 8x13 grid  → 464x764 element  (Bash) [RIGHT]"
+echo ""
+echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 7 success"
 if [ $FAIL_COUNT -gt 0 ]; then
-    echo -e "            ${RED}$FAIL_COUNT${NC} / 5 failed"
+    echo -e "            ${RED}$FAIL_COUNT${NC} / 7 failed"
 fi
 echo ""
 echo "Presentation:"
