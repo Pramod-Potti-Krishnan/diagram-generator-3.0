@@ -6,10 +6,43 @@ Pydantic models for the /v1.2/atomic/CODE_DISPLAY endpoint that provides
 direct code block generation following the atomic endpoint pattern.
 
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
+v1.1.0: Added position presets, color themes, external margin, vertical scrolling,
+        prompt-based code generation, line number options, header options
 """
 
 from typing import Dict, List, Optional, Any, Literal
 from pydantic import BaseModel, Field, model_validator
+
+
+# =============================================================================
+# Position Preset Definitions
+# =============================================================================
+
+POSITION_PRESETS = {
+    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+    "left_half": {"start_col": 2, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
+    "right_half": {"start_col": 17, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
+    "left_third": {"start_col": 2, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "center_third": {"start_col": 12, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "right_third": {"start_col": 22, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "top_half": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 7},
+    "bottom_half": {"start_col": 2, "start_row": 11, "gridWidth": 30, "gridHeight": 7},
+}
+
+# Color theme type definition
+ColorThemeType = Literal[
+    "github_dark", "github_light", "monokai", "solarized_dark", "dracula"
+]
+
+# Position preset type definition
+PositionPresetType = Literal[
+    "full_content", "left_half", "right_half",
+    "left_third", "center_third", "right_third",
+    "top_half", "bottom_half"
+]
+
+# Complexity type for code generation
+ComplexityType = Literal["simple", "medium", "advanced"]
 
 
 # =============================================================================
@@ -75,10 +108,12 @@ class CodeDisplayAtomicRequest(BaseModel):
 
     Generates a styled code block with syntax highlighting,
     language badge, copy button, and optional key concepts.
+
+    v1.1.0: Added position presets, color themes, margin, scrolling, prompt generation
     """
-    # Required code content
+    # Required code content (can be empty if prompt or placeholder_mode is used)
     code: str = Field(
-        ...,
+        default="",
         description="The code content to display"
     )
     language: str = Field(
@@ -100,11 +135,32 @@ class CodeDisplayAtomicRequest(BaseModel):
         description="Available height in grid units (18-grid system, 60px per unit)"
     )
 
+    # NEW: Position presets - convenience shortcuts for common layouts
+    position_preset: Optional[PositionPresetType] = Field(
+        default=None,
+        description="Position preset: full_content, left_half, right_half, left_third, center_third, right_third, top_half, bottom_half. Explicit values override preset."
+    )
+
     # Styling options
     variant: Literal["light", "dark"] = Field(
         default="dark",
-        description="Theme variant - 'light' (GitHub light) or 'dark' (GitHub dark)"
+        description="Theme variant - 'light' (GitHub light) or 'dark' (GitHub dark). Maps to color_theme."
     )
+
+    # NEW: Extended color themes
+    color_theme: ColorThemeType = Field(
+        default="github_dark",
+        description="Color theme: github_dark, github_light, monokai, solarized_dark, dracula"
+    )
+
+    # NEW: External margin configuration
+    external_margin: int = Field(
+        default=10,
+        ge=0,
+        le=30,
+        description="External margin in pixels (0-30, default: 10)"
+    )
+
     show_line_numbers: bool = Field(
         default=True,
         description="Display line numbers alongside code"
@@ -124,6 +180,33 @@ class CodeDisplayAtomicRequest(BaseModel):
         description="Base font size in pixels"
     )
 
+    # NEW: Line number options
+    line_number_start: int = Field(
+        default=1,
+        ge=1,
+        description="Starting line number (default: 1)"
+    )
+    highlight_lines: Optional[List[int]] = Field(
+        default=None,
+        description="List of line numbers to highlight"
+    )
+
+    # NEW: Header options
+    show_header: bool = Field(
+        default=True,
+        description="Show/hide entire header (default: True)"
+    )
+    header_text: Optional[str] = Field(
+        default=None,
+        max_length=50,
+        description="Custom header text (replaces language badge)"
+    )
+    filename: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Filename to display in header"
+    )
+
     # Optional context (atomic standard)
     context: Optional[AtomicContext] = Field(
         None,
@@ -134,6 +217,45 @@ class CodeDisplayAtomicRequest(BaseModel):
     placeholder_mode: bool = Field(
         default=False,
         description="If true, use sample placeholder code (no LLM call)"
+    )
+
+    # NEW: Prompt-based code generation
+    prompt: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="Prompt for LLM-based code generation (e.g., 'Create a FastAPI health endpoint')"
+    )
+    code_topic: Optional[str] = Field(
+        default=None,
+        max_length=100,
+        description="Code topic: 'API endpoint', 'data processing', 'algorithm', etc."
+    )
+    framework: Optional[str] = Field(
+        default=None,
+        max_length=50,
+        description="Target framework: 'FastAPI', 'React', 'Express', etc."
+    )
+    complexity: ComplexityType = Field(
+        default="medium",
+        description="Code complexity: simple, medium, advanced"
+    )
+    include_comments: bool = Field(
+        default=True,
+        description="Include explanatory comments in generated code"
+    )
+    include_imports: bool = Field(
+        default=True,
+        description="Include import statements in generated code"
+    )
+    include_error_handling: bool = Field(
+        default=False,
+        description="Include try/catch error handling in generated code"
+    )
+    max_lines: Optional[int] = Field(
+        default=None,
+        ge=10,
+        le=100,
+        description="Maximum lines for generated code (10-100)"
     )
 
     # Optional key concepts generation
@@ -171,10 +293,47 @@ class CodeDisplayAtomicRequest(BaseModel):
     )
 
     @model_validator(mode='after')
-    def validate_code_or_placeholder(self) -> 'CodeDisplayAtomicRequest':
-        """Validate that code is provided unless in placeholder mode."""
-        if not self.placeholder_mode and (not self.code or not self.code.strip()):
-            raise ValueError("Code content cannot be empty unless placeholder_mode is True")
+    def validate_code_or_placeholder_or_prompt(self) -> 'CodeDisplayAtomicRequest':
+        """Validate that code, prompt, or placeholder mode is provided."""
+        has_code = self.code and self.code.strip()
+        has_prompt = self.prompt and self.prompt.strip()
+
+        if not self.placeholder_mode and not has_code and not has_prompt:
+            raise ValueError(
+                "Must provide one of: code content, prompt for generation, or placeholder_mode=True"
+            )
+        return self
+
+    @model_validator(mode='after')
+    def sync_variant_with_color_theme(self) -> 'CodeDisplayAtomicRequest':
+        """Sync variant field with color_theme for backward compatibility.
+
+        Only syncs when:
+        - variant is set to "light" (non-default) AND color_theme is at default (github_dark)
+          -> This means user used old API with variant="light", so map to github_light
+
+        We do NOT sync the reverse (variant="dark" with color_theme!="github_dark")
+        because that could be intentional (user wants dark mode with monokai/dracula).
+        """
+        if self.variant == "light" and self.color_theme == "github_dark":
+            object.__setattr__(self, 'color_theme', "github_light")
+        return self
+
+    @model_validator(mode='after')
+    def apply_position_preset(self) -> 'CodeDisplayAtomicRequest':
+        """Apply position preset values where explicit values are not set."""
+        if self.position_preset and self.position_preset in POSITION_PRESETS:
+            preset = POSITION_PRESETS[self.position_preset]
+            # Only apply preset values if not explicitly set
+            if self.start_col is None:
+                object.__setattr__(self, 'start_col', preset["start_col"])
+            if self.start_row is None:
+                object.__setattr__(self, 'start_row', preset["start_row"])
+            # gridWidth/gridHeight have defaults, check if at default values
+            if self.gridWidth == 28:  # default value
+                object.__setattr__(self, 'gridWidth', preset["gridWidth"])
+            if self.gridHeight == 12:  # default value
+                object.__setattr__(self, 'gridHeight', preset["gridHeight"])
         return self
 
     class Config:
@@ -185,10 +344,16 @@ class CodeDisplayAtomicRequest(BaseModel):
                 "gridWidth": 28,
                 "gridHeight": 12,
                 "variant": "dark",
+                "color_theme": "github_dark",
+                "external_margin": 10,
                 "show_line_numbers": True,
                 "show_copy_button": True,
                 "show_language_badge": True,
-                "font_size": 14
+                "font_size": 14,
+                "position_preset": None,
+                "prompt": None,
+                "framework": None,
+                "complexity": "medium"
             }
         }
 
@@ -229,6 +394,8 @@ class CodeDisplayAtomicResponse(BaseModel):
     Response model for POST /v1.2/atomic/CODE_DISPLAY
 
     Returns generated code block HTML along with metadata.
+
+    v1.1.0: Added code_generated, prompt_used, color_theme, preset_used fields
     """
     success: bool = Field(
         ...,
@@ -269,6 +436,24 @@ class CodeDisplayAtomicResponse(BaseModel):
         description="Normalized language name"
     )
 
+    # NEW: Generation info
+    code_generated: bool = Field(
+        default=False,
+        description="Whether code was generated via LLM prompt"
+    )
+    prompt_used: Optional[str] = Field(
+        default=None,
+        description="The prompt used for LLM generation (if any)"
+    )
+    color_theme: str = Field(
+        default="github_dark",
+        description="Color theme actually applied"
+    )
+    preset_used: Optional[str] = Field(
+        default=None,
+        description="Position preset applied (if any)"
+    )
+
     # Embedded key concepts (optional)
     key_concepts_html: Optional[str] = Field(
         None,
@@ -305,13 +490,17 @@ class CodeDisplayAtomicResponse(BaseModel):
                 "character_counts": {"code": 245, "key_concepts": 0},
                 "line_count": 8,
                 "language": "python",
+                "code_generated": False,
+                "prompt_used": None,
+                "color_theme": "github_dark",
+                "preset_used": None,
                 "key_concepts_html": None,
                 "key_concepts_source": None,
                 "metadata": {
                     "generation_time_ms": 15,
                     "grid_dimensions": {"width": 28, "height": 12},
                     "pixel_dimensions": {"width": 1680, "height": 720},
-                    "version": "1.0.0"
+                    "version": "1.1.0"
                 },
                 "grid_position": {
                     "start_col": 2,
