@@ -395,6 +395,18 @@ generate_slide() {
     fi
     echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
+    # Determine if this is a right-side position (needs element API without event handlers)
+    local needs_element_api=false
+    local show_copy_button=true
+    if [ "$preset" = "right_half" ] || [ "$preset" = "right_third" ]; then
+        needs_element_api=true
+        show_copy_button=false  # Disable copy button to avoid onclick handlers
+    fi
+    if [ -n "$start_col" ] && [ "$start_col" -ge 12 ]; then
+        needs_element_api=true
+        show_copy_button=false  # Disable copy button to avoid onclick handlers
+    fi
+
     # Build JSON payload - use start_col if provided, otherwise use preset
     local json_payload
     if [ -n "$start_col" ]; then
@@ -407,6 +419,7 @@ generate_slide() {
             --arg header "$header" \
             --argjson width "$width" \
             --argjson start_col "$start_col" \
+            --argjson show_copy "$show_copy_button" \
             '{
                 code: $code,
                 language: $lang,
@@ -418,7 +431,7 @@ generate_slide() {
                 gridWidth: $width,
                 gridHeight: 13,
                 show_line_numbers: true,
-                show_copy_button: true
+                show_copy_button: $show_copy
             }')
     elif [ -n "$filename" ]; then
         json_payload=$(jq -n \
@@ -429,6 +442,7 @@ generate_slide() {
             --arg filename "$filename" \
             --arg preset "$preset" \
             --argjson width "$width" \
+            --argjson show_copy "$show_copy_button" \
             '{
                 code: $code,
                 language: $lang,
@@ -439,7 +453,7 @@ generate_slide() {
                 gridWidth: $width,
                 gridHeight: 13,
                 show_line_numbers: true,
-                show_copy_button: true
+                show_copy_button: $show_copy
             }')
     elif [ -n "$header" ]; then
         json_payload=$(jq -n \
@@ -450,6 +464,7 @@ generate_slide() {
             --arg header "$header" \
             --arg preset "$preset" \
             --argjson width "$width" \
+            --argjson show_copy "$show_copy_button" \
             '{
                 code: $code,
                 language: $lang,
@@ -460,7 +475,7 @@ generate_slide() {
                 gridWidth: $width,
                 gridHeight: 13,
                 show_line_numbers: true,
-                show_copy_button: true
+                show_copy_button: $show_copy
             }')
     else
         json_payload=$(jq -n \
@@ -470,6 +485,7 @@ generate_slide() {
             --argjson margin "$margin" \
             --arg preset "$preset" \
             --argjson width "$width" \
+            --argjson show_copy "$show_copy_button" \
             '{
                 code: $code,
                 language: $lang,
@@ -479,7 +495,7 @@ generate_slide() {
                 gridWidth: $width,
                 gridHeight: 13,
                 show_line_numbers: true,
-                show_copy_button: true
+                show_copy_button: $show_copy
             }')
     fi
 
