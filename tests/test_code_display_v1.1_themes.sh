@@ -10,8 +10,8 @@
 # v1.2.4 Changes:
 # - Code area uses explicit height instead of flex:1 to fill available space
 # - Copy button uses script-based addEventListener instead of inline onclick
-# - Copy button now works for ALL slides (including right-side positioned)
-# - This avoids Layout Service TextBox validation errors for event handlers
+# - Copy button works for left-side/body slides (not right-side element API)
+# - TextBox validation rejects both onclick handlers AND script tags
 #
 # v1.2.3 Changes:
 # - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX
@@ -402,14 +402,17 @@ generate_slide() {
     echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
     # Determine if this is a right-side position (needs element API)
-    # v1.2.4: Copy button now works for all positions (uses script-based addEventListener)
+    # Right-side elements go through TextBox validation which rejects both onclick AND script tags
+    # So copy button can only work for left-side/body content slides
     local needs_element_api=false
     local show_copy_button=true
     if [ "$preset" = "right_half" ] || [ "$preset" = "right_third" ]; then
         needs_element_api=true
+        show_copy_button=false  # TextBox validation rejects script tags
     fi
     if [ -n "$start_col" ] && [ "$start_col" -ge 12 ]; then
         needs_element_api=true
+        show_copy_button=false  # TextBox validation rejects script tags
     fi
 
     # Build JSON payload - use start_col if provided, otherwise use preset
