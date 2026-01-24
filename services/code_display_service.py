@@ -25,7 +25,7 @@ v1.2.4: Fixed height/scrolling and copy button issues
         - Code area now uses explicit height instead of flex:1 to fill available space
         - Copy button uses script-based addEventListener instead of inline onclick
         - This avoids Layout Service TextBox validation errors for event handlers
-v1.2.5: Fixed syntax highlighting order bug
+v1.2.5: Fixed syntax highlighting order bug (deployed 2026-01-24)
         - Numbers regex must run FIRST before keywords create spans with hex colors
         - Previous order caused hex codes (859900) to be wrapped in number spans
 """
