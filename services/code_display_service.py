@@ -25,6 +25,9 @@ v1.2.4: Fixed height/scrolling and copy button issues
         - Code area now uses explicit height instead of flex:1 to fill available space
         - Copy button uses script-based addEventListener instead of inline onclick
         - This avoids Layout Service TextBox validation errors for event handlers
+v1.2.5: Fixed syntax highlighting order bug
+        - Numbers regex must run FIRST before keywords create spans with hex colors
+        - Previous order caused hex codes (859900) to be wrapped in number spans
 """
 
 import re
@@ -300,7 +303,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.4"
+                    version="1.2.5"
                 ),
                 grid_position=position_data
             )
@@ -628,9 +631,17 @@ btn.style.borderColor=origBorder;
         fn_color: str,
         var_color: str
     ) -> str:
-        """Apply syntax highlighting to a single line of code."""
+        """Apply syntax highlighting to a single line of code.
+
+        v1.2.5: Fixed order of operations - numbers must be applied FIRST
+        before keywords create spans containing hex color codes.
+        Order: Numbers -> Keywords -> Strings -> Comments -> Functions
+        """
         # Python highlighting
         if language in ['python', 'py']:
+            # Numbers FIRST (before any spans with hex colors exist)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|yield|lambda|and|or|not|in|is|True|False|None|async|await|raise|pass|break|continue|global|nonlocal)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
@@ -645,13 +656,13 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
             # Function calls
             line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['javascript', 'js', 'typescript', 'ts']:
+            # Numbers FIRST
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|async|await|try|catch|finally|throw|new|this|super|typeof|instanceof|true|false|null|undefined|interface|type|enum|implements|private|public|protected|readonly)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
@@ -663,13 +674,13 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
             # Function calls
             line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['java']:
+            # Numbers FIRST
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(public|private|protected|static|final|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|void|int|double|float|boolean|String|long|short|byte|char|null|true|false|this|super|abstract|synchronized|volatile|transient)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
@@ -682,13 +693,13 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
             # Function calls
             line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['go', 'golang']:
+            # Numbers FIRST
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(func|package|import|var|const|type|struct|interface|map|chan|go|defer|return|if|else|for|range|switch|case|default|break|continue|fallthrough|select|nil|true|false|make|new|append|len|cap|copy|delete|panic|recover)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
@@ -699,13 +710,13 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
             # Function calls
             line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['rust']:
+            # Numbers FIRST
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|self|super|where|as|match|if|else|loop|while|for|in|break|continue|return|async|await|move|unsafe|extern|ref|type|dyn|true|false|Some|None|Ok|Err)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
@@ -718,13 +729,13 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
             # Function calls
             line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['sql']:
+            # Numbers FIRST
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
+
             keywords = r'\b(SELECT|FROM|WHERE|AND|OR|NOT|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|ALTER|DROP|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|CASCADE|DEFAULT|CHECK|UNIQUE|IN|LIKE|BETWEEN|IS|EXISTS|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>',
                           line, flags=re.IGNORECASE)
@@ -735,10 +746,10 @@ btn.style.borderColor=origBorder;
             # Comments
             line = re.sub(r'(--.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
-            # Numbers
+        elif language in ['bash', 'sh', 'shell']:
+            # Numbers FIRST (bash doesn't typically highlight numbers, but for consistency)
             line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
-        elif language in ['bash', 'sh', 'shell']:
             keywords = r'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|alias|unalias|echo|printf|read|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|xargs|curl|wget|chmod|chown|sudo|apt|yum|brew|npm|pip|git)\b'
             line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
