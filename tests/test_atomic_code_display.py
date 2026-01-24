@@ -1,5 +1,5 @@
 """
-Tests for Atomic CODE_DISPLAY Endpoint v1.1.0
+Tests for Atomic CODE_DISPLAY Endpoint v1.2.0
 ==============================================
 
 Test suite for the /v1.2/atomic/CODE_DISPLAY endpoint covering:
@@ -9,9 +9,11 @@ Test suite for the /v1.2/atomic/CODE_DISPLAY endpoint covering:
 - Language normalization
 - Grid positioning with position presets
 - External margin configuration
+- Border radius configuration (v1.2.0)
 - Line highlighting
 - Header options
 - Error handling
+- Inline styles (v1.2.0 - for Layout Service compatibility)
 
 Run with: pytest tests/test_atomic_code_display.py -v
 """
@@ -62,7 +64,8 @@ class TestCodeDisplayAtomic:
             assert data["language"] == "python"
             assert data["line_count"] == 1
             assert "html" in data
-            assert "theme-dark-mode" in data["html"]
+            # v1.2.0: Check for inline background color (github_dark)
+            assert "#0d1117" in data["html"]
 
     @pytest.mark.asyncio
     async def test_basic_code_display_light(self, async_client):
@@ -85,7 +88,8 @@ class TestCodeDisplayAtomic:
             assert data["success"] is True
             assert "light" in data["variants_used"]
             assert data["language"] == "javascript"
-            assert "theme-light-mode" in data["html"]
+            # v1.2.0: Check for inline background color (github_light)
+            assert "#faf9f7" in data["html"]
 
     @pytest.mark.asyncio
     async def test_placeholder_mode(self, async_client):
@@ -108,8 +112,8 @@ class TestCodeDisplayAtomic:
             assert data["success"] is True
             assert data["line_count"] > 0
             assert data["character_counts"]["code"] > 0
-            # Placeholder code contains highlighted keywords
-            assert "token keyword" in data["html"]
+            # v1.2.0: Check for inline keyword color (github_dark theme)
+            assert "#ff7b72" in data["html"]
             # And contains function content
             assert "calculate_total" in data["html"]
 
@@ -190,13 +194,13 @@ class TestCodeDisplayAtomic:
             data = response.json()
 
             assert data["success"] is True
-            # Language badge element (span) should not be present in the body
-            # Note: CSS class definitions are always in the style block
-            assert '<span class="code-lang-badge">' not in data["html"]
-            # Copy button element should not be present
-            assert '<button class="code-copy-btn"' not in data["html"]
-            # Font size should be 16px
-            assert "font-size: 16px" in data["html"]
+            # v1.2.0: Check inline styles - no badge should be present
+            # When show_language_badge=False, no badge span is generated
+            assert "PYTHON" not in data["html"]
+            # Copy button element should not be present when show_copy_button=False
+            assert "Copy</button>" not in data["html"]
+            # Font size should be 16px in inline style
+            assert "font-size:16px" in data["html"]
 
     @pytest.mark.asyncio
     async def test_empty_code_error(self, async_client):
@@ -263,7 +267,7 @@ class TestCodeDisplayAtomic:
             assert "pixel_dimensions" in meta
             assert meta["pixel_dimensions"]["width"] == 28 * 60
             assert meta["pixel_dimensions"]["height"] == 12 * 60
-            assert meta["version"] == "1.1.0"
+            assert meta["version"] == "1.2.0"
 
     @pytest.mark.asyncio
     async def test_syntax_highlighting(self, async_client):
@@ -282,8 +286,8 @@ class TestCodeDisplayAtomic:
             assert response.status_code == 200
             data = response.json()
 
-            # Should have token spans for highlighting
-            assert "token keyword" in data["html"]
+            # v1.2.0: Check for inline keyword color (github_dark theme)
+            assert "#ff7b72" in data["html"]
 
 
 class TestAtomicHealth:
@@ -325,7 +329,7 @@ class TestAtomicHealth:
 
             assert code_display is not None
             assert code_display["component_id"] == "code_display"
-            assert code_display["version"] == "1.1.0"
+            assert code_display["version"] == "1.2.0"
             assert "python" in code_display["supported_languages"]
             assert "github_dark" in code_display["color_themes"]
             assert "monokai" in code_display["color_themes"]
@@ -487,9 +491,16 @@ class TestColorThemes:
 
             assert data["success"] is True
             assert data["color_theme"] == theme
-            # Theme class should be in HTML
-            theme_class = theme.replace("_", "-")
-            assert f"code-slide-{theme_class}" in data["html"]
+            # v1.2.0: Theme colors should be in inline styles
+            # Check for background colors based on theme
+            theme_colors = {
+                "github_dark": "#0d1117",
+                "github_light": "#faf9f7",
+                "monokai": "#272822",
+                "solarized_dark": "#002b36",
+                "dracula": "#282a36"
+            }
+            assert theme_colors[theme] in data["html"]
 
     @pytest.mark.asyncio
     async def test_monokai_theme_colors(self, async_client):
@@ -549,8 +560,8 @@ class TestExternalMargin:
             assert response.status_code == 200
             data = response.json()
 
-            # Default margin should be in CSS
-            assert "padding: 10px" in data["html"]
+            # v1.2.0: Default margin in inline style
+            assert "padding:10px" in data["html"]
 
     @pytest.mark.asyncio
     async def test_custom_margin(self, async_client):
@@ -568,7 +579,7 @@ class TestExternalMargin:
             assert response.status_code == 200
             data = response.json()
 
-            assert "padding: 20px" in data["html"]
+            assert "padding:20px" in data["html"]
 
     @pytest.mark.asyncio
     async def test_zero_margin(self, async_client):
@@ -586,7 +597,7 @@ class TestExternalMargin:
             assert response.status_code == 200
             data = response.json()
 
-            assert "padding: 0px" in data["html"]
+            assert "padding:0px" in data["html"]
 
 
 class TestHeaderOptions:
@@ -609,9 +620,9 @@ class TestHeaderOptions:
             data = response.json()
 
             assert data["success"] is True
-            # Header div element should not be present
-            # Note: CSS class definitions are always in the style block
-            assert '<div class="code-box-header">' not in data["html"]
+            # v1.2.0: With inline styles, header_bg color shouldn't be present
+            # Header background colors for github_dark theme
+            assert "#161b22" not in data["html"]
 
     @pytest.mark.asyncio
     async def test_custom_header_text(self, async_client):
@@ -649,8 +660,10 @@ class TestHeaderOptions:
             assert response.status_code == 200
             data = response.json()
 
+            # v1.2.0: Filename should be present in the HTML
             assert "app.py" in data["html"]
-            assert "code-filename" in data["html"]
+            # Monospace font for filename
+            assert "JetBrains Mono" in data["html"]
 
 
 class TestVerticalScrolling:
@@ -671,9 +684,9 @@ class TestVerticalScrolling:
             assert response.status_code == 200
             data = response.json()
 
-            # Scroll CSS should be present
-            assert "overflow-y: auto" in data["html"]
-            assert "overflow-x: hidden" in data["html"]
+            # v1.2.0: Scroll in inline styles (no spaces)
+            assert "overflow-y:auto" in data["html"]
+            assert "overflow-x:hidden" in data["html"]
 
 
 class TestLineHighlighting:
@@ -695,8 +708,206 @@ class TestLineHighlighting:
             assert response.status_code == 200
             data = response.json()
 
-            # Line highlight class should be present
-            assert "line-highlight" in data["html"]
+            # v1.2.0: Line highlight with inline background color
+            # github_dark line highlight color
+            assert "rgba(56,139,253,0.15)" in data["html"]
+
+
+# =============================================================================
+# v1.2.0 Feature Tests
+# =============================================================================
+
+class TestBorderRadius:
+    """Tests for border radius feature (v1.2.0)."""
+
+    @pytest.mark.asyncio
+    async def test_default_border_radius(self, async_client):
+        """Test default border radius is 12px."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Default border radius should be 12px
+            assert "border-radius:12px" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_custom_border_radius(self, async_client):
+        """Test custom border radius value."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "border_radius": 8
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert "border-radius:8px" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_zero_border_radius(self, async_client):
+        """Test zero border radius for square corners."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "border_radius": 0
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert "border-radius:0px" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_corner_style_square(self, async_client):
+        """Test corner_style='square' sets border_radius to 0."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "corner_style": "square"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert "border-radius:0px" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_corner_style_rounded(self, async_client):
+        """Test corner_style='rounded' keeps default 12px."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "corner_style": "rounded"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert "border-radius:12px" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_explicit_border_radius_overrides_corner_style(self, async_client):
+        """Test explicit border_radius overrides corner_style."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "corner_style": "square",
+                    "border_radius": 20  # Explicit override
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Explicit value should win
+            assert "border-radius:20px" in data["html"]
+
+
+class TestInlineStyles:
+    """Tests for inline styles (v1.2.0)."""
+
+    @pytest.mark.asyncio
+    async def test_no_style_tag(self, async_client):
+        """Test that HTML doesn't contain <style> tags."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # v1.2.0: No <style> tags, all inline
+            assert "<style>" not in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_inline_background_color(self, async_client):
+        """Test background color is inline in monokai theme."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "color_theme": "monokai"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Monokai background color in inline style
+            assert "background:#272822" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_inline_keyword_color(self, async_client):
+        """Test keyword highlighting uses inline color."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "def foo(): pass",
+                    "language": "python",
+                    "color_theme": "dracula"
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # Dracula keyword color (pink)
+            assert "#ff79c6" in data["html"]
+
+    @pytest.mark.asyncio
+    async def test_data_code_container_attribute(self, async_client):
+        """Test data-code-container attribute for copy button."""
+        async with async_client as client:
+            response = await client.post(
+                "/v1.2/atomic/CODE_DISPLAY",
+                json={
+                    "code": "test",
+                    "language": "python",
+                    "show_copy_button": True
+                }
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            # v1.2.0: data-code-container attribute for copy functionality
+            assert "data-code-container" in data["html"]
 
 
 class TestResponseFields:

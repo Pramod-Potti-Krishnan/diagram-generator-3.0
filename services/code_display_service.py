@@ -6,7 +6,7 @@ Service layer for generating styled code block HTML with:
 - Syntax highlighting for multiple languages
 - Light/dark theme support with 5 color themes
 - Grid-based positioning with position presets
-- Configurable external margin
+- Configurable external margin and border radius
 - Vertical scrolling for overflow
 - Placeholder mode for testing
 - Optional Text Service integration for key concepts
@@ -14,6 +14,7 @@ Service layer for generating styled code block HTML with:
 
 v1.0.0: Initial implementation following atomic endpoint pattern
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
+v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 """
 
 import re
@@ -41,6 +42,118 @@ TEXT_SERVICE_URL = "https://web-production-5daf.up.railway.app"
 
 # Template directory
 TEMPLATES_DIR = Path(__file__).parent.parent / "templates" / "code_display"
+
+# =============================================================================
+# Theme Color Definitions (for inline styling)
+# =============================================================================
+
+THEME_COLORS = {
+    "github_dark": {
+        "bg": "#0d1117",
+        "header_bg": "#161b22",
+        "text": "#c9d1d9",
+        "badge_bg": "#238636",
+        "badge_text": "#ffffff",
+        "btn_bg": "rgba(255,255,255,0.06)",
+        "btn_text": "#8b949e",
+        "btn_border": "rgba(255,255,255,0.15)",
+        "btn_hover_bg": "rgba(255,255,255,0.1)",
+        "btn_hover_text": "#c9d1d9",
+        "scrollbar_track": "rgba(255,255,255,0.05)",
+        "scrollbar_thumb": "rgba(255,255,255,0.2)",
+        "keyword": "#ff7b72",
+        "string": "#a5d6ff",
+        "comment": "#8b949e",
+        "number": "#79c0ff",
+        "function": "#d2a8ff",
+        "variable": "#ffa657",
+        "line_highlight": "rgba(56,139,253,0.15)"
+    },
+    "github_light": {
+        "bg": "#faf9f7",
+        "header_bg": "#f5f3f0",
+        "text": "#24292f",
+        "badge_bg": "#3b82f6",
+        "badge_text": "#ffffff",
+        "btn_bg": "rgba(0,0,0,0.04)",
+        "btn_text": "#4b5563",
+        "btn_border": "rgba(0,0,0,0.12)",
+        "btn_hover_bg": "rgba(0,0,0,0.08)",
+        "btn_hover_text": "#1f2937",
+        "scrollbar_track": "rgba(0,0,0,0.05)",
+        "scrollbar_thumb": "rgba(0,0,0,0.2)",
+        "keyword": "#cf222e",
+        "string": "#116329",
+        "comment": "#6a737d",
+        "number": "#0550ae",
+        "function": "#8250df",
+        "variable": "#953800",
+        "line_highlight": "rgba(255,235,59,0.2)"
+    },
+    "monokai": {
+        "bg": "#272822",
+        "header_bg": "#1e1e1e",
+        "text": "#f8f8f2",
+        "badge_bg": "#a6e22e",
+        "badge_text": "#272822",
+        "btn_bg": "rgba(255,255,255,0.06)",
+        "btn_text": "#8f908a",
+        "btn_border": "rgba(255,255,255,0.15)",
+        "btn_hover_bg": "rgba(255,255,255,0.1)",
+        "btn_hover_text": "#f8f8f2",
+        "scrollbar_track": "rgba(255,255,255,0.05)",
+        "scrollbar_thumb": "rgba(255,255,255,0.2)",
+        "keyword": "#f92672",
+        "string": "#e6db74",
+        "comment": "#75715e",
+        "number": "#ae81ff",
+        "function": "#a6e22e",
+        "variable": "#fd971f",
+        "line_highlight": "rgba(166,226,46,0.15)"
+    },
+    "solarized_dark": {
+        "bg": "#002b36",
+        "header_bg": "#073642",
+        "text": "#839496",
+        "badge_bg": "#268bd2",
+        "badge_text": "#fdf6e3",
+        "btn_bg": "rgba(255,255,255,0.06)",
+        "btn_text": "#586e75",
+        "btn_border": "rgba(255,255,255,0.15)",
+        "btn_hover_bg": "rgba(255,255,255,0.1)",
+        "btn_hover_text": "#839496",
+        "scrollbar_track": "rgba(255,255,255,0.05)",
+        "scrollbar_thumb": "rgba(131,148,150,0.3)",
+        "keyword": "#859900",
+        "string": "#2aa198",
+        "comment": "#586e75",
+        "number": "#d33682",
+        "function": "#268bd2",
+        "variable": "#b58900",
+        "line_highlight": "rgba(38,139,210,0.15)"
+    },
+    "dracula": {
+        "bg": "#282a36",
+        "header_bg": "#21222c",
+        "text": "#f8f8f2",
+        "badge_bg": "#bd93f9",
+        "badge_text": "#282a36",
+        "btn_bg": "rgba(255,255,255,0.06)",
+        "btn_text": "#6272a4",
+        "btn_border": "rgba(255,255,255,0.15)",
+        "btn_hover_bg": "rgba(255,255,255,0.1)",
+        "btn_hover_text": "#f8f8f2",
+        "scrollbar_track": "rgba(255,255,255,0.05)",
+        "scrollbar_thumb": "rgba(189,147,249,0.3)",
+        "keyword": "#ff79c6",
+        "string": "#f1fa8c",
+        "comment": "#6272a4",
+        "number": "#bd93f9",
+        "function": "#50fa7b",
+        "variable": "#ffb86c",
+        "line_highlight": "rgba(189,147,249,0.15)"
+    }
+}
 
 
 class CodeDisplayGenerator:
@@ -111,7 +224,7 @@ class CodeDisplayGenerator:
             else:
                 raise ValueError("No code source provided")
 
-            # Generate code HTML with enhanced options
+            # Generate code HTML with enhanced options (v1.2.0: inline styles)
             html_content = self._generate_html(
                 code=code,
                 language=language,
@@ -127,7 +240,8 @@ class CodeDisplayGenerator:
                 header_text=request.header_text,
                 filename=request.filename,
                 line_number_start=request.line_number_start,
-                highlight_lines=request.highlight_lines
+                highlight_lines=request.highlight_lines,
+                border_radius=request.border_radius
             )
 
             # Generate key concepts if requested
@@ -176,7 +290,7 @@ class CodeDisplayGenerator:
                         "width": request.gridWidth * 60,
                         "height": request.gridHeight * 60
                     },
-                    version="1.1.0"
+                    version="1.2.0"
                 ),
                 grid_position=position_data
             )
@@ -213,10 +327,15 @@ class CodeDisplayGenerator:
         header_text: Optional[str] = None,
         filename: Optional[str] = None,
         line_number_start: int = 1,
-        highlight_lines: Optional[List[int]] = None
+        highlight_lines: Optional[List[int]] = None,
+        border_radius: int = 12
     ) -> str:
         """
-        Generate complete code display HTML.
+        Generate complete code display HTML with inline styles.
+
+        v1.2.0: Refactored to use inline styles for Layout Service compatibility.
+        All critical styles are applied directly to elements via style="" attributes
+        to ensure they work even when <style> tags are stripped or overridden.
 
         Args:
             code: The code to display
@@ -234,83 +353,185 @@ class CodeDisplayGenerator:
             filename: Filename to display
             line_number_start: Starting line number
             highlight_lines: Lines to highlight
+            border_radius: Border radius in pixels (0 for square, 12 for rounded)
 
         Returns:
-            Complete HTML string
+            Complete HTML string with all styles inline
         """
+        # Get theme colors (fallback to github_dark if theme not found)
+        theme = THEME_COLORS.get(color_theme, THEME_COLORS["github_dark"])
+
         # Escape code for HTML
         escaped_code = html_escape.escape(code)
 
-        # Apply syntax highlighting
-        highlighted_code = self._highlight_code(escaped_code, language, highlight_lines, line_number_start)
+        # Apply syntax highlighting with inline colors
+        highlighted_code = self._highlight_code_inline(
+            escaped_code, language, theme, highlight_lines, line_number_start
+        )
 
-        # Get CSS for the theme
-        css = self._get_theme_css(color_theme, external_margin)
+        # Header height
+        header_height = 72 if show_header else 0
 
-        # Determine theme class for styling
-        is_dark = color_theme in ["github_dark", "monokai", "solarized_dark", "dracula"]
-        theme_class = "theme-dark-mode" if is_dark else "theme-light-mode"
-        theme_suffix = color_theme.replace("_", "-")
-
-        # Generate header content
+        # Generate header content with inline styles
         header_html = ""
         if show_header:
-            # Badge content
-            badge_html = ""
-            if header_text:
-                badge_html = f'<span class="code-lang-badge">{header_text}</span>'
-            elif filename:
-                badge_html = f'<span class="code-lang-badge code-filename">{filename}</span>'
-            elif show_language_badge:
-                badge_html = f'<span class="code-lang-badge">{language.upper()}</span>'
+            # Determine badge content
+            badge_content = ""
+            badge_text_transform = "uppercase"
+            badge_letter_spacing = "0.08em"
+            badge_font_family = "'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif"
+            badge_font_size = "18px"
 
-            # Copy button
+            if header_text:
+                badge_content = header_text
+                badge_text_transform = "none"
+                badge_letter_spacing = "normal"
+            elif filename:
+                badge_content = filename
+                badge_text_transform = "none"
+                badge_letter_spacing = "normal"
+                badge_font_family = "'Fira Code', 'JetBrains Mono', monospace"
+                badge_font_size = "14px"
+            elif show_language_badge:
+                badge_content = language.upper()
+
+            badge_style = (
+                f"background:{theme['badge_bg']};"
+                f"color:{theme['badge_text']};"
+                f"padding:11px 28px;"
+                f"border-radius:4px;"
+                f"font-weight:700;"
+                f"font-size:{badge_font_size};"
+                f"text-transform:{badge_text_transform};"
+                f"letter-spacing:{badge_letter_spacing};"
+                f"font-family:{badge_font_family};"
+            )
+
+            badge_html = f'<span style="{badge_style}">{badge_content}</span>' if badge_content else ''
+
+            # Copy button with inline styles
             copy_button_html = ""
             if show_copy_button:
-                copy_button_html = '''<button class="code-copy-btn" onclick="(function(btn){var code=document.getElementById('code-block').innerText;navigator.clipboard.writeText(code).then(function(){btn.innerText='Copied!';btn.classList.add('copied');setTimeout(function(){btn.innerText='Copy';btn.classList.remove('copied');},2000);}).catch(function(err){console.error('Copy failed:',err);});}).call(this,this);">Copy</button>'''
+                btn_style = (
+                    f"background:{theme['btn_bg']};"
+                    f"color:{theme['btn_text']};"
+                    f"padding:10px 20px;"
+                    f"border:1px solid {theme['btn_border']};"
+                    f"border-radius:6px;"
+                    f"cursor:pointer;"
+                    f"font-size:14px;"
+                    f"font-weight:600;"
+                    f"transition:all 0.15s ease;"
+                    f"font-family:'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;"
+                )
+                # Copy button with unique ID per code block
+                copy_button_html = f'''<button style="{btn_style}" onclick="(function(btn){{var codeEl=btn.closest('[data-code-container]').querySelector('code');var code=codeEl.innerText;navigator.clipboard.writeText(code).then(function(){{btn.innerText='Copied!';btn.style.background='#22c55e';btn.style.color='white';btn.style.borderColor='#22c55e';setTimeout(function(){{btn.innerText='Copy';btn.style.background='{theme["btn_bg"]}';btn.style.color='{theme["btn_text"]}';btn.style.borderColor='{theme["btn_border"]}';}},2000);}}).catch(function(err){{console.error('Copy failed:',err);}});}}).call(this,this);">Copy</button>'''
 
-            header_html = f'''<div class="code-box-header">
-        {badge_html}
-        <div class="code-controls">
-            {copy_button_html}
-        </div>
+            header_style = (
+                f"background:{theme['header_bg']};"
+                f"padding:16px 20px;"
+                f"display:flex;"
+                f"justify-content:space-between;"
+                f"align-items:center;"
+                f"min-height:{header_height}px;"
+                f"flex-shrink:0;"
+            )
+
+            controls_style = "display:flex;gap:12px;align-items:center;margin-right:20px;"
+            badge_wrapper_style = "margin-left:20px;"
+
+            header_html = f'''<div style="{header_style}">
+      <div style="{badge_wrapper_style}">{badge_html}</div>
+      <div style="{controls_style}">{copy_button_html}</div>
     </div>'''
 
-        # Build complete HTML with ARIA accessibility
-        html = f'''<div class="diagram-container {theme_class} code-theme-{theme_suffix}" style="width:100%;height:100%;" role="region" aria-label="Code display">
-<style>
-{css}
-pre.code-box-content code {{
-    font-size: {font_size}px !important;
-}}
-</style>
-<div class="code-slide code-slide-{theme_suffix}">
+        # Build container styles
+        outer_style = (
+            f"padding:{external_margin}px;"
+            f"width:100%;"
+            f"height:100%;"
+            f"box-sizing:border-box;"
+            f"margin:0;"
+        )
+
+        inner_style = (
+            f"background:{theme['bg']};"
+            f"border-radius:{border_radius}px;"
+            f"display:flex;"
+            f"flex-direction:column;"
+            f"width:100%;"
+            f"height:100%;"
+            f"overflow:hidden;"
+        )
+
+        pre_style = (
+            f"background:{theme['bg']};"
+            f"margin:0;"
+            f"padding:20px 24px;"
+            f"overflow-y:auto;"
+            f"overflow-x:hidden;"
+            f"flex:1;"
+            f"min-height:0;"
+            f"border:none;"
+            f"border-radius:0;"
+            f"box-shadow:none;"
+        )
+
+        code_style = (
+            f"font-family:'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, monospace;"
+            f"font-size:{font_size}px;"
+            f"line-height:1.6;"
+            f"color:{theme['text']};"
+            f"white-space:pre-wrap;"
+            f"word-wrap:break-word;"
+            f"overflow-wrap:break-word;"
+            f"display:block;"
+            f"background:transparent;"
+        )
+
+        # Build complete HTML with inline styles and data attribute for copy button
+        html = f'''<div style="{outer_style}" role="region" aria-label="Code display" data-code-container="true">
+  <div style="{inner_style}">
     {header_html}
-    <pre class="code-box-content" role="code" aria-label="{language} code block"><code class="language-{language}" id="code-block">{highlighted_code}</code></pre>
-</div>
+    <pre style="{pre_style}" role="code" aria-label="{language} code block"><code style="{code_style}">{highlighted_code}</code></pre>
+  </div>
 </div>'''
 
         return html
 
-    def _highlight_code(
+    def _highlight_code_inline(
         self,
         code: str,
         language: str,
+        theme: Dict[str, str],
         highlight_lines: Optional[List[int]] = None,
         line_number_start: int = 1
     ) -> str:
         """
-        Apply basic syntax highlighting with span tags.
+        Apply syntax highlighting with inline color styles.
+
+        v1.2.0: Uses inline style="" attributes instead of CSS classes
+        to ensure colors work when embedded in Layout Service.
 
         Args:
             code: HTML-escaped code string
             language: Programming language
+            theme: Theme color dictionary with keyword, string, comment, etc. colors
             highlight_lines: Optional list of line numbers to highlight
             line_number_start: Starting line number
 
         Returns:
-            Code with syntax highlighting spans
+            Code with inline syntax highlighting styles
         """
+        # Get colors from theme
+        kw_color = theme.get("keyword", "#ff7b72")
+        str_color = theme.get("string", "#a5d6ff")
+        cmt_color = theme.get("comment", "#8b949e")
+        num_color = theme.get("number", "#79c0ff")
+        fn_color = theme.get("function", "#d2a8ff")
+        var_color = theme.get("variable", "#ffa657")
+        line_hl_color = theme.get("line_highlight", "rgba(56,139,253,0.15)")
+
         # Apply line highlighting if specified
         if highlight_lines:
             lines = code.split('\n')
@@ -318,548 +539,156 @@ pre.code-box-content code {{
             for i, line in enumerate(lines):
                 line_num = i + line_number_start
                 if line_num in highlight_lines:
-                    highlighted_lines.append(f'<span class="line-highlight">{line}</span>')
+                    line_style = f"display:block;background:{line_hl_color};margin:0 -24px;padding:0 24px;"
+                    highlighted_lines.append(f'<span style="{line_style}">{line}</span>')
                 else:
                     highlighted_lines.append(line)
             code = '\n'.join(highlighted_lines)
+
         # Python highlighting
         if language in ['python', 'py']:
             keywords = r'\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|yield|lambda|and|or|not|in|is|True|False|None|async|await|raise|pass|break|continue|global|nonlocal)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Decorators
-            code = re.sub(r'(@\w+)', r'<span class="token function">\1</span>', code)
+            code = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', code)
 
             # Strings (double quotes)
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
             # Strings (single quotes)
-            code = re.sub(r"('.*?')", r'<span class="token string">\1</span>', code)
+            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
 
             # Comments
-            code = re.sub(r'(#.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
+            code = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
 
         elif language in ['javascript', 'js', 'typescript', 'ts']:
             keywords = r'\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|async|await|try|catch|finally|throw|new|this|super|typeof|instanceof|true|false|null|undefined|interface|type|enum|implements|private|public|protected|readonly)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
-            code = re.sub(r"('.*?')", r'<span class="token string">\1</span>', code)
-            code = re.sub(r'(`.*?`)', r'<span class="token string">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
+            code = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', code, flags=re.DOTALL)
 
             # Comments
-            code = re.sub(r'(//.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', r'<span class="token comment">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
+            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.DOTALL)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
 
         elif language in ['java']:
             keywords = r'\b(public|private|protected|static|final|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|void|int|double|float|boolean|String|long|short|byte|char|null|true|false|this|super|abstract|synchronized|volatile|transient)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Annotations
-            code = re.sub(r'(@\w+)', r'<span class="token function">\1</span>', code)
+            code = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', code)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
 
             # Comments
-            code = re.sub(r'(//.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', r'<span class="token comment">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
+            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.DOTALL)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
 
         elif language in ['go', 'golang']:
             keywords = r'\b(func|package|import|var|const|type|struct|interface|map|chan|go|defer|return|if|else|for|range|switch|case|default|break|continue|fallthrough|select|nil|true|false|make|new|append|len|cap|copy|delete|panic|recover)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
-            code = re.sub(r'(`.*?`)', r'<span class="token string">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            code = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', code, flags=re.DOTALL)
 
             # Comments
-            code = re.sub(r'(//.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', r'<span class="token comment">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
+            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.DOTALL)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
 
         elif language in ['rust']:
             keywords = r'\b(fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|self|super|where|as|match|if|else|loop|while|for|in|break|continue|return|async|await|move|unsafe|extern|ref|type|dyn|true|false|Some|None|Ok|Err)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Macros
-            code = re.sub(r'(\w+!)', r'<span class="token function">\1</span>', code)
+            code = re.sub(r'(\w+!)', rf'<span style="color:{fn_color}">\1</span>', code)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
 
             # Comments
-            code = re.sub(r'(//.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', r'<span class="token comment">\1</span>', code, flags=re.DOTALL)
+            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
+            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.DOTALL)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', r'<span class="token function">\1</span>\2', code)
+            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
 
         elif language in ['sql']:
             keywords = r'\b(SELECT|FROM|WHERE|AND|OR|NOT|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|ALTER|DROP|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|CASCADE|DEFAULT|CHECK|UNIQUE|IN|LIKE|BETWEEN|IS|EXISTS|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code, flags=re.IGNORECASE)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>',
+                          code, flags=re.IGNORECASE)
 
             # Strings
-            code = re.sub(r"('.*?')", r'<span class="token string">\1</span>', code)
+            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
 
             # Comments
-            code = re.sub(r'(--.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
+            code = re.sub(r'(--.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', r'<span class="token number">\1</span>', code)
+            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
 
         elif language in ['bash', 'sh', 'shell']:
             keywords = r'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|alias|unalias|echo|printf|read|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|xargs|curl|wget|chmod|chown|sudo|apt|yum|brew|npm|pip|git)\b'
-            code = re.sub(keywords, r'<span class="token keyword">\1</span>', code)
+            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', r'<span class="token string">\1</span>', code)
-            code = re.sub(r"('.*?')", r'<span class="token string">\1</span>', code)
+            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
 
             # Comments
-            code = re.sub(r'(#.*?)$', r'<span class="token comment">\1</span>', code, flags=re.MULTILINE)
+            code = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
+                          code, flags=re.MULTILINE)
 
             # Variables
-            code = re.sub(r'(\$\w+)', r'<span class="token variable">\1</span>', code)
-            code = re.sub(r'(\$\{[^}]+\})', r'<span class="token variable">\1</span>', code)
+            code = re.sub(r'(\$\w+)', rf'<span style="color:{var_color}">\1</span>', code)
+            code = re.sub(r'(\$\{{[^}}]+\}})', rf'<span style="color:{var_color}">\1</span>', code)
 
         return code
 
-    def _get_theme_css(self, color_theme: str, external_margin: int = 10) -> str:
-        """
-        Get CSS for the specified color theme.
-
-        Args:
-            color_theme: Theme name (github_dark, github_light, monokai, solarized_dark, dracula)
-            external_margin: External margin in pixels
-
-        Returns:
-            CSS string for the theme
-        """
-        # Base CSS (shared between all themes) with vertical scrolling
-        base_css = f"""
-/* v1.1.0: Atomic CODE_DISPLAY styling with themes and scrolling */
-.diagram-container {{
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: {external_margin}px;
-    border: none;
-    box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-}}
-
-.code-slide,
-[class^="code-slide-"] {{
-    display: flex;
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    margin: 0;
-    padding: 0;
-    border-radius: 12px;
-    overflow: hidden;
-}}
-
-.code-box-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    min-height: 72px;
-    flex-shrink: 0;
-}}
-
-.code-lang-badge {{
-    font-size: 18px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 11px 28px;
-    border-radius: 4px;
-    margin-left: 20px !important;
-}}
-
-.code-lang-badge.code-filename {{
-    text-transform: none;
-    letter-spacing: normal;
-    font-family: 'Fira Code', 'JetBrains Mono', monospace;
-    font-size: 14px;
-}}
-
-.code-controls {{
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-right: 20px !important;
-}}
-
-.code-copy-btn {{
-    padding: 10px 20px;
-    border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.15);
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 600;
-    transition: all 0.15s ease;
-    pointer-events: auto !important;
-}}
-
-.code-copy-btn:focus {{
-    outline: 2px solid #3b82f6;
-    outline-offset: 2px;
-}}
-
-.code-copy-btn.copied {{
-    background: #22c55e !important;
-    color: white !important;
-    border-color: #22c55e !important;
-}}
-
-/* Vertical scrolling for code overflow */
-pre.code-box-content {{
-    flex: 1;
-    margin: 0 !important;
-    padding: 20px 24px !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    overflow-y: auto;
-    overflow-x: hidden;
-    min-height: 0;
-}}
-
-pre.code-box-content code {{
-    font-family: 'Fira Code', 'JetBrains Mono', 'SF Mono', Consolas, monospace !important;
-    font-size: 14px !important;
-    line-height: 1.6 !important;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    display: block;
-}}
-
-/* Line highlighting */
-.line-highlight {{
-    display: block;
-    background: rgba(255, 255, 0, 0.15);
-    margin: 0 -24px;
-    padding: 0 24px;
-}}
-"""
-
-        # Theme-specific CSS
-        theme_css = {
-            "github_dark": """
-/* GitHub Dark Theme */
-.code-theme-github-dark,
-.code-slide-github-dark {{
-    background: #0d1117 !important;
-}}
-
-.code-slide-github-dark .code-box-header {{
-    background: #161b22;
-}}
-
-.code-slide-github-dark .code-lang-badge {{
-    background: #238636;
-    color: white;
-}}
-
-.code-slide-github-dark .code-copy-btn {{
-    background: rgba(255, 255, 255, 0.06);
-    color: #8b949e;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}}
-
-.code-slide-github-dark .code-copy-btn:hover {{
-    background: rgba(255, 255, 255, 0.1);
-    color: #c9d1d9;
-    border-color: rgba(255, 255, 255, 0.25);
-}}
-
-.code-slide-github-dark pre.code-box-content {{
-    background: #0d1117;
-}}
-
-/* Scrollbar styling - dark */
-.code-slide-github-dark pre.code-box-content::-webkit-scrollbar {{
-    width: 8px;
-}}
-.code-slide-github-dark pre.code-box-content::-webkit-scrollbar-track {{
-    background: rgba(255, 255, 255, 0.05);
-}}
-.code-slide-github-dark pre.code-box-content::-webkit-scrollbar-thumb {{
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-}}
-.code-slide-github-dark pre.code-box-content::-webkit-scrollbar-thumb:hover {{
-    background: rgba(255, 255, 255, 0.3);
-}}
-
-/* Syntax Highlighting */
-.code-slide-github-dark code {{ color: #c9d1d9; background: transparent; }}
-.code-slide-github-dark .token.comment {{ color: #8b949e; font-style: italic; }}
-.code-slide-github-dark .token.keyword {{ color: #ff7b72; font-weight: 500; }}
-.code-slide-github-dark .token.string {{ color: #a5d6ff; }}
-.code-slide-github-dark .token.number {{ color: #79c0ff; }}
-.code-slide-github-dark .token.function {{ color: #d2a8ff; }}
-.code-slide-github-dark .token.variable {{ color: #ffa657; }}
-.code-slide-github-dark .line-highlight {{ background: rgba(56, 139, 253, 0.15); }}
-""",
-            "github_light": """
-/* GitHub Light Theme */
-.code-theme-github-light,
-.code-slide-github-light {{
-    background: #faf9f7 !important;
-}}
-
-.code-slide-github-light .code-box-header {{
-    background: #f5f3f0;
-}}
-
-.code-slide-github-light .code-lang-badge {{
-    background: #3b82f6;
-    color: white;
-}}
-
-.code-slide-github-light .code-copy-btn {{
-    background: rgba(0, 0, 0, 0.04);
-    color: #4b5563;
-    border: 1px solid rgba(0, 0, 0, 0.12);
-}}
-
-.code-slide-github-light .code-copy-btn:hover {{
-    background: rgba(0, 0, 0, 0.08);
-    color: #1f2937;
-    border-color: rgba(0, 0, 0, 0.2);
-}}
-
-.code-slide-github-light pre.code-box-content {{
-    background: #faf9f7;
-}}
-
-/* Scrollbar styling - light */
-.code-slide-github-light pre.code-box-content::-webkit-scrollbar {{
-    width: 8px;
-}}
-.code-slide-github-light pre.code-box-content::-webkit-scrollbar-track {{
-    background: rgba(0, 0, 0, 0.05);
-}}
-.code-slide-github-light pre.code-box-content::-webkit-scrollbar-thumb {{
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-}}
-.code-slide-github-light pre.code-box-content::-webkit-scrollbar-thumb:hover {{
-    background: rgba(0, 0, 0, 0.3);
-}}
-
-/* Syntax Highlighting */
-.code-slide-github-light code {{ color: #24292f; background: transparent; }}
-.code-slide-github-light .token.comment {{ color: #6a737d; font-style: italic; }}
-.code-slide-github-light .token.keyword {{ color: #cf222e; font-weight: 500; }}
-.code-slide-github-light .token.string {{ color: #116329; }}
-.code-slide-github-light .token.number {{ color: #0550ae; }}
-.code-slide-github-light .token.function {{ color: #8250df; }}
-.code-slide-github-light .token.variable {{ color: #953800; }}
-.code-slide-github-light .line-highlight {{ background: rgba(255, 235, 59, 0.2); }}
-""",
-            "monokai": """
-/* Monokai Theme */
-.code-theme-monokai,
-.code-slide-monokai {{
-    background: #272822 !important;
-}}
-
-.code-slide-monokai .code-box-header {{
-    background: #1e1e1e;
-}}
-
-.code-slide-monokai .code-lang-badge {{
-    background: #a6e22e;
-    color: #272822;
-}}
-
-.code-slide-monokai .code-copy-btn {{
-    background: rgba(255, 255, 255, 0.06);
-    color: #8f908a;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}}
-
-.code-slide-monokai .code-copy-btn:hover {{
-    background: rgba(255, 255, 255, 0.1);
-    color: #f8f8f2;
-    border-color: rgba(255, 255, 255, 0.25);
-}}
-
-.code-slide-monokai pre.code-box-content {{
-    background: #272822;
-}}
-
-/* Scrollbar styling */
-.code-slide-monokai pre.code-box-content::-webkit-scrollbar {{
-    width: 8px;
-}}
-.code-slide-monokai pre.code-box-content::-webkit-scrollbar-track {{
-    background: rgba(255, 255, 255, 0.05);
-}}
-.code-slide-monokai pre.code-box-content::-webkit-scrollbar-thumb {{
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-}}
-
-/* Syntax Highlighting - Monokai */
-.code-slide-monokai code {{ color: #f8f8f2; background: transparent; }}
-.code-slide-monokai .token.comment {{ color: #75715e; font-style: italic; }}
-.code-slide-monokai .token.keyword {{ color: #f92672; font-weight: 500; }}
-.code-slide-monokai .token.string {{ color: #e6db74; }}
-.code-slide-monokai .token.number {{ color: #ae81ff; }}
-.code-slide-monokai .token.function {{ color: #a6e22e; }}
-.code-slide-monokai .token.variable {{ color: #fd971f; }}
-.code-slide-monokai .line-highlight {{ background: rgba(166, 226, 46, 0.15); }}
-""",
-            "solarized_dark": """
-/* Solarized Dark Theme */
-.code-theme-solarized-dark,
-.code-slide-solarized-dark {{
-    background: #002b36 !important;
-}}
-
-.code-slide-solarized-dark .code-box-header {{
-    background: #073642;
-}}
-
-.code-slide-solarized-dark .code-lang-badge {{
-    background: #268bd2;
-    color: #fdf6e3;
-}}
-
-.code-slide-solarized-dark .code-copy-btn {{
-    background: rgba(255, 255, 255, 0.06);
-    color: #586e75;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}}
-
-.code-slide-solarized-dark .code-copy-btn:hover {{
-    background: rgba(255, 255, 255, 0.1);
-    color: #839496;
-    border-color: rgba(255, 255, 255, 0.25);
-}}
-
-.code-slide-solarized-dark pre.code-box-content {{
-    background: #002b36;
-}}
-
-/* Scrollbar styling */
-.code-slide-solarized-dark pre.code-box-content::-webkit-scrollbar {{
-    width: 8px;
-}}
-.code-slide-solarized-dark pre.code-box-content::-webkit-scrollbar-track {{
-    background: rgba(255, 255, 255, 0.05);
-}}
-.code-slide-solarized-dark pre.code-box-content::-webkit-scrollbar-thumb {{
-    background: rgba(131, 148, 150, 0.3);
-    border-radius: 4px;
-}}
-
-/* Syntax Highlighting - Solarized Dark */
-.code-slide-solarized-dark code {{ color: #839496; background: transparent; }}
-.code-slide-solarized-dark .token.comment {{ color: #586e75; font-style: italic; }}
-.code-slide-solarized-dark .token.keyword {{ color: #859900; font-weight: 500; }}
-.code-slide-solarized-dark .token.string {{ color: #2aa198; }}
-.code-slide-solarized-dark .token.number {{ color: #d33682; }}
-.code-slide-solarized-dark .token.function {{ color: #268bd2; }}
-.code-slide-solarized-dark .token.variable {{ color: #b58900; }}
-.code-slide-solarized-dark .line-highlight {{ background: rgba(38, 139, 210, 0.15); }}
-""",
-            "dracula": """
-/* Dracula Theme */
-.code-theme-dracula,
-.code-slide-dracula {{
-    background: #282a36 !important;
-}}
-
-.code-slide-dracula .code-box-header {{
-    background: #21222c;
-}}
-
-.code-slide-dracula .code-lang-badge {{
-    background: #bd93f9;
-    color: #282a36;
-}}
-
-.code-slide-dracula .code-copy-btn {{
-    background: rgba(255, 255, 255, 0.06);
-    color: #6272a4;
-    border: 1px solid rgba(255, 255, 255, 0.15);
-}}
-
-.code-slide-dracula .code-copy-btn:hover {{
-    background: rgba(255, 255, 255, 0.1);
-    color: #f8f8f2;
-    border-color: rgba(255, 255, 255, 0.25);
-}}
-
-.code-slide-dracula pre.code-box-content {{
-    background: #282a36;
-}}
-
-/* Scrollbar styling */
-.code-slide-dracula pre.code-box-content::-webkit-scrollbar {{
-    width: 8px;
-}}
-.code-slide-dracula pre.code-box-content::-webkit-scrollbar-track {{
-    background: rgba(255, 255, 255, 0.05);
-}}
-.code-slide-dracula pre.code-box-content::-webkit-scrollbar-thumb {{
-    background: rgba(189, 147, 249, 0.3);
-    border-radius: 4px;
-}}
-
-/* Syntax Highlighting - Dracula */
-.code-slide-dracula code {{ color: #f8f8f2; background: transparent; }}
-.code-slide-dracula .token.comment {{ color: #6272a4; font-style: italic; }}
-.code-slide-dracula .token.keyword {{ color: #ff79c6; font-weight: 500; }}
-.code-slide-dracula .token.string {{ color: #f1fa8c; }}
-.code-slide-dracula .token.number {{ color: #bd93f9; }}
-.code-slide-dracula .token.function {{ color: #50fa7b; }}
-.code-slide-dracula .token.variable {{ color: #ffb86c; }}
-.code-slide-dracula .line-highlight {{ background: rgba(189, 147, 249, 0.15); }}
-"""
-        }
-
-        # Get theme-specific CSS or default to github_dark
-        specific_css = theme_css.get(color_theme, theme_css["github_dark"])
-
-        return base_css + specific_css
+    # Note: _highlight_code and _get_theme_css methods removed in v1.2.0
+    # These were replaced by _highlight_code_inline and THEME_COLORS dictionary
+    # to use inline styles for Layout Service compatibility.
 
     def _generate_placeholder_code(self, language: str) -> str:
         """

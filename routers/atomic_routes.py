@@ -13,15 +13,17 @@ Features:
 - Syntax highlighting for 10+ languages
 - 5 color themes: github_dark, github_light, monokai, solarized_dark, dracula
 - Grid-based positioning (32x18 system) with position presets
-- Configurable external margin (0-30px)
+- Configurable external margin (0-30px) and border radius (0-24px)
 - Vertical scrolling for code overflow
 - Placeholder mode for instant generation without LLM
 - LLM-based code generation from prompts
 - Line highlighting support
 - Optional Text Service integration for key concepts
+- Inline styles for Layout Service compatibility (v1.2.0)
 
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
+v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 """
 
 import asyncio
@@ -78,6 +80,8 @@ async def generate_code_display(
     - variant: Theme variant ('light' or 'dark') - maps to color_theme
     - color_theme: Extended theme (github_dark, github_light, monokai, solarized_dark, dracula)
     - external_margin: Margin in pixels (0-30, default: 10)
+    - border_radius: Border radius in pixels (0-24, default: 12 for rounded corners)
+    - corner_style: Convenience field - 'rounded' (12px) or 'square' (0px)
     - show_line_numbers: Display line numbers (default: True)
     - show_copy_button: Display copy button (default: True)
     - show_language_badge: Display language badge (default: True)
@@ -179,7 +183,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -210,12 +214,15 @@ async def atomic_health():
                     "prompt_generation": True,
                     "vertical_scrolling": True,
                     "configurable_margin": True,
+                    "configurable_border_radius": True,
                     "custom_header": True,
-                    "key_concepts_integration": True
+                    "key_concepts_integration": True,
+                    "inline_styles": True
                 },
                 "defaults": {
                     "color_theme": "github_dark",
                     "external_margin": 10,
+                    "border_radius": 12,
                     "font_size": 14,
                     "line_number_start": 1
                 }
@@ -246,8 +253,8 @@ async def list_atomic_components():
             {
                 "type": "CODE_DISPLAY",
                 "component_id": "code_display",
-                "version": "1.1.0",
-                "description": "Styled code block with syntax highlighting, 5 color themes, scrolling, and LLM generation",
+                "version": "1.2.0",
+                "description": "Styled code block with syntax highlighting, 5 color themes, scrolling, LLM generation, and inline styles for Layout Service compatibility",
                 "use_cases": [
                     "code snippets",
                     "API examples",
@@ -279,6 +286,8 @@ async def list_atomic_components():
                 "default_options": {
                     "color_theme": "github_dark",
                     "external_margin": 10,
+                    "border_radius": 12,
+                    "corner_style": "rounded",
                     "font_size": 14,
                     "show_line_numbers": True,
                     "show_copy_button": True,
@@ -306,7 +315,16 @@ async def list_atomic_components():
                     "custom_header": {
                         "description": "Custom header text or filename",
                         "options": ["header_text", "filename"]
+                    },
+                    "corner_styling": {
+                        "description": "Customize border radius for rounded or square corners",
+                        "options": ["border_radius", "corner_style"]
                     }
+                },
+                "v1.2.0_changes": {
+                    "inline_styles": "All critical styles are now inline for Layout Service compatibility",
+                    "border_radius": "New field for customizable corner radius (0-24px)",
+                    "corner_style": "New convenience field: 'rounded' or 'square'"
                 }
             }
         ]

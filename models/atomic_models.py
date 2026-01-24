@@ -8,6 +8,7 @@ direct code block generation following the atomic endpoint pattern.
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, vertical scrolling,
         prompt-based code generation, line number options, header options
+v1.2.0: Added border_radius and corner_style fields, refactored to inline styles
 """
 
 from typing import Dict, List, Optional, Any, Literal
@@ -43,6 +44,9 @@ PositionPresetType = Literal[
 
 # Complexity type for code generation
 ComplexityType = Literal["simple", "medium", "advanced"]
+
+# Corner style type for convenience
+CornerStyleType = Literal["rounded", "square"]
 
 
 # =============================================================================
@@ -159,6 +163,19 @@ class CodeDisplayAtomicRequest(BaseModel):
         ge=0,
         le=30,
         description="External margin in pixels (0-30, default: 10)"
+    )
+
+    # NEW v1.2.0: Border radius for rounded/square corners
+    border_radius: int = Field(
+        default=12,
+        ge=0,
+        le=24,
+        description="Border radius in pixels (0 for square corners, 12 for rounded, max 24)"
+    )
+
+    corner_style: CornerStyleType = Field(
+        default="rounded",
+        description="Corner style: 'rounded' (12px radius) or 'square' (0px). Explicit border_radius overrides this."
     )
 
     show_line_numbers: bool = Field(
@@ -336,6 +353,18 @@ class CodeDisplayAtomicRequest(BaseModel):
                 object.__setattr__(self, 'gridHeight', preset["gridHeight"])
         return self
 
+    @model_validator(mode='after')
+    def sync_corner_style_with_border_radius(self) -> 'CodeDisplayAtomicRequest':
+        """Sync corner_style field with border_radius for convenience.
+
+        Only syncs when:
+        - corner_style is set to "square" (non-default) AND border_radius is at default (12)
+          -> This means user wants square corners, so set border_radius to 0
+        """
+        if self.corner_style == "square" and self.border_radius == 12:
+            object.__setattr__(self, 'border_radius', 0)
+        return self
+
     class Config:
         json_schema_extra = {
             "example": {
@@ -346,6 +375,8 @@ class CodeDisplayAtomicRequest(BaseModel):
                 "variant": "dark",
                 "color_theme": "github_dark",
                 "external_margin": 10,
+                "border_radius": 12,
+                "corner_style": "rounded",
                 "show_line_numbers": True,
                 "show_copy_button": True,
                 "show_language_badge": True,
@@ -482,7 +513,7 @@ class CodeDisplayAtomicResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "success": True,
-                "html": "<div class=\"diagram-container theme-dark-mode\">...</div>",
+                "html": "<div style=\"padding:10px;width:100%;height:100%;box-sizing:border-box;\">...</div>",
                 "component_type": "code_display",
                 "instance_count": 1,
                 "arrangement": "single",
@@ -500,7 +531,7 @@ class CodeDisplayAtomicResponse(BaseModel):
                     "generation_time_ms": 15,
                     "grid_dimensions": {"width": 28, "height": 12},
                     "pixel_dimensions": {"width": 1680, "height": 720},
-                    "version": "1.1.0"
+                    "version": "1.2.0"
                 },
                 "grid_position": {
                     "start_col": 2,
