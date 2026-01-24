@@ -532,159 +532,165 @@ class CodeDisplayGenerator:
         var_color = theme.get("variable", "#ffa657")
         line_hl_color = theme.get("line_highlight", "rgba(56,139,253,0.15)")
 
-        # Apply line highlighting if specified
-        if highlight_lines:
-            lines = code.split('\n')
-            highlighted_lines = []
-            for i, line in enumerate(lines):
+        # Apply syntax highlighting per-line FIRST, then wrap with line highlight
+        # This prevents the syntax highlighting regex from corrupting the line highlight styles
+        lines = code.split('\n')
+        highlighted_lines = []
+
+        for i, line in enumerate(lines):
+            # Apply syntax highlighting to this line
+            highlighted_line = self._apply_syntax_highlighting(
+                line, language, kw_color, str_color, cmt_color, num_color, fn_color, var_color
+            )
+
+            # Then wrap with line highlight if needed
+            if highlight_lines:
                 line_num = i + line_number_start
                 if line_num in highlight_lines:
                     line_style = f"display:block;background:{line_hl_color};margin:0 -24px;padding:0 24px;"
-                    highlighted_lines.append(f'<span style="{line_style}">{line}</span>')
-                else:
-                    highlighted_lines.append(line)
-            code = '\n'.join(highlighted_lines)
+                    highlighted_line = f'<span style="{line_style}">{highlighted_line}</span>'
 
+            highlighted_lines.append(highlighted_line)
+
+        return '\n'.join(highlighted_lines)
+
+    def _apply_syntax_highlighting(
+        self,
+        line: str,
+        language: str,
+        kw_color: str,
+        str_color: str,
+        cmt_color: str,
+        num_color: str,
+        fn_color: str,
+        var_color: str
+    ) -> str:
+        """Apply syntax highlighting to a single line of code."""
         # Python highlighting
         if language in ['python', 'py']:
             keywords = r'\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|yield|lambda|and|or|not|in|is|True|False|None|async|await|raise|pass|break|continue|global|nonlocal)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Decorators
-            code = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', code)
+            line = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', line)
 
             # Strings (double quotes)
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
             # Strings (single quotes)
-            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
+            line = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
+            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['javascript', 'js', 'typescript', 'ts']:
             keywords = r'\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|async|await|try|catch|finally|throw|new|this|super|typeof|instanceof|true|false|null|undefined|interface|type|enum|implements|private|public|protected|readonly)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
-            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
-            code = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', code, flags=re.DOTALL)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
+            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
+            line = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.DOTALL)
+            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
+            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['java']:
             keywords = r'\b(public|private|protected|static|final|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|void|int|double|float|boolean|String|long|short|byte|char|null|true|false|this|super|abstract|synchronized|volatile|transient)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Annotations
-            code = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', code)
+            line = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', line)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.DOTALL)
+            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
+            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['go', 'golang']:
             keywords = r'\b(func|package|import|var|const|type|struct|interface|map|chan|go|defer|return|if|else|for|range|switch|case|default|break|continue|fallthrough|select|nil|true|false|make|new|append|len|cap|copy|delete|panic|recover)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
-            code = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', code, flags=re.DOTALL)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
+            line = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.DOTALL)
+            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
+            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['rust']:
             keywords = r'\b(fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|self|super|where|as|match|if|else|loop|while|for|in|break|continue|return|async|await|move|unsafe|extern|ref|type|dyn|true|false|Some|None|Ok|Err)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Macros
-            code = re.sub(r'(\w+!)', rf'<span style="color:{fn_color}">\1</span>', code)
+            line = re.sub(r'(\w+!)', rf'<span style="color:{fn_color}">\1</span>', line)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
-            code = re.sub(r'(/\*.*?\*/)', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.DOTALL)
+            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
             # Function calls
-            code = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', code)
+            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
 
         elif language in ['sql']:
             keywords = r'\b(SELECT|FROM|WHERE|AND|OR|NOT|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|ALTER|DROP|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|CASCADE|DEFAULT|CHECK|UNIQUE|IN|LIKE|BETWEEN|IS|EXISTS|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>',
-                          code, flags=re.IGNORECASE)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>',
+                          line, flags=re.IGNORECASE)
 
             # Strings
-            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(--.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
+            line = re.sub(r'(--.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Numbers
-            code = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', code)
+            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
 
         elif language in ['bash', 'sh', 'shell']:
             keywords = r'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|alias|unalias|echo|printf|read|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|xargs|curl|wget|chmod|chown|sudo|apt|yum|brew|npm|pip|git)\b'
-            code = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', code)
+            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
 
             # Strings
-            code = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', code)
-            code = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', code)
+            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
+            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
 
             # Comments
-            code = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>',
-                          code, flags=re.MULTILINE)
+            line = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
 
             # Variables
-            code = re.sub(r'(\$\w+)', rf'<span style="color:{var_color}">\1</span>', code)
-            code = re.sub(r'(\$\{{[^}}]+\}})', rf'<span style="color:{var_color}">\1</span>', code)
+            line = re.sub(r'(\$\w+)', rf'<span style="color:{var_color}">\1</span>', line)
+            line = re.sub(r'(\$\{{[^}}]+\}})', rf'<span style="color:{var_color}">\1</span>', line)
 
-        return code
+        return line
 
     # Note: _highlight_code and _get_theme_css methods removed in v1.2.0
     # These were replaced by _highlight_code_inline and THEME_COLORS dictionary
