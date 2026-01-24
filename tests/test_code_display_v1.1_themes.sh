@@ -1,11 +1,17 @@
 #!/bin/bash
 #
-# Test Script: CODE_DISPLAY v1.2.3 - Sizing & Position Preset Showcase
-# Version: 1.2.3
-# Tests: 5 different configurations showcasing position presets and sizing fixes
+# Test Script: CODE_DISPLAY v1.2.4 - Sizing & Position Preset Showcase
+# Version: 1.2.4
+# Tests: 7 different configurations showcasing position presets, sizing, and copy button
 #
-# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.3) and publishes
+# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.4) and publishes
 # code blocks with different position presets and sizes to Layout Service.
+#
+# v1.2.4 Changes:
+# - Code area uses explicit height instead of flex:1 to fill available space
+# - Copy button uses script-based addEventListener instead of inline onclick
+# - Copy button now works for ALL slides (including right-side positioned)
+# - This avoids Layout Service TextBox validation errors for event handlers
 #
 # v1.2.3 Changes:
 # - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX
@@ -39,7 +45,7 @@ NC='\033[0m' # No Color
 
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.3 - Sizing & Preset Test"
+echo "  CODE_DISPLAY v1.2.4 - Sizing & Preset Test"
 echo "  Testing Position Presets with Element Sizing"
 echo "=============================================="
 echo "Diagram Service: $DIAGRAM_URL"
@@ -395,16 +401,15 @@ generate_slide() {
     fi
     echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
-    # Determine if this is a right-side position (needs element API without event handlers)
+    # Determine if this is a right-side position (needs element API)
+    # v1.2.4: Copy button now works for all positions (uses script-based addEventListener)
     local needs_element_api=false
     local show_copy_button=true
     if [ "$preset" = "right_half" ] || [ "$preset" = "right_third" ]; then
         needs_element_api=true
-        show_copy_button=false  # Disable copy button to avoid onclick handlers
     fi
     if [ -n "$start_col" ] && [ "$start_col" -ge 12 ]; then
         needs_element_api=true
-        show_copy_button=false  # Disable copy button to avoid onclick handlers
     fi
 
     # Build JSON payload - use start_col if provided, otherwise use preset
@@ -568,7 +573,7 @@ generate_slide() {
                     \"slide_title\": \"$NAME_ESCAPED\",
                     \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
                     \"body\": \"\",
-                    \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
+                    \"footer_text\": \"CODE_DISPLAY v1.2.4 Sizing Test\",
                     \"logo\": \" \"
                 }
             }"
@@ -586,7 +591,7 @@ generate_slide() {
                     \"slide_title\": \"$NAME_ESCAPED\",
                     \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
                     \"body\": $CODE_ESCAPED,
-                    \"footer_text\": \"CODE_DISPLAY v1.2.3 Sizing Test\",
+                    \"footer_text\": \"CODE_DISPLAY v1.2.4 Sizing Test\",
                     \"logo\": \" \"
                 }
             }"
@@ -626,7 +631,7 @@ generate_slide 7 "$CONFIG_7_NAME" "$CONFIG_7_THEME" "$CONFIG_7_LANG" "$CONFIG_7_
 echo "--- Creating Presentation via Layout Service ---"
 
 C1_REQUEST="{
-    \"title\": \"CODE_DISPLAY v1.2.3 - Sizing Fix Test - $TIMESTAMP\",
+    \"title\": \"CODE_DISPLAY v1.2.4 - Sizing Fix Test - $TIMESTAMP\",
     \"template_id\": \"L25\",
     \"slides\": [$C1_SLIDES]
 }"
@@ -693,7 +698,7 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CODE_DISPLAY v1.2.3 - Sizing & Position Presets</title>
+    <title>CODE_DISPLAY v1.2.4 - Sizing & Position Presets</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -872,8 +877,8 @@ echo "--- Generating Test Report ---"
 cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "test_name": "code_display_v1.2.3_sizing",
-    "version": "1.2.3",
+    "test_name": "code_display_v1.2.4_sizing",
+    "version": "1.2.4",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
     "custom_positions_tested": ["start_col=12 (right 2/3)", "start_col=24 (narrow right)"],
     "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760", "1180x760", "464x764"],
@@ -887,7 +892,9 @@ cat > "$OUTPUT_DIR/test_report.json" << EOF
         "external_margin configuration",
         "custom header_text",
         "filename display",
-        "syntax highlighting per theme"
+        "syntax highlighting per theme",
+        "explicit code area height (v1.2.4)",
+        "script-based copy button for all positions (v1.2.4)"
     ],
     "results": {
         "success": $SUCCESS_COUNT,
@@ -914,7 +921,7 @@ echo "Test Report: $OUTPUT_DIR/test_report.json"
 # ============================================
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.3 SIZING TEST RESULTS"
+echo "  CODE_DISPLAY v1.2.4 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
 echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"

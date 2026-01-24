@@ -21,6 +21,10 @@ v1.2.3: Fixed element box sizing and footer protection
         - Outer wrapper has padding:0, inner container applies the margin as padding
         - Footer protection: end_row clamped to max 17 (row 18 reserved for footer)
         - Position presets updated to gridHeight=13 (was 14) for footer safety
+v1.2.4: Fixed height/scrolling and copy button issues
+        - Code area now uses explicit height instead of flex:1 to fill available space
+        - Copy button uses script-based addEventListener instead of inline onclick
+        - This avoids Layout Service TextBox validation errors for event handlers
 """
 
 import re
@@ -296,7 +300,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.3"
+                    version="1.2.4"
                 ),
                 grid_position=position_data
             )
@@ -415,7 +419,7 @@ class CodeDisplayGenerator:
 
             badge_html = f'<span style="{badge_style}">{badge_content}</span>' if badge_content else ''
 
-            # Copy button with inline styles
+            # Copy button with inline styles (no onclick - uses script-based addEventListener)
             copy_button_html = ""
             if show_copy_button:
                 btn_style = (
@@ -430,8 +434,8 @@ class CodeDisplayGenerator:
                     f"transition:all 0.15s ease;"
                     f"font-family:'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;"
                 )
-                # Copy button with unique ID per code block
-                copy_button_html = f'''<button style="{btn_style}" onclick="(function(btn){{var codeEl=btn.closest('[data-code-container]').querySelector('code');var code=codeEl.innerText;navigator.clipboard.writeText(code).then(function(){{btn.innerText='Copied!';btn.style.background='#22c55e';btn.style.color='white';btn.style.borderColor='#22c55e';setTimeout(function(){{btn.innerText='Copy';btn.style.background='{theme["btn_bg"]}';btn.style.color='{theme["btn_text"]}';btn.style.borderColor='{theme["btn_border"]}';}},2000);}}).catch(function(err){{console.error('Copy failed:',err);}});}}).call(this,this);">Copy</button>'''
+                # Copy button WITHOUT onclick - event listener added via script tag below
+                copy_button_html = f'''<button style="{btn_style}" data-copy-btn="true">Copy</button>'''
 
             header_style = (
                 f"background:{theme['header_bg']};"
@@ -461,6 +465,13 @@ class CodeDisplayGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
+        # v1.2.4: Calculate explicit code area height instead of using flex:1
+        # This ensures the code fills the available space without premature scrolling
+        # inner_height = element_height - (2 * external_margin) for inner container padding
+        # code_area_height = inner_height - header_height
+        inner_height = element_height - (2 * external_margin)
+        code_area_height = inner_height - header_height
+
         # Outer wrapper has NO padding - it's the element box boundary
         outer_style = (
             f"width:{element_width}px;"
@@ -484,17 +495,19 @@ class CodeDisplayGenerator:
             f"box-sizing:border-box;"
         )
 
+        # v1.2.4: Use explicit height instead of flex:1 to ensure code fills available space
         pre_style = (
             f"background:{theme['bg']};"
             f"margin:0;"
             f"padding:20px 24px;"
             f"overflow-y:auto;"
             f"overflow-x:hidden;"
-            f"flex:1;"
+            f"height:{code_area_height}px;"
             f"min-height:0;"
             f"border:none;"
             f"border-radius:0;"
             f"box-shadow:none;"
+            f"box-sizing:border-box;"
         )
 
         code_style = (
@@ -509,12 +522,42 @@ class CodeDisplayGenerator:
             f"background:transparent;"
         )
 
+        # Build copy button script (uses addEventListener instead of inline onclick)
+        # This avoids Layout Service TextBox validation errors for inline event handlers
+        copy_script = ""
+        if show_copy_button:
+            copy_script = f'''<script>(function(){{
+var container=document.currentScript.parentElement;
+var btn=container.querySelector('[data-copy-btn]');
+if(btn){{
+var codeEl=container.querySelector('code');
+var origBg='{theme["btn_bg"]}';
+var origColor='{theme["btn_text"]}';
+var origBorder='{theme["btn_border"]}';
+btn.addEventListener('click',function(){{
+navigator.clipboard.writeText(codeEl.innerText).then(function(){{
+btn.innerText='Copied!';
+btn.style.background='#22c55e';
+btn.style.color='white';
+btn.style.borderColor='#22c55e';
+setTimeout(function(){{
+btn.innerText='Copy';
+btn.style.background=origBg;
+btn.style.color=origColor;
+btn.style.borderColor=origBorder;
+}},2000);
+}}).catch(function(err){{console.error('Copy failed:',err);}});
+}});
+}}
+}})();</script>'''
+
         # Build complete HTML with inline styles and data attribute for copy button
         html = f'''<div style="{outer_style}" role="region" aria-label="Code display" data-code-container="true">
   <div style="{inner_style}">
     {header_html}
     <pre style="{pre_style}" role="code" aria-label="{language} code block"><code style="{code_style}">{highlighted_code}</code></pre>
   </div>
+{copy_script}
 </div>'''
 
         return html
