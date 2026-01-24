@@ -15,6 +15,7 @@ Service layer for generating styled code block HTML with:
 v1.0.0: Initial implementation following atomic endpoint pattern
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
+v1.2.2: Fixed sizing - use explicit pixel dimensions (gridWidth*60, gridHeight*60) instead of 100%
 """
 
 import re
@@ -290,7 +291,7 @@ class CodeDisplayGenerator:
                         "width": request.gridWidth * 60,
                         "height": request.gridHeight * 60
                     },
-                    version="1.2.0"
+                    version="1.2.2"
                 ),
                 grid_position=position_data
             )
@@ -446,10 +447,15 @@ class CodeDisplayGenerator:
     </div>'''
 
         # Build container styles
+        # v1.2.2: Use explicit pixel dimensions for correct sizing in Layout Service
+        # Grid units are 60px each, so multiply grid dimensions to get pixels
+        pixel_width = grid_width * 60
+        pixel_height = grid_height * 60
+
         outer_style = (
+            f"width:{pixel_width}px;"
+            f"height:{pixel_height}px;"
             f"padding:{external_margin}px;"
-            f"width:100%;"
-            f"height:100%;"
             f"box-sizing:border-box;"
             f"margin:0;"
         )
