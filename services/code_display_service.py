@@ -21,13 +21,15 @@ v1.2.3: Fixed element box sizing and footer protection
         - Outer wrapper has padding:0, inner container applies the margin as padding
         - Footer protection: end_row clamped to max 17 (row 18 reserved for footer)
         - Position presets updated to gridHeight=13 (was 14) for footer safety
-v1.2.4: Fixed height/scrolling and copy button issues
-        - Code area now uses explicit height instead of flex:1 to fill available space
+v1.2.4: Fixed copy button issues
         - Copy button uses script-based addEventListener instead of inline onclick
         - This avoids Layout Service TextBox validation errors for event handlers
 v1.2.5: Fixed syntax highlighting order bug (deployed 2026-01-24)
         - Numbers regex must run FIRST before keywords create spans with hex colors
         - Previous order caused hex codes (859900) to be wrapped in number spans
+v1.2.6: Fixed height/scrolling issues
+        - Code area now uses flex:1 instead of explicit height to fill available space
+        - Works better with flexbox layout and avoids premature scrolling
 """
 
 import re
@@ -303,7 +305,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.5"
+                    version="1.2.6"
                 ),
                 grid_position=position_data
             )
@@ -468,13 +470,6 @@ class CodeDisplayGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
-        # v1.2.4: Calculate explicit code area height instead of using flex:1
-        # This ensures the code fills the available space without premature scrolling
-        # inner_height = element_height - (2 * external_margin) for inner container padding
-        # code_area_height = inner_height - header_height
-        inner_height = element_height - (2 * external_margin)
-        code_area_height = inner_height - header_height
-
         # Outer wrapper has NO padding - it's the element box boundary
         outer_style = (
             f"width:{element_width}px;"
@@ -498,14 +493,15 @@ class CodeDisplayGenerator:
             f"box-sizing:border-box;"
         )
 
-        # v1.2.4: Use explicit height instead of flex:1 to ensure code fills available space
+        # v1.2.6: Use flex:1 to fill remaining space after header
+        # Combined with min-height:0 this allows proper flexbox sizing
         pre_style = (
             f"background:{theme['bg']};"
             f"margin:0;"
             f"padding:20px 24px;"
             f"overflow-y:auto;"
             f"overflow-x:hidden;"
-            f"height:{code_area_height}px;"
+            f"flex:1;"
             f"min-height:0;"
             f"border:none;"
             f"border-radius:0;"

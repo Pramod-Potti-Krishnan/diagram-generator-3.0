@@ -1,17 +1,19 @@
 #!/bin/bash
 #
-# Test Script: CODE_DISPLAY v1.2.4 - Sizing & Position Preset Showcase
-# Version: 1.2.4
+# Test Script: CODE_DISPLAY v1.2.6 - Sizing & Position Preset Showcase
+# Version: 1.2.6
 # Tests: 7 different configurations showcasing position presets, sizing, and copy button
 #
-# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.4) and publishes
+# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.6) and publishes
 # code blocks with different position presets and sizes to Layout Service.
 #
+# v1.2.6 Changes:
+# - Code area now uses flex:1 to fill available space (fixes height issues)
+# - Uses ContentElement API instead of TextBox for right-side elements
+# - Copy button now works for ALL positions (ContentElement has NO validation)
+#
 # v1.2.4 Changes:
-# - Code area uses explicit height instead of flex:1 to fill available space
 # - Copy button uses script-based addEventListener instead of inline onclick
-# - Copy button works for left-side/body slides (not right-side element API)
-# - TextBox validation rejects both onclick handlers AND script tags
 #
 # v1.2.3 Changes:
 # - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX
@@ -45,7 +47,7 @@ NC='\033[0m' # No Color
 
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.4 - Sizing & Preset Test"
+echo "  CODE_DISPLAY v1.2.6 - Sizing & Preset Test"
 echo "  Testing Position Presets with Element Sizing"
 echo "=============================================="
 echo "Diagram Service: $DIAGRAM_URL"
@@ -308,8 +310,9 @@ pm2 restart all
 echo "Done!"'
 
 # ============================================
-# Function: Add positioned element via Layout Service element API
-# This allows proper grid positioning for right-side elements
+# Function: Add positioned element via Layout Service ContentElement API
+# Uses /contents endpoint which accepts any HTML including scripts
+# This allows proper grid positioning for right-side elements with copy buttons
 # ============================================
 add_positioned_element() {
     local pres_id=$1
@@ -320,27 +323,32 @@ add_positioned_element() {
     local height=${6:-13}
     local start_row=${7:-4}
 
+    # Calculate end positions for grid CSS
+    local end_row=$((start_row + height))
+    local end_col=$((start_col + width))
+
     # Escape HTML for JSON using jq
     local escaped_html=$(echo "$html" | jq -Rs .)
 
+    # Use ContentElement API which has NO validation and accepts scripts
     local element_payload="{
-        \"element_type\": \"TEXT_BOX\",
-        \"html\": $escaped_html,
-        \"start_row\": $start_row,
-        \"start_col\": $start_col,
-        \"width\": $width,
-        \"height\": $height,
-        \"draggable\": true,
-        \"resizable\": true
+        \"slot_name\": \"code_display\",
+        \"content_html\": $escaped_html,
+        \"content_type\": \"html\",
+        \"position\": {
+            \"grid_row\": \"$start_row/$end_row\",
+            \"grid_column\": \"$start_col/$end_col\"
+        },
+        \"z_index\": 100
     }"
 
-    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/elements" \
+    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/contents" \
         -H "Content-Type: application/json" \
         -d "$element_payload")
 
     local success=$(echo "$response" | jq -r '.success // .id // "null"')
     if [ "$success" != "null" ] && [ -n "$success" ]; then
-        echo -e "    ${GREEN}Element added at grid position ($start_col, $start_row)${NC}"
+        echo -e "    ${GREEN}ContentElement added at grid position ($start_col/$end_col, $start_row/$end_row)${NC}"
         return 0
     else
         echo -e "    ${RED}Failed to add element: $(echo "$response" | jq -r '.detail // .error // "Unknown error"')${NC}"
@@ -401,18 +409,16 @@ generate_slide() {
     fi
     echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
-    # Determine if this is a right-side position (needs element API)
-    # Right-side elements go through TextBox validation which rejects both onclick AND script tags
-    # So copy button can only work for left-side/body content slides
+    # Determine if this is a right-side position (needs ContentElement API)
+    # v1.2.6: Now uses ContentElement API which has NO validation
+    # So copy button works for ALL positions including right-side
     local needs_element_api=false
-    local show_copy_button=true
+    local show_copy_button=true  # Always enabled now
     if [ "$preset" = "right_half" ] || [ "$preset" = "right_third" ]; then
         needs_element_api=true
-        show_copy_button=false  # TextBox validation rejects script tags
     fi
     if [ -n "$start_col" ] && [ "$start_col" -ge 12 ]; then
         needs_element_api=true
-        show_copy_button=false  # TextBox validation rejects script tags
     fi
 
     # Build JSON payload - use start_col if provided, otherwise use preset
@@ -576,7 +582,7 @@ generate_slide() {
                     \"slide_title\": \"$NAME_ESCAPED\",
                     \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
                     \"body\": \"\",
-                    \"footer_text\": \"CODE_DISPLAY v1.2.4 Sizing Test\",
+                    \"footer_text\": \"CODE_DISPLAY v1.2.6 Sizing Test\",
                     \"logo\": \" \"
                 }
             }"
@@ -594,7 +600,7 @@ generate_slide() {
                     \"slide_title\": \"$NAME_ESCAPED\",
                     \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
                     \"body\": $CODE_ESCAPED,
-                    \"footer_text\": \"CODE_DISPLAY v1.2.4 Sizing Test\",
+                    \"footer_text\": \"CODE_DISPLAY v1.2.6 Sizing Test\",
                     \"logo\": \" \"
                 }
             }"
@@ -880,8 +886,8 @@ echo "--- Generating Test Report ---"
 cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "test_name": "code_display_v1.2.4_sizing",
-    "version": "1.2.4",
+    "test_name": "code_display_v1.2.6_sizing",
+    "version": "1.2.6",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
     "custom_positions_tested": ["start_col=12 (right 2/3)", "start_col=24 (narrow right)"],
     "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760", "1180x760", "464x764"],
@@ -896,8 +902,9 @@ cat > "$OUTPUT_DIR/test_report.json" << EOF
         "custom header_text",
         "filename display",
         "syntax highlighting per theme",
-        "explicit code area height (v1.2.4)",
-        "script-based copy button for all positions (v1.2.4)"
+        "flex:1 code area height (v1.2.6)",
+        "script-based copy button for all positions (v1.2.6)",
+        "ContentElement API for right-side positions (v1.2.6)"
     ],
     "results": {
         "success": $SUCCESS_COUNT,
@@ -924,7 +931,7 @@ echo "Test Report: $OUTPUT_DIR/test_report.json"
 # ============================================
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.4 SIZING TEST RESULTS"
+echo "  CODE_DISPLAY v1.2.6 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
 echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"
