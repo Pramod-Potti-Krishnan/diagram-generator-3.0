@@ -493,15 +493,16 @@ class CodeDisplayGenerator:
             f"box-sizing:border-box;"
         )
 
-        # v1.2.6: Use flex:1 to fill remaining space after header
-        # Combined with min-height:0 this allows proper flexbox sizing
+        # v1.2.9: Use height:0 with flex:1 1 0 to force expansion to fill container
+        # Without height:0, flex uses content height as starting point
         pre_style = (
             f"background:{theme['bg']};"
             f"margin:0;"
             f"padding:20px 24px;"
             f"overflow-y:auto;"
             f"overflow-x:hidden;"
-            f"flex:1;"
+            f"flex:1 1 0;"
+            f"height:0;"
             f"min-height:0;"
             f"border:none;"
             f"border-radius:0;"
