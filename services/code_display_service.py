@@ -30,6 +30,11 @@ v1.2.5: Fixed syntax highlighting order bug (deployed 2026-01-24)
 v1.2.6: Fixed height/scrolling issues
         - Code area now uses flex:1 instead of explicit height to fill available space
         - Works better with flexbox layout and avoids premature scrolling
+v1.2.11: Fixed copy button cutoff + added text size options
+        - Header: Added width:100% to constrain within parent
+        - Controls: Added flex-shrink:0 and padding-right:8px for safe margin
+        - Badge wrapper: Added overflow:hidden;flex:1 1 auto;min-width:0 to prevent pushing button out
+        - Added text_size preset field: "small" (14px), "medium" (~17px), "large" (~19px)
 """
 
 import re
@@ -239,6 +244,20 @@ class CodeDisplayGenerator:
             else:
                 raise ValueError("No code source provided")
 
+            # v1.2.11: Calculate font_size based on text_size preset
+            base_font_size = request.font_size  # default is 14
+            if hasattr(request, 'text_size') and request.text_size:
+                if request.text_size == "small":
+                    calculated_font_size = base_font_size  # 14px
+                elif request.text_size == "medium":
+                    calculated_font_size = int(base_font_size * 1.2)  # ~17px
+                elif request.text_size == "large":
+                    calculated_font_size = int(base_font_size * 1.35)  # ~19px
+                else:
+                    calculated_font_size = base_font_size
+            else:
+                calculated_font_size = base_font_size
+
             # Generate code HTML with enhanced options (v1.2.0: inline styles)
             html_content = self._generate_html(
                 code=code,
@@ -249,7 +268,7 @@ class CodeDisplayGenerator:
                 show_line_numbers=request.show_line_numbers,
                 show_copy_button=request.show_copy_button,
                 show_language_badge=request.show_language_badge,
-                font_size=request.font_size,
+                font_size=calculated_font_size,
                 external_margin=request.external_margin,
                 show_header=request.show_header,
                 header_text=request.header_text,
@@ -305,7 +324,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.6"
+                    version="1.2.11"
                 ),
                 grid_position=position_data
             )
@@ -442,7 +461,7 @@ class CodeDisplayGenerator:
                 # Copy button WITHOUT onclick - event listener added via script tag below
                 copy_button_html = f'''<button style="{btn_style}" data-copy-btn="true">Copy</button>'''
 
-            # v1.2.10: Add box-sizing and overflow to prevent copy button cutoff
+            # v1.2.11: Add width:100% to constrain header within parent
             header_style = (
                 f"background:{theme['header_bg']};"
                 f"padding:16px 20px;"
@@ -452,12 +471,13 @@ class CodeDisplayGenerator:
                 f"min-height:{header_height}px;"
                 f"flex-shrink:0;"
                 f"box-sizing:border-box;"
-                f"overflow:hidden;"
+                f"width:100%;"
             )
 
-            # v1.2.10: Remove margin-right as header padding already provides spacing
-            controls_style = "display:flex;gap:12px;align-items:center;"
-            badge_wrapper_style = "margin-left:20px;"
+            # v1.2.11: Add flex-shrink:0 to prevent button shrinking, padding-right for safe margin
+            controls_style = "display:flex;gap:12px;align-items:center;flex-shrink:0;padding-right:8px;"
+            # v1.2.11: Add overflow:hidden and flex properties to prevent badge pushing button out
+            badge_wrapper_style = "margin-left:20px;overflow:hidden;flex:1 1 auto;min-width:0;"
 
             header_html = f'''<div style="{header_style}">
       <div style="{badge_wrapper_style}">{badge_html}</div>

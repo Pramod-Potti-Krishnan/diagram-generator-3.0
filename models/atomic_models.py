@@ -12,6 +12,9 @@ v1.2.0: Added border_radius and corner_style fields, refactored to inline styles
 v1.2.3: Fixed element box sizing and footer protection
         - POSITION_PRESETS heights adjusted from 14 to 13 (row 18 reserved for footer)
         - top_half/bottom_half adjusted from 7 to 6 rows for symmetry
+v1.2.11: Added text_size preset field for convenience
+        - TextSizeType: "small", "medium", "large"
+        - "small" = base font_size (14px), "medium" = +20% (~17px), "large" = +35% (~19px)
 """
 
 from typing import Dict, List, Optional, Any, Literal
@@ -53,6 +56,9 @@ ComplexityType = Literal["simple", "medium", "advanced"]
 
 # Corner style type for convenience
 CornerStyleType = Literal["rounded", "square"]
+
+# v1.2.11: Text size type for convenience presets
+TextSizeType = Literal["small", "medium", "large"]
 
 
 # =============================================================================
@@ -201,6 +207,12 @@ class CodeDisplayAtomicRequest(BaseModel):
         ge=10,
         le=24,
         description="Base font size in pixels"
+    )
+
+    # v1.2.11: Text size preset for convenience
+    text_size: Optional[str] = Field(
+        default=None,
+        description="Text size preset: 'small' (default 14px), 'medium' (20% larger ~17px), 'large' (35% larger ~19px). Overrides font_size calculation."
     )
 
     # NEW: Line number options
