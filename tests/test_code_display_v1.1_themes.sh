@@ -1,11 +1,16 @@
 #!/bin/bash
 #
-# Test Script: CODE_DISPLAY v1.2.6 - Sizing & Position Preset Showcase
-# Version: 1.2.6
+# Test Script: CODE_DISPLAY v1.2.7 - Sizing & Position Preset Showcase
+# Version: 1.2.7
 # Tests: 7 different configurations showcasing position presets, sizing, and copy button
 #
-# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.6) and publishes
+# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.7) and publishes
 # code blocks with different position presets and sizes to Layout Service.
+#
+# v1.2.7 Changes:
+# - Uses Diagram Element API with html_content field instead of ContentElement API
+# - Diagram elements with html_content are rendered in iframes (allows scripts)
+# - Proper semantic model: diagrams stored in slide.diagrams[] array
 #
 # v1.2.6 Changes:
 # - Code area now uses flex:1 to fill available space (fixes height issues)
@@ -310,9 +315,10 @@ pm2 restart all
 echo "Done!"'
 
 # ============================================
-# Function: Add positioned element via Layout Service ContentElement API
-# Uses /contents endpoint which accepts any HTML including scripts
+# Function: Add positioned element via Layout Service Diagram API
+# Uses /diagrams endpoint with html_content field for script-enabled HTML
 # This allows proper grid positioning for right-side elements with copy buttons
+# v1.2.7: Uses Diagram Element API instead of ContentElement for semantic correctness
 # ============================================
 add_positioned_element() {
     local pres_id=$1
@@ -330,25 +336,24 @@ add_positioned_element() {
     # Escape HTML for JSON using jq
     local escaped_html=$(echo "$html" | jq -Rs .)
 
-    # Use ContentElement API which has NO validation and accepts scripts
+    # Use Diagram Element API with html_content field (rendered in iframe)
     local element_payload="{
-        \"slot_name\": \"code_display\",
-        \"content_html\": $escaped_html,
-        \"content_type\": \"html\",
         \"position\": {
             \"grid_row\": \"$start_row/$end_row\",
             \"grid_column\": \"$start_col/$end_col\"
         },
+        \"html_content\": $escaped_html,
+        \"diagram_type\": \"code_display\",
         \"z_index\": 100
     }"
 
-    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/contents" \
+    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/diagrams" \
         -H "Content-Type: application/json" \
         -d "$element_payload")
 
     local success=$(echo "$response" | jq -r '.success // .id // "null"')
     if [ "$success" != "null" ] && [ -n "$success" ]; then
-        echo -e "    ${GREEN}ContentElement added at grid position ($start_col/$end_col, $start_row/$end_row)${NC}"
+        echo -e "    ${GREEN}Diagram element added at grid position ($start_col/$end_col, $start_row/$end_row)${NC}"
         return 0
     else
         echo -e "    ${RED}Failed to add element: $(echo "$response" | jq -r '.detail // .error // "Unknown error"')${NC}"
