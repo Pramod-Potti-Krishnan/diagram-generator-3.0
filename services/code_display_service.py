@@ -35,6 +35,9 @@ v1.2.11: Fixed copy button cutoff + added text size options
         - Controls: Added flex-shrink:0 and padding-right:8px for safe margin
         - Badge wrapper: Added overflow:hidden;flex:1 1 auto;min-width:0 to prevent pushing button out
         - Added text_size preset field: "small" (14px), "medium" (~17px), "large" (~19px)
+v1.2.12: Fixed copy button cutoff by using relative dimensions
+        - Outer wrapper changed from fixed pixels to width:100%; height:100%
+        - Element now adapts to Layout Service container size
 """
 
 import re
@@ -324,7 +327,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.11"
+                    version="1.2.12"
                 ),
                 grid_position=position_data
             )
@@ -494,10 +497,11 @@ class CodeDisplayGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
-        # Outer wrapper has NO padding - it's the element box boundary
+        # v1.2.12: Use relative dimensions so element adapts to container size
+        # The Layout Service container controls the actual dimensions
         outer_style = (
-            f"width:{element_width}px;"
-            f"height:{element_height}px;"
+            f"width:100%;"
+            f"height:100%;"
             f"padding:0;"
             f"margin:0;"
             f"box-sizing:border-box;"
