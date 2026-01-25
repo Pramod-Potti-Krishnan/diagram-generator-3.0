@@ -442,6 +442,7 @@ class CodeDisplayGenerator:
                 # Copy button WITHOUT onclick - event listener added via script tag below
                 copy_button_html = f'''<button style="{btn_style}" data-copy-btn="true">Copy</button>'''
 
+            # v1.2.10: Add box-sizing and overflow to prevent copy button cutoff
             header_style = (
                 f"background:{theme['header_bg']};"
                 f"padding:16px 20px;"
@@ -450,9 +451,12 @@ class CodeDisplayGenerator:
                 f"align-items:center;"
                 f"min-height:{header_height}px;"
                 f"flex-shrink:0;"
+                f"box-sizing:border-box;"
+                f"overflow:hidden;"
             )
 
-            controls_style = "display:flex;gap:12px;align-items:center;margin-right:20px;"
+            # v1.2.10: Remove margin-right as header padding already provides spacing
+            controls_style = "display:flex;gap:12px;align-items:center;"
             badge_wrapper_style = "margin-left:20px;"
 
             header_html = f'''<div style="{header_style}">
