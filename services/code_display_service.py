@@ -42,6 +42,10 @@ v1.2.13: Fixed HTML style fragments appearing as visible text
         - Root cause: comment regex matched hex colors inside span attributes
         - Solution: Two-pass tokenization (tokenize raw code, then escape, then render)
         - Prevents regex patterns from seeing content inside HTML tags
+v1.2.14: Added interactive text size buttons
+        - Three buttons (A small, A medium, A large) in header controls
+        - Sizes: 15px, 18px, 21px with medium as default
+        - Dynamic font-size change on click
 """
 
 import re
@@ -336,7 +340,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.13"
+                    version="1.2.14"
                 ),
                 grid_position=position_data
             )
@@ -407,6 +411,10 @@ class CodeDisplayGenerator:
         # Get theme colors (fallback to github_dark if theme not found)
         theme = THEME_COLORS.get(color_theme, THEME_COLORS["github_dark"])
 
+        # v1.2.14: Default to medium (18px) when interactive size buttons are shown
+        if show_header:
+            font_size = 18  # Medium default for interactive sizing
+
         # v1.2.13: Pass raw code to highlighting - escaping now happens inside
         # _highlight_code_inline after tokenization to prevent regex from matching
         # hex colors inside span style attributes
@@ -472,6 +480,21 @@ class CodeDisplayGenerator:
                 # Copy button WITHOUT onclick - event listener added via script tag below
                 copy_button_html = f'''<button style="{btn_style}" data-copy-btn="true">Copy</button>'''
 
+            # v1.2.14: Text size buttons (Small=15px, Medium=18px, Large=21px)
+            size_btn_base_style = (
+                f"background:{theme['btn_bg']};"
+                f"color:{theme['btn_text']};"
+                f"padding:6px 10px;"
+                f"border:1px solid {theme['btn_border']};"
+                f"border-radius:4px;"
+                f"cursor:pointer;"
+                f"font-weight:600;"
+                f"transition:all 0.15s ease;"
+                f"font-family:'Fira Code', monospace;"
+            )
+            # Medium button highlighted as active by default
+            size_buttons_html = f'''<button style="{size_btn_base_style}font-size:12px;" data-size-btn="small" title="Small (15px)">A</button><button style="{size_btn_base_style}font-size:14px;background:{theme['btn_hover_bg']};color:{theme['btn_hover_text']};" data-size-btn="medium" title="Medium (18px)">A</button><button style="{size_btn_base_style}font-size:16px;" data-size-btn="large" title="Large (21px)">A</button>'''
+
             # v1.2.11: Add width:100% to constrain header within parent
             header_style = (
                 f"background:{theme['header_bg']};"
@@ -492,7 +515,7 @@ class CodeDisplayGenerator:
 
             header_html = f'''<div style="{header_style}">
       <div style="{badge_wrapper_style}">{badge_html}</div>
-      <div style="{controls_style}">{copy_button_html}</div>
+      <div style="{controls_style}">{size_buttons_html}{copy_button_html}</div>
     </div>'''
 
         # Build container styles
@@ -587,13 +610,41 @@ btn.style.borderColor=origBorder;
 }}
 }})();</script>'''
 
+        # v1.2.14: Build text size button script
+        size_script = ""
+        if show_header:
+            size_script = f'''<script>(function(){{
+var container=document.currentScript.parentElement;
+var codeEl=container.querySelector('code');
+var sizeBtns=container.querySelectorAll('[data-size-btn]');
+var sizes={{'small':15,'medium':18,'large':21}};
+var origBg='{theme["btn_bg"]}';
+var activeBg='{theme["btn_hover_bg"]}';
+var origColor='{theme["btn_text"]}';
+var activeColor='{theme["btn_hover_text"]}';
+sizeBtns.forEach(function(btn){{
+btn.addEventListener('click',function(){{
+var size=btn.getAttribute('data-size-btn');
+codeEl.style.fontSize=sizes[size]+'px';
+sizeBtns.forEach(function(b){{
+b.style.background=origBg;
+b.style.color=origColor;
+}});
+btn.style.background=activeBg;
+btn.style.color=activeColor;
+}});
+}});
+}})();</script>'''
+
         # Build complete HTML with inline styles and data attribute for copy button
+        # v1.2.14: Include both copy script and size button script
         html = f'''<div style="{outer_style}" role="region" aria-label="Code display" data-code-container="true">
   <div style="{inner_style}">
     {header_html}
     <pre style="{pre_style}" role="code" aria-label="{language} code block"><code style="{code_style}">{highlighted_code}</code></pre>
   </div>
 {copy_script}
+{size_script}
 </div>'''
 
         return html
