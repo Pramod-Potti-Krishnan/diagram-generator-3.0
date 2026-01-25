@@ -38,6 +38,10 @@ v1.2.11: Fixed copy button cutoff + added text size options
 v1.2.12: Fixed copy button cutoff by using relative dimensions
         - Outer wrapper changed from fixed pixels to width:100%; height:100%
         - Element now adapts to Layout Service container size
+v1.2.13: Fixed HTML style fragments appearing as visible text
+        - Root cause: comment regex matched hex colors inside span attributes
+        - Solution: Two-pass tokenization (tokenize raw code, then escape, then render)
+        - Prevents regex patterns from seeing content inside HTML tags
 """
 
 import re
@@ -59,6 +63,11 @@ from models.atomic_models import (
 from settings import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Syntax highlighting token markers (null-byte delimited to avoid regex conflicts)
+# v1.2.13: Used for two-pass tokenization to prevent regex matching inside HTML tags
+HL_TOKEN_START = "\x00HL_"
+HL_TOKEN_END = "\x00_HL"
 
 # Text Service Configuration
 TEXT_SERVICE_URL = "https://web-production-5daf.up.railway.app"
@@ -327,7 +336,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.12"
+                    version="1.2.13"
                 ),
                 grid_position=position_data
             )
@@ -398,12 +407,11 @@ class CodeDisplayGenerator:
         # Get theme colors (fallback to github_dark if theme not found)
         theme = THEME_COLORS.get(color_theme, THEME_COLORS["github_dark"])
 
-        # Escape code for HTML
-        escaped_code = html_escape.escape(code)
-
-        # Apply syntax highlighting with inline colors
+        # v1.2.13: Pass raw code to highlighting - escaping now happens inside
+        # _highlight_code_inline after tokenization to prevent regex from matching
+        # hex colors inside span style attributes
         highlighted_code = self._highlight_code_inline(
-            escaped_code, language, theme, highlight_lines, line_number_start
+            code, language, theme, highlight_lines, line_number_start
         )
 
         # Header height
@@ -590,6 +598,184 @@ btn.style.borderColor=origBorder;
 
         return html
 
+    def _make_token(self, token_type: str, content: str) -> str:
+        """
+        Create a highlighting token placeholder.
+
+        v1.2.13: Tokens use null-byte delimiters that won't be matched by
+        subsequent regex patterns, preventing the cascade corruption bug.
+
+        Args:
+            token_type: Type of token (keyword, string, comment, number, function, variable)
+            content: The actual code content to wrap
+
+        Returns:
+            Token placeholder string
+        """
+        # Remove any null bytes from content (shouldn't happen, but safety first)
+        encoded = content.replace("\x00", "")
+        return f"{HL_TOKEN_START}{token_type}:{encoded}{HL_TOKEN_END}"
+
+    def _tokenize_line(self, line: str, language: str) -> str:
+        """
+        Pass 1: Replace syntax elements with tokens on RAW (unescaped) code.
+
+        v1.2.13: Order matters critically:
+        1. Comments FIRST (consume everything to EOL, preventing false matches)
+        2. Strings (before keywords can match inside them)
+        3. Decorators/annotations
+        4. Keywords
+        5. Numbers
+        6. Function calls
+
+        Args:
+            line: Raw line of code (NOT HTML-escaped)
+            language: Programming language
+
+        Returns:
+            Line with syntax elements replaced by tokens
+        """
+        if language in ['python', 'py']:
+            # 1. Comments FIRST (consume everything from # to EOL)
+            line = re.sub(r'(#.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings (before keywords can match inside them)
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            line = re.sub(r"('.*?')", lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Decorators
+            line = re.sub(r'(@\w+)', lambda m: self._make_token('function', m.group(1)), line)
+            # 4. Keywords
+            keywords = r'\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|yield|lambda|and|or|not|in|is|True|False|None|async|await|raise|pass|break|continue|global|nonlocal)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 5. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+            # 6. Function calls (word followed by open paren)
+            line = re.sub(r'\b(\w+)(\()', lambda m: self._make_token('function', m.group(1)) + m.group(2), line)
+
+        elif language in ['javascript', 'js', 'typescript', 'ts']:
+            # 1. Comments FIRST
+            line = re.sub(r'(//.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            line = re.sub(r"('.*?')", lambda m: self._make_token('string', m.group(1)), line)
+            line = re.sub(r'(`.*?`)', lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Keywords
+            keywords = r'\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|async|await|try|catch|finally|throw|new|this|super|typeof|instanceof|true|false|null|undefined|interface|type|enum|implements|private|public|protected|readonly)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 4. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+            # 5. Function calls
+            line = re.sub(r'\b(\w+)(\()', lambda m: self._make_token('function', m.group(1)) + m.group(2), line)
+
+        elif language in ['java']:
+            # 1. Comments FIRST
+            line = re.sub(r'(//.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Annotations
+            line = re.sub(r'(@\w+)', lambda m: self._make_token('function', m.group(1)), line)
+            # 4. Keywords
+            keywords = r'\b(public|private|protected|static|final|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|void|int|double|float|boolean|String|long|short|byte|char|null|true|false|this|super|abstract|synchronized|volatile|transient)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 5. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+            # 6. Function calls
+            line = re.sub(r'\b(\w+)(\()', lambda m: self._make_token('function', m.group(1)) + m.group(2), line)
+
+        elif language in ['go', 'golang']:
+            # 1. Comments FIRST
+            line = re.sub(r'(//.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            line = re.sub(r'(`.*?`)', lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Keywords
+            keywords = r'\b(func|package|import|var|const|type|struct|interface|map|chan|go|defer|return|if|else|for|range|switch|case|default|break|continue|fallthrough|select|nil|true|false|make|new|append|len|cap|copy|delete|panic|recover)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 4. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+            # 5. Function calls
+            line = re.sub(r'\b(\w+)(\()', lambda m: self._make_token('function', m.group(1)) + m.group(2), line)
+
+        elif language in ['rust']:
+            # 1. Comments FIRST
+            line = re.sub(r'(//.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Macros (before keywords to catch macro calls)
+            line = re.sub(r'(\w+!)', lambda m: self._make_token('function', m.group(1)), line)
+            # 4. Keywords
+            keywords = r'\b(fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|self|super|where|as|match|if|else|loop|while|for|in|break|continue|return|async|await|move|unsafe|extern|ref|type|dyn|true|false|Some|None|Ok|Err)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 5. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+            # 6. Function calls
+            line = re.sub(r'\b(\w+)(\()', lambda m: self._make_token('function', m.group(1)) + m.group(2), line)
+
+        elif language in ['sql']:
+            # 1. Comments FIRST (SQL uses --)
+            line = re.sub(r'(--.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r"('.*?')", lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Keywords (case insensitive)
+            keywords = r'\b(SELECT|FROM|WHERE|AND|OR|NOT|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|ALTER|DROP|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|CASCADE|DEFAULT|CHECK|UNIQUE|IN|LIKE|BETWEEN|IS|EXISTS|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line, flags=re.IGNORECASE)
+            # 4. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+
+        elif language in ['bash', 'sh', 'shell']:
+            # 1. Comments FIRST (bash uses #)
+            line = re.sub(r'(#.*)$', lambda m: self._make_token('comment', m.group(1)), line)
+            # 2. Strings
+            line = re.sub(r'(".*?")', lambda m: self._make_token('string', m.group(1)), line)
+            line = re.sub(r"('.*?')", lambda m: self._make_token('string', m.group(1)), line)
+            # 3. Variables (before keywords)
+            line = re.sub(r'(\$\w+)', lambda m: self._make_token('variable', m.group(1)), line)
+            line = re.sub(r'(\$\{[^}]+\})', lambda m: self._make_token('variable', m.group(1)), line)
+            # 4. Keywords
+            keywords = r'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|alias|unalias|echo|printf|read|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|xargs|curl|wget|chmod|chown|sudo|apt|yum|brew|npm|pip|git)\b'
+            line = re.sub(keywords, lambda m: self._make_token('keyword', m.group(1)), line)
+            # 5. Numbers
+            line = re.sub(r'\b(\d+\.?\d*)\b', lambda m: self._make_token('number', m.group(1)), line)
+
+        return line
+
+    def _render_tokens(self, line: str, theme: Dict[str, str]) -> str:
+        """
+        Pass 2: Replace tokens with styled spans after HTML escaping.
+
+        v1.2.13: This runs AFTER html_escape.escape(), so tokens are now
+        safe to replace with actual HTML span tags without risk of regex
+        matching content inside those tags.
+
+        Args:
+            line: HTML-escaped line containing token placeholders
+            theme: Theme color dictionary
+
+        Returns:
+            Line with tokens replaced by styled spans
+        """
+        token_styles = {
+            'keyword': (theme.get('keyword', '#ff7b72'), 'font-weight:500'),
+            'string': (theme.get('string', '#a5d6ff'), ''),
+            'comment': (theme.get('comment', '#8b949e'), 'font-style:italic'),
+            'number': (theme.get('number', '#79c0ff'), ''),
+            'function': (theme.get('function', '#d2a8ff'), ''),
+            'variable': (theme.get('variable', '#ffa657'), ''),
+        }
+
+        def replace_token(match):
+            token_type = match.group(1)
+            content = match.group(2)
+            color, extra_style = token_styles.get(token_type, (theme.get('text', '#c9d1d9'), ''))
+            style = f"color:{color}"
+            if extra_style:
+                style += f";{extra_style}"
+            return f'<span style="{style}">{content}</span>'
+
+        # Match tokens: \x00HL_type:content\x00_HL
+        # The token delimiters use null bytes which survive HTML escaping unchanged
+        pattern = re.escape(HL_TOKEN_START) + r'(\w+):(.+?)' + re.escape(HL_TOKEN_END)
+        return re.sub(pattern, replace_token, line, flags=re.DOTALL)
+
     def _highlight_code_inline(
         self,
         code: str,
@@ -599,13 +785,23 @@ btn.style.borderColor=origBorder;
         line_number_start: int = 1
     ) -> str:
         """
-        Apply syntax highlighting with inline color styles.
+        Apply syntax highlighting with inline color styles using two-pass tokenization.
 
-        v1.2.0: Uses inline style="" attributes instead of CSS classes
-        to ensure colors work when embedded in Layout Service.
+        v1.2.13: Complete rewrite to fix HTML style fragment leak bug.
+
+        The bug: Comment regex `(#.*?)$` was matching hex colors (e.g., #ff7b72)
+        inside previously-generated span style attributes, creating malformed HTML:
+        `<span style="color:<span style="color:#8b949e">#ff7b72...`
+
+        The fix: Two-pass tokenization
+        - Pass 1: Tokenize syntax on RAW code using null-byte delimited placeholders
+        - Pass 2: HTML-escape the tokenized line (tokens unaffected by escaping)
+        - Pass 3: Replace tokens with actual styled spans
+
+        This prevents regex patterns from ever seeing content inside HTML tags.
 
         Args:
-            code: HTML-escaped code string
+            code: RAW code string (NOT HTML-escaped - escaping happens here)
             language: Programming language
             theme: Theme color dictionary with keyword, string, comment, etc. colors
             highlight_lines: Optional list of line numbers to highlight
@@ -614,27 +810,22 @@ btn.style.borderColor=origBorder;
         Returns:
             Code with inline syntax highlighting styles
         """
-        # Get colors from theme
-        kw_color = theme.get("keyword", "#ff7b72")
-        str_color = theme.get("string", "#a5d6ff")
-        cmt_color = theme.get("comment", "#8b949e")
-        num_color = theme.get("number", "#79c0ff")
-        fn_color = theme.get("function", "#d2a8ff")
-        var_color = theme.get("variable", "#ffa657")
         line_hl_color = theme.get("line_highlight", "rgba(56,139,253,0.15)")
 
-        # Apply syntax highlighting per-line FIRST, then wrap with line highlight
-        # This prevents the syntax highlighting regex from corrupting the line highlight styles
         lines = code.split('\n')
         highlighted_lines = []
 
         for i, line in enumerate(lines):
-            # Apply syntax highlighting to this line
-            highlighted_line = self._apply_syntax_highlighting(
-                line, language, kw_color, str_color, cmt_color, num_color, fn_color, var_color
-            )
+            # Pass 1: Tokenize on raw code (before any HTML exists)
+            tokenized = self._tokenize_line(line, language)
 
-            # Then wrap with line highlight if needed
+            # Pass 2: HTML escape (tokens use null bytes, unaffected by escaping)
+            escaped = html_escape.escape(tokenized)
+
+            # Pass 3: Replace tokens with styled spans
+            highlighted_line = self._render_tokens(escaped, theme)
+
+            # Line highlighting (if requested) - applied AFTER syntax highlighting
             if highlight_lines:
                 line_num = i + line_number_start
                 if line_num in highlight_lines:
@@ -644,152 +835,6 @@ btn.style.borderColor=origBorder;
             highlighted_lines.append(highlighted_line)
 
         return '\n'.join(highlighted_lines)
-
-    def _apply_syntax_highlighting(
-        self,
-        line: str,
-        language: str,
-        kw_color: str,
-        str_color: str,
-        cmt_color: str,
-        num_color: str,
-        fn_color: str,
-        var_color: str
-    ) -> str:
-        """Apply syntax highlighting to a single line of code.
-
-        v1.2.5: Fixed order of operations - numbers must be applied FIRST
-        before keywords create spans containing hex color codes.
-        Order: Numbers -> Keywords -> Strings -> Comments -> Functions
-        """
-        # Python highlighting
-        if language in ['python', 'py']:
-            # Numbers FIRST (before any spans with hex colors exist)
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(def|class|if|else|elif|for|while|return|import|from|as|try|except|finally|with|yield|lambda|and|or|not|in|is|True|False|None|async|await|raise|pass|break|continue|global|nonlocal)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Decorators
-            line = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', line)
-
-            # Strings (double quotes)
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-            # Strings (single quotes)
-            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Function calls
-            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
-
-        elif language in ['javascript', 'js', 'typescript', 'ts']:
-            # Numbers FIRST
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(const|let|var|function|return|if|else|for|while|class|extends|import|export|from|async|await|try|catch|finally|throw|new|this|super|typeof|instanceof|true|false|null|undefined|interface|type|enum|implements|private|public|protected|readonly)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Strings
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
-            line = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Function calls
-            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
-
-        elif language in ['java']:
-            # Numbers FIRST
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(public|private|protected|static|final|class|interface|extends|implements|new|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|throws|import|package|void|int|double|float|boolean|String|long|short|byte|char|null|true|false|this|super|abstract|synchronized|volatile|transient)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Annotations
-            line = re.sub(r'(@\w+)', rf'<span style="color:{fn_color}">\1</span>', line)
-
-            # Strings
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Function calls
-            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
-
-        elif language in ['go', 'golang']:
-            # Numbers FIRST
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(func|package|import|var|const|type|struct|interface|map|chan|go|defer|return|if|else|for|range|switch|case|default|break|continue|fallthrough|select|nil|true|false|make|new|append|len|cap|copy|delete|panic|recover)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Strings
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-            line = re.sub(r'(`.*?`)', rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Function calls
-            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
-
-        elif language in ['rust']:
-            # Numbers FIRST
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(fn|let|mut|const|static|struct|enum|trait|impl|use|mod|pub|crate|self|super|where|as|match|if|else|loop|while|for|in|break|continue|return|async|await|move|unsafe|extern|ref|type|dyn|true|false|Some|None|Ok|Err)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Macros
-            line = re.sub(r'(\w+!)', rf'<span style="color:{fn_color}">\1</span>', line)
-
-            # Strings
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(//.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Function calls
-            line = re.sub(r'\b(\w+)(\()', rf'<span style="color:{fn_color}">\1</span>\2', line)
-
-        elif language in ['sql']:
-            # Numbers FIRST
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(SELECT|FROM|WHERE|AND|OR|NOT|INSERT|INTO|VALUES|UPDATE|SET|DELETE|CREATE|TABLE|ALTER|DROP|INDEX|JOIN|LEFT|RIGHT|INNER|OUTER|ON|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|DISTINCT|NULL|PRIMARY|KEY|FOREIGN|REFERENCES|CASCADE|DEFAULT|CHECK|UNIQUE|IN|LIKE|BETWEEN|IS|EXISTS|COUNT|SUM|AVG|MAX|MIN|CASE|WHEN|THEN|ELSE|END)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>',
-                          line, flags=re.IGNORECASE)
-
-            # Strings
-            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(--.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-        elif language in ['bash', 'sh', 'shell']:
-            # Numbers FIRST (bash doesn't typically highlight numbers, but for consistency)
-            line = re.sub(r'\b(\d+\.?\d*)\b', rf'<span style="color:{num_color}">\1</span>', line)
-
-            keywords = r'\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|exit|export|source|alias|unalias|echo|printf|read|cd|pwd|ls|mkdir|rm|cp|mv|cat|grep|sed|awk|find|xargs|curl|wget|chmod|chown|sudo|apt|yum|brew|npm|pip|git)\b'
-            line = re.sub(keywords, rf'<span style="color:{kw_color};font-weight:500">\1</span>', line)
-
-            # Strings
-            line = re.sub(r'(&quot;.*?&quot;)', rf'<span style="color:{str_color}">\1</span>', line)
-            line = re.sub(r"('.*?')", rf'<span style="color:{str_color}">\1</span>', line)
-
-            # Comments
-            line = re.sub(r'(#.*?)$', rf'<span style="color:{cmt_color};font-style:italic">\1</span>', line)
-
-            # Variables
-            line = re.sub(r'(\$\w+)', rf'<span style="color:{var_color}">\1</span>', line)
-            line = re.sub(r'(\$\{{[^}}]+\}})', rf'<span style="color:{var_color}">\1</span>', line)
-
-        return line
 
     # Note: _highlight_code and _get_theme_css methods removed in v1.2.0
     # These were replaced by _highlight_code_inline and THEME_COLORS dictionary
