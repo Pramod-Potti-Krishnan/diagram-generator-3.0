@@ -1,11 +1,17 @@
 #!/bin/bash
 #
-# Test Script: CODE_DISPLAY v1.2.7 - Sizing & Position Preset Showcase
-# Version: 1.2.7
+# Test Script: CODE_DISPLAY v1.2.8 - Sizing & Position Preset Showcase
+# Version: 1.2.8
 # Tests: 7 different configurations showcasing position presets, sizing, and copy button
 #
-# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.7) and publishes
+# This script tests the enhanced CODE_DISPLAY endpoint (v1.2.8) and publishes
 # code blocks with different position presets and sizes to Layout Service.
+#
+# v1.2.8 Changes:
+# - ALL positions now use Diagram Element API (not just right-side)
+# - Fixes element box wrapping issue for left-side positions
+# - Consistent rendering: all CODE_DISPLAY elements use iframe/srcdoc
+# - Copy buttons work correctly on ALL slides
 #
 # v1.2.7 Changes:
 # - Uses Diagram Element API with html_content field instead of ContentElement API
@@ -52,8 +58,8 @@ NC='\033[0m' # No Color
 
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.6 - Sizing & Preset Test"
-echo "  Testing Position Presets with Element Sizing"
+echo "  CODE_DISPLAY v1.2.8 - Sizing & Preset Test"
+echo "  All Positions Use Diagram Element API"
 echo "=============================================="
 echo "Diagram Service: $DIAGRAM_URL"
 echo "Layout Service:  $LAYOUT_URL"
@@ -103,10 +109,11 @@ echo ""
 # Tests position presets with different sizes
 # ============================================
 
-# Arrays to track right-positioned slides for element API insertion
+# Arrays to track ALL slides for Diagram Element API insertion
+# v1.2.8: ALL positions now use element API (not just right-side)
 # Format: "slide_index:start_col:width:height"
-declare -a RIGHT_POSITIONED_SLIDES
-declare -a RIGHT_POSITIONED_HTML
+declare -a ALL_POSITIONED_SLIDES
+declare -a ALL_POSITIONED_HTML
 
 # Configuration 1: GitHub Dark - full_content (1780x760 element = 30x13 grid - 2*10px margin)
 CONFIG_1_NAME="Full Content (1780x760)"
@@ -571,45 +578,38 @@ generate_slide() {
             esac
         fi
 
-        # Check if this is a right-side position that needs element API
-        local is_right_side=false
-        if is_right_side_position "$preset" "$start_col"; then
-            is_right_side=true
-            echo -e "  ${CYAN}Position: RIGHT-SIDE (will use element API)${NC}"
+        # v1.2.8: Calculate actual_start_col for ALL positions based on preset
+        # ALL slides now use the Diagram Element API for consistent rendering
+        if [ -z "$actual_start_col" ]; then
+            case "$preset" in
+                "full_content") actual_start_col=2 ;;
+                "left_half") actual_start_col=2 ;;
+                "left_third") actual_start_col=2 ;;
+                "right_half") actual_start_col=17 ;;
+                "right_third") actual_start_col=22 ;;
+                *) actual_start_col=2 ;;  # Default to left
+            esac
         fi
 
-        # Build C1-text slide JSON
-        # For right-side positions, use empty body - element will be added via API
-        if [ "$is_right_side" = true ]; then
-            C1_SLIDE="{
-                \"layout\": \"C1-text\",
-                \"content\": {
-                    \"slide_title\": \"$NAME_ESCAPED\",
-                    \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
-                    \"body\": \"\",
-                    \"footer_text\": \"CODE_DISPLAY v1.2.6 Sizing Test\",
-                    \"logo\": \" \"
-                }
-            }"
+        echo -e "  ${CYAN}Position: Will use Diagram Element API (grid-col: $actual_start_col)${NC}"
 
-            # Track for later element API insertion
-            # Calculate 0-based slide index (num-1)
-            local slide_idx=$((num - 1))
-            RIGHT_POSITIONED_SLIDES+=("$slide_idx:$actual_start_col:$width:13")
-            RIGHT_POSITIONED_HTML+=("$CODE_HTML")
-        else
-            # Left-side or full-width: use body content directly
-            C1_SLIDE="{
-                \"layout\": \"C1-text\",
-                \"content\": {
-                    \"slide_title\": \"$NAME_ESCAPED\",
-                    \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
-                    \"body\": $CODE_ESCAPED,
-                    \"footer_text\": \"CODE_DISPLAY v1.2.6 Sizing Test\",
-                    \"logo\": \" \"
-                }
-            }"
-        fi
+        # v1.2.8: ALL slides use empty body - element added via /diagrams API
+        # This ensures consistent rendering with proper element box wrapping
+        C1_SLIDE="{
+            \"layout\": \"C1-text\",
+            \"content\": {
+                \"slide_title\": \"$NAME_ESCAPED\",
+                \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
+                \"body\": \"\",
+                \"footer_text\": \"CODE_DISPLAY v1.2.8 Sizing Test\",
+                \"logo\": \" \"
+            }
+        }"
+
+        # Track ALL slides for Diagram Element API insertion
+        local slide_idx=$((num - 1))
+        ALL_POSITIONED_SLIDES+=("$slide_idx:$actual_start_col:$width:13")
+        ALL_POSITIONED_HTML+=("$CODE_HTML")
 
         # Append to slides array
         if [ -z "$C1_SLIDES" ]; then
@@ -645,7 +645,7 @@ generate_slide 7 "$CONFIG_7_NAME" "$CONFIG_7_THEME" "$CONFIG_7_LANG" "$CONFIG_7_
 echo "--- Creating Presentation via Layout Service ---"
 
 C1_REQUEST="{
-    \"title\": \"CODE_DISPLAY v1.2.4 - Sizing Fix Test - $TIMESTAMP\",
+    \"title\": \"CODE_DISPLAY v1.2.8 - All Positions Element API - $TIMESTAMP\",
     \"template_id\": \"L25\",
     \"slides\": [$C1_SLIDES]
 }"
@@ -668,21 +668,22 @@ if [ -n "$C1_PRES_ID" ] && [ "$C1_PRES_ID" != "null" ]; then
     echo "  URL: $C1_URL"
 
     # ============================================
-    # Add Right-Positioned Elements via Element API
+    # Add ALL CODE_DISPLAY Elements via Diagram API
+    # v1.2.8: ALL positions now use element API for consistent rendering
     # ============================================
-    if [ ${#RIGHT_POSITIONED_SLIDES[@]} -gt 0 ]; then
+    if [ ${#ALL_POSITIONED_SLIDES[@]} -gt 0 ]; then
         echo ""
-        echo "--- Adding Right-Positioned Elements via Element API ---"
-        echo "  ${#RIGHT_POSITIONED_SLIDES[@]} elements to add..."
+        echo "--- Adding ALL CODE_DISPLAY Elements via Diagram API ---"
+        echo "  ${#ALL_POSITIONED_SLIDES[@]} elements to add..."
         echo ""
 
         ELEMENT_SUCCESS=0
         ELEMENT_FAIL=0
 
-        for i in "${!RIGHT_POSITIONED_SLIDES[@]}"; do
+        for i in "${!ALL_POSITIONED_SLIDES[@]}"; do
             # Parse slide info: "slide_idx:start_col:width:height"
-            IFS=':' read -r slide_idx start_col width height <<< "${RIGHT_POSITIONED_SLIDES[$i]}"
-            html="${RIGHT_POSITIONED_HTML[$i]}"
+            IFS=':' read -r slide_idx start_col width height <<< "${ALL_POSITIONED_SLIDES[$i]}"
+            html="${ALL_POSITIONED_HTML[$i]}"
 
             echo -e "  ${BLUE}Adding element to slide $((slide_idx + 1))${NC} (grid-column: $start_col/$(($start_col + $width)))"
 
@@ -712,7 +713,7 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CODE_DISPLAY v1.2.4 - Sizing & Position Presets</title>
+    <title>CODE_DISPLAY v1.2.8 - Sizing & Position Presets</title>
     <style>
         * { box-sizing: border-box; }
         body {
@@ -829,8 +830,8 @@ cat > "$OUTPUT_DIR/preview_themes.html" << EOF
 </head>
 <body>
     <div class="header">
-        <h1>CODE_DISPLAY<span class="version-badge">v1.2.3</span></h1>
-        <p class="subtitle">Sizing Fix - Element Dimensions = (Grid*60) - (2*Margin)</p>
+        <h1>CODE_DISPLAY<span class="version-badge">v1.2.8</span></h1>
+        <p class="subtitle">All Positions Use Diagram Element API</p>
         <a href="$C1_URL" target="_blank" class="presentation-link">View Full Presentation</a>
     </div>
 
@@ -891,15 +892,15 @@ echo "--- Generating Test Report ---"
 cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "test_name": "code_display_v1.2.6_sizing",
-    "version": "1.2.6",
+    "test_name": "code_display_v1.2.8_sizing",
+    "version": "1.2.8",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
     "custom_positions_tested": ["start_col=12 (right 2/3)", "start_col=24 (narrow right)"],
     "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760", "1180x760", "464x764"],
     "themes_tested": ["github_dark", "monokai", "dracula", "solarized_dark", "github_light"],
     "features_tested": [
         "position_preset configuration",
-        "custom start_col positioning (right-side)",
+        "custom start_col positioning",
         "element-based sizing: (grid*60)-(2*margin)",
         "footer protection: end_row clamped to 17",
         "color_theme configuration",
@@ -907,9 +908,9 @@ cat > "$OUTPUT_DIR/test_report.json" << EOF
         "custom header_text",
         "filename display",
         "syntax highlighting per theme",
-        "flex:1 code area height (v1.2.6)",
-        "script-based copy button for all positions (v1.2.6)",
-        "ContentElement API for right-side positions (v1.2.6)"
+        "flex:1 code area height",
+        "script-based copy button for all positions",
+        "Diagram Element API for ALL positions (v1.2.8)"
     ],
     "results": {
         "success": $SUCCESS_COUNT,
@@ -936,7 +937,7 @@ echo "Test Report: $OUTPUT_DIR/test_report.json"
 # ============================================
 echo ""
 echo "=============================================="
-echo "  CODE_DISPLAY v1.2.6 SIZING TEST RESULTS"
+echo "  CODE_DISPLAY v1.2.8 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
 echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"
