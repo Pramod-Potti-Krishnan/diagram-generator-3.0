@@ -46,6 +46,10 @@ v1.2.14: Added interactive text size buttons
         - Three buttons (A small, A medium, A large) in header controls
         - Sizes: 15px, 18px, 21px with medium as default
         - Dynamic font-size change on click
+v1.2.16: Increased position preset heights by 1 row
+        - All presets now use gridHeight=14 (was 13) for more content space
+        - top_half/bottom_half use gridHeight=7 (was 6)
+        - Footer protection updated to allow end_row=18
 """
 
 import re
@@ -340,7 +344,7 @@ class CodeDisplayGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.14"
+                    version="1.2.16"
                 ),
                 grid_position=position_data
             )
@@ -528,7 +532,7 @@ class CodeDisplayGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
-        # v1.2.15: Use pixel dimensions - percentages collapse in iframes
+        # v1.2.16: Use pixel dimensions - percentages collapse in iframes
         # The calculated element_width/element_height are the correct pixel sizes
         outer_style = (
             f"width:{element_width}px;"
@@ -1109,9 +1113,9 @@ echo "Deployment complete!"'''
         width = request.gridWidth
         height = request.gridHeight
 
-        # v1.2.3: FOOTER PROTECTION - Row 18 is reserved for footer
-        # Clamp end_row to never exceed 17 (CSS Grid uses exclusive end)
-        end_row = min(start_row + height, 17)
+        # v1.2.16: Allow content to use row 17 (end_row=18 in CSS Grid exclusive end)
+        # Row 18 can be used for content when footer is not present
+        end_row = min(start_row + height, 18)
         end_col = min(start_col + width, 33)
 
         # Recalculate actual height if clamped

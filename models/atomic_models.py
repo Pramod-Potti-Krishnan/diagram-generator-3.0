@@ -15,6 +15,9 @@ v1.2.3: Fixed element box sizing and footer protection
 v1.2.11: Added text_size preset field for convenience
         - TextSizeType: "small", "medium", "large"
         - "small" = base font_size (14px), "medium" = +20% (~17px), "large" = +35% (~19px)
+v1.2.16: Increased position preset heights by 1 row
+        - full_content, left_half, right_half, left_third, center_third, right_third: 13→14 rows
+        - top_half, bottom_half: 6→7 rows
 """
 
 from typing import Dict, List, Optional, Any, Literal
@@ -25,18 +28,18 @@ from pydantic import BaseModel, Field, model_validator
 # Position Preset Definitions
 # =============================================================================
 
-# v1.2.3: All heights adjusted to avoid footer (row 18)
-# Row 18 is reserved for footer, so max end_row = 17
-# With start_row=4, max height = 17 - 4 = 13 rows
+# v1.2.16: Heights increased by 1 row for more content space
+# Row 18 can be used for content (footer is optional/configurable)
+# With start_row=4, max height = 18 - 4 = 14 rows
 POSITION_PRESETS = {
-    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 13},
-    "left_half": {"start_col": 2, "start_row": 4, "gridWidth": 15, "gridHeight": 13},
-    "right_half": {"start_col": 17, "start_row": 4, "gridWidth": 15, "gridHeight": 13},
-    "left_third": {"start_col": 2, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
-    "center_third": {"start_col": 12, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
-    "right_third": {"start_col": 22, "start_row": 4, "gridWidth": 10, "gridHeight": 13},
-    "top_half": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 6},
-    "bottom_half": {"start_col": 2, "start_row": 11, "gridWidth": 30, "gridHeight": 6},
+    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+    "left_half": {"start_col": 2, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
+    "right_half": {"start_col": 17, "start_row": 4, "gridWidth": 15, "gridHeight": 14},
+    "left_third": {"start_col": 2, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "center_third": {"start_col": 12, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "right_third": {"start_col": 22, "start_row": 4, "gridWidth": 10, "gridHeight": 14},
+    "top_half": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 7},
+    "bottom_half": {"start_col": 2, "start_row": 11, "gridWidth": 30, "gridHeight": 7},
 }
 
 # Color theme type definition
