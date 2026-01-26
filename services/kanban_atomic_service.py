@@ -21,6 +21,9 @@ v1.2.0: Fixed column stretching with flex:1 1 0, added theme_mode for light/dark
 v1.3.0: Added R/A/G status indicator on card right side, edit dialog prompts for
         title/assignee/status, CSS variable light/dark mode for column headings
         using var(--text-primary) and var(--text-secondary)
+v1.4.0: Full CSS variable theming with postMessage sync for live dark/light mode
+        switching. All element styles now use CSS variables. Layout Service can
+        broadcast theme changes and iframes will update instantly without regeneration.
 """
 
 import logging
@@ -125,11 +128,76 @@ class KanbanAtomicGenerator:
 
     Generates interactive Kanban board HTML with inline styles
     for Layout Service compatibility.
+
+    v1.4.0: Added CSS variable theming with postMessage sync for live dark/light mode switching
     """
 
     def __init__(self):
         """Initialize the Kanban board generator."""
         pass
+
+    def _generate_theme_css(self) -> str:
+        """
+        Generate CSS variables for theme support with light defaults and dark overrides.
+
+        v1.4.0: Enables live dark/light mode switching via Layout Service postMessage.
+        CSS variables are updated by the theme sync script when parent broadcasts changes.
+
+        Returns:
+            str: Style block with CSS variable definitions
+        """
+        return '''<style>
+/* Deckster Theme Variables - v1.4.0 */
+:root {
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-body: #1F2937;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --card-border: #E5E7EB;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    --add-btn-border: #D1D5DB;
+    --add-btn-text: #6B7280;
+    --count-bg: rgba(229, 231, 235, 0.8);
+    --count-text: #6B7280;
+    --accent: #8B5CF6;
+}
+:root.theme-dark {
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+    --text-body: #F9FAFB;
+    --card-bg: rgba(75, 85, 99, 0.85);
+    --card-border: rgba(107, 114, 128, 0.6);
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --add-btn-border: rgba(107, 114, 128, 0.6);
+    --add-btn-text: #D1D5DB;
+    --count-bg: rgba(75, 85, 99, 0.8);
+    --count-text: #D1D5DB;
+    --accent: #A78BFA;
+}
+</style>'''
+
+    def _generate_theme_sync_script(self) -> str:
+        """
+        Generate postMessage listener for theme synchronization from Layout Service.
+
+        v1.4.0: Listens for 'deckster-theme-sync' messages and updates CSS variables
+        to enable live dark/light mode switching without iframe regeneration.
+
+        Returns:
+            str: Script block with postMessage listener
+        """
+        return '''<script>
+(function(){
+    window.addEventListener('message',function(e){
+        if(!e.data||e.data.type!=='deckster-theme-sync')return;
+        var m=e.data.mode,v=e.data.variables,r=document.documentElement;
+        if(!m||!v)return;
+        for(var k in v)if(v.hasOwnProperty(k))r.style.setProperty(k,v[k]);
+        r.classList.toggle('theme-dark',m==='dark');
+        r.classList.toggle('theme-light',m==='light');
+    });
+})();
+</script>'''
 
     async def generate(
         self,
@@ -220,7 +288,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.3.0"
+                    version="1.4.0"
                 ),
                 grid_position=position_data
             )
@@ -292,11 +360,17 @@ class KanbanAtomicGenerator:
             f"font-family:'Inter', 'Segoe UI', 'Roboto', sans-serif;"
         )
 
-        html = f'''<div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true">
+        # v1.4.0: Add theme CSS and sync script for live dark/light mode switching
+        theme_css = self._generate_theme_css()
+        theme_sync_script = self._generate_theme_sync_script()
+
+        html = f'''{theme_css}
+<div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true">
   <div style="{columns_container_style}">
     {columns_html}
   </div>
   {interactive_js}
+  {theme_sync_script}
 </div>'''
 
         return html
@@ -341,22 +415,21 @@ class KanbanAtomicGenerator:
                 f"flex-shrink:0;"
             )
 
-            # Column name style - v1.3.0: Use CSS variable for automatic light/dark mode
-            # var(--text-primary, fallback) allows Layout Service to toggle via postMessage
+            # Column name style - v1.4.0: Use CSS variable for live dark/light mode sync
             name_style = (
                 f"font-size:12px;"
                 f"font-weight:700;"
                 f"text-transform:uppercase;"
                 f"letter-spacing:0.08em;"
-                f"color:var(--text-primary, #111827);"
+                f"color:var(--text-primary);"
             )
 
-            # Count badge style - v1.3.0: Use CSS variable for automatic light/dark mode
+            # Count badge style - v1.4.0: Use CSS variables for live dark/light mode sync
             count_style = (
                 f"font-size:11px;"
                 f"font-weight:600;"
-                f"background:{theme_colors['count_bg']};"
-                f"color:var(--text-secondary, #6B7280);"
+                f"background:var(--count-bg);"
+                f"color:var(--count-text);"
                 f"padding:2px 8px;"
                 f"border-radius:9999px;"
                 f"min-width:20px;"
@@ -371,15 +444,15 @@ class KanbanAtomicGenerator:
                 f"min-height:0;"
             )
 
-            # Add card button style
+            # Add card button style - v1.4.0: Use CSS variables for live dark/light mode sync
             add_btn_style = (
                 f"width:calc(100% - 24px);"
                 f"margin:8px 12px 12px 12px;"
                 f"padding:10px;"
                 f"border-radius:8px;"
-                f"border:2px dashed {theme_colors['add_btn_border']};"
+                f"border:2px dashed var(--add-btn-border);"
                 f"background:transparent;"
-                f"color:{theme_colors['add_btn_text']};"
+                f"color:var(--add-btn-text);"
                 f"font-size:13px;"
                 f"font-weight:500;"
                 f"cursor:pointer;"
@@ -426,12 +499,12 @@ class KanbanAtomicGenerator:
         for i, card in enumerate(cards):
             priority_color = PRIORITY_COLORS.get(card.priority, PRIORITY_COLORS[""])
 
-            # Card style
+            # Card style - v1.4.0: Use CSS variables for live dark/light mode sync
             card_style = (
-                f"background:{theme_colors['card_bg']};"
+                f"background:var(--card-bg);"
                 f"border-radius:8px;"
-                f"border:1px solid {theme_colors['card_border']};"
-                f"box-shadow:{theme_colors['card_shadow']};"
+                f"border:1px solid var(--card-border);"
+                f"box-shadow:var(--card-shadow);"
                 f"overflow:hidden;"
                 f"cursor:grab;"
                 f"transition:transform 0.15s ease, box-shadow 0.15s ease;"
@@ -454,16 +527,16 @@ class KanbanAtomicGenerator:
                 f"padding:12px;"
             )
 
-            # Title style
+            # Title style - v1.4.0: Use CSS variable for live dark/light mode sync
             title_style = (
                 f"font-size:14px;"
                 f"font-weight:500;"
-                f"color:{theme_colors['text']};"
+                f"color:var(--text-body);"
                 f"line-height:1.4;"
                 f"margin:0;"
             )
 
-            # Assignee HTML
+            # Assignee HTML - v1.4.0: Use CSS variable for accent color
             assignee_html = ""
             if card.assignee:
                 initials = card.assignee[:2].upper()
@@ -471,7 +544,7 @@ class KanbanAtomicGenerator:
                     f"width:24px;"
                     f"height:24px;"
                     f"border-radius:50%;"
-                    f"background:{theme_colors['accent']};"
+                    f"background:var(--accent);"
                     f"color:white;"
                     f"font-size:11px;"
                     f"font-weight:600;"
@@ -520,8 +593,8 @@ class KanbanAtomicGenerator:
       {assignee_html}
     </div>
     {status_html}
-    <button class="kanban-card-edit" style="{edit_btn_style}" onclick="editCard(this, event)">
-      <svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24">
+    <button class="kanban-card-edit" style="{edit_btn_style}color:var(--add-btn-text);" onclick="editCard(this, event)">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
       </svg>
     </button>
@@ -652,10 +725,10 @@ button:hover {{
       if (assigneeEl) {{
         assigneeEl.textContent = initials;
       }} else {{
-        // Create new assignee badge
+        // Create new assignee badge - v1.4.0: Use CSS variable for accent
         var contentDiv = card.querySelector('.kanban-content');
         if (contentDiv) {{
-          var assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:{theme_colors['accent']};color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+          var assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
           contentDiv.insertAdjacentHTML('beforeend', assigneeHtml);
         }}
       }}
@@ -697,12 +770,12 @@ button:hover {{
     var newTitle = prompt('Enter card title:');
     if (!newTitle || !newTitle.trim()) return;
 
-    // Prompt 2: Assignee (optional)
+    // Prompt 2: Assignee (optional) - v1.4.0: Use CSS variable for accent
     var assignee = prompt('Assignee initials (optional, leave empty to skip):');
     var assigneeHtml = '';
     if (assignee && assignee.trim()) {{
       var initials = assignee.trim().substring(0, 2).toUpperCase();
-      assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:{theme_colors['accent']};color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+      assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
     }}
 
     // Prompt 3: Status (optional, v1.3.0)
@@ -716,16 +789,17 @@ button:hover {{
       }}
     }}
 
-    var cardHtml = '<div class="kanban-card" style="background:{theme_colors['card_bg']};border-radius:8px;border:1px solid {theme_colors['card_border']};box-shadow:{theme_colors['card_shadow']};overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
+    // v1.4.0: Use CSS variables for live dark/light mode sync
+    var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
       '<div style="display:flex;">' +
       '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
       '<div class="kanban-content" style="flex:1;padding:12px;">' +
-      '<p class="kanban-title" style="font-size:14px;font-weight:500;color:{theme_colors['text']};line-height:1.4;">' + newTitle.trim() + '</p>' +
+      '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;">' + newTitle.trim() + '</p>' +
       assigneeHtml +
       '</div>' +
       statusHtml +
-      '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;" onclick="editCard(this, event)">' +
-      '<svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
+      '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;color:var(--add-btn-text);" onclick="editCard(this, event)">' +
+      '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
       '</button>' +
       '</div></div>';
     cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
