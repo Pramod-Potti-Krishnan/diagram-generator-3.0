@@ -24,6 +24,9 @@ v1.3.0: Added R/A/G status indicator on card right side, edit dialog prompts for
 v1.4.0: Full CSS variable theming with postMessage sync for live dark/light mode
         switching. All element styles now use CSS variables. Layout Service can
         broadcast theme changes and iframes will update instantly without regeneration.
+v1.5.0: Dark mode improvements - solid darker column colors instead of transparent
+        pastels, white Add Card button border. Replaced sequential prompt() dialogs
+        with single modal popup containing all fields (task name, initials, status).
 """
 
 import logging
@@ -68,15 +71,15 @@ KANBAN_COLORS_LIGHT = {
     "count_text": "#6B7280",
 }
 
-# Dark mode colors - same pastel backgrounds (slightly more transparent), light text
-# Pastel colors remain visible against dark slide backgrounds
+# Dark mode colors - solid darker backgrounds for visibility against dark slides
+# v1.5.0: Changed from transparent pastels to solid darker colors
 KANBAN_COLORS_DARK = {
     "column_colors": [
-        "rgba(243, 244, 246, 0.5)",   # gray pastel, slightly more transparent
-        "rgba(219, 234, 254, 0.5)",   # blue pastel
-        "rgba(254, 243, 199, 0.5)",   # yellow pastel
-        "rgba(209, 250, 229, 0.5)",   # green pastel
-        "rgba(252, 231, 243, 0.5)",   # pink pastel
+        "#374151",   # dark gray (gray-700)
+        "#1E3A5F",   # dark blue
+        "#78350F",   # dark amber/brown
+        "#064E3B",   # dark green (emerald-900)
+        "#701A4D",   # dark pink/magenta
     ],
     "header": "#FFFFFF",              # White header text
     "text": "#F9FAFB",                # Light card text
@@ -84,7 +87,7 @@ KANBAN_COLORS_DARK = {
     "card_border": "rgba(107, 114, 128, 0.6)",
     "card_shadow": "0 1px 3px rgba(0,0,0,0.3)",
     "accent": "#A78BFA",
-    "add_btn_border": "rgba(107, 114, 128, 0.6)",
+    "add_btn_border": "#FFFFFF",      # v1.5.0: White border (same as text)
     "add_btn_text": "#D1D5DB",
     "count_bg": "rgba(75, 85, 99, 0.8)",
     "count_text": "#D1D5DB",
@@ -130,6 +133,7 @@ class KanbanAtomicGenerator:
     for Layout Service compatibility.
 
     v1.4.0: Added CSS variable theming with postMessage sync for live dark/light mode switching
+    v1.5.0: Dark mode solid colors, white button border, modal dialog for add/edit
     """
 
     def __init__(self):
@@ -168,7 +172,7 @@ class KanbanAtomicGenerator:
     --card-bg: rgba(75, 85, 99, 0.85);
     --card-border: rgba(107, 114, 128, 0.6);
     --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    --add-btn-border: rgba(107, 114, 128, 0.6);
+    --add-btn-border: #FFFFFF;
     --add-btn-text: #D1D5DB;
     --count-bg: rgba(75, 85, 99, 0.8);
     --count-text: #D1D5DB;
@@ -198,6 +202,48 @@ class KanbanAtomicGenerator:
     });
 })();
 </script>'''
+
+    def _generate_modal_html(self) -> str:
+        """
+        Generate reusable modal dialog HTML for add/edit card.
+
+        v1.5.0: Replaces sequential prompt() calls with a single modal
+        containing all fields: task name, initials, and status.
+
+        Returns:
+            str: Modal HTML structure with CSS variable theming
+        """
+        return '''
+<div id="kanban-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border-radius:12px;padding:24px;min-width:320px;max-width:400px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);border:1px solid var(--card-border);">
+    <h3 id="modal-title" style="margin:0 0 20px 0;font-size:18px;font-weight:600;color:var(--text-primary);">Edit Card</h3>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Task Name</label>
+      <input id="modal-task-name" type="text" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:transparent;color:var(--text-body);box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Assignee Initials</label>
+      <input id="modal-initials" type="text" maxlength="2" placeholder="e.g. JD" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:transparent;color:var(--text-body);box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+    </div>
+
+    <div style="margin-bottom:24px;">
+      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Status</label>
+      <select id="modal-status" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text-body);box-sizing:border-box;outline:none;cursor:pointer;">
+        <option value="">None</option>
+        <option value="green">Green - On Track</option>
+        <option value="amber">Amber - At Risk</option>
+        <option value="red">Red - Blocked</option>
+      </select>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;gap:12px;">
+      <button id="modal-cancel" style="padding:10px 20px;border:1px solid var(--card-border);border-radius:8px;background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;">Cancel</button>
+      <button id="modal-save" style="padding:10px 20px;border:none;border-radius:8px;background:var(--accent);color:white;font-size:14px;font-weight:500;cursor:pointer;">Save</button>
+    </div>
+  </div>
+</div>'''
 
     async def generate(
         self,
@@ -288,7 +334,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.4.0"
+                    version="1.5.0"
                 ),
                 grid_position=position_data
             )
@@ -364,7 +410,11 @@ class KanbanAtomicGenerator:
         theme_css = self._generate_theme_css()
         theme_sync_script = self._generate_theme_sync_script()
 
+        # v1.5.0: Add modal dialog for add/edit card
+        modal_html = self._generate_modal_html()
+
         html = f'''{theme_css}
+{modal_html}
 <div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true">
   <div style="{columns_container_style}">
     {columns_html}
@@ -604,7 +654,12 @@ class KanbanAtomicGenerator:
         return "\n".join(html_parts)
 
     def _generate_interactive_scripts(self, theme_colors: Dict[str, Any]) -> str:
-        """Generate JavaScript for drag-and-drop and add/edit card functionality with assignee support."""
+        """
+        Generate JavaScript for drag-and-drop and add/edit card functionality.
+
+        v1.5.0: Replaced sequential prompt() calls with a single modal dialog.
+        Modal contains all fields: task name, initials, and status dropdown.
+        """
         return f'''<style>
 .kanban-card:hover {{
   transform: translateY(-2px);
@@ -627,6 +682,12 @@ class KanbanAtomicGenerator:
 }}
 button:hover {{
   opacity: 0.8;
+}}
+#modal-save:hover {{
+  filter: brightness(1.1);
+}}
+#modal-cancel:hover {{
+  background: rgba(0,0,0,0.05);
 }}
 </style>
 <script>
@@ -689,7 +750,7 @@ button:hover {{
     }});
   }}
 
-  // Status color mapping for v1.3.0
+  // Status color mapping
   var STATUS_COLORS = {{
     'green': '#10B981',
     'amber': '#F59E0B',
@@ -697,134 +758,184 @@ button:hover {{
     '': 'transparent'
   }};
 
-  // Global functions for onclick handlers
+  // v1.5.0: Modal-based edit card function
   window.editCard = function(btn, e) {{
     if (e) e.stopPropagation();
     var card = btn.closest('.kanban-card');
     var titleEl = card.querySelector('.kanban-title');
     var assigneeEl = card.querySelector('.kanban-assignee');
     var statusEl = card.querySelector('.kanban-status');
-    var currentText = titleEl.textContent;
-    var currentAssignee = assigneeEl ? assigneeEl.textContent : '';
-    var currentStatus = statusEl ? (statusEl.dataset.status || '') : '';
 
-    // Prompt 1: Title
-    var newText = prompt('Edit card title:', currentText);
-    if (newText === null) return; // Cancelled
+    // Populate modal with current values
+    document.getElementById('modal-title').textContent = 'Edit Card';
+    document.getElementById('modal-task-name').value = titleEl.textContent;
+    document.getElementById('modal-initials').value = assigneeEl ? assigneeEl.textContent : '';
+    document.getElementById('modal-status').value = statusEl ? (statusEl.dataset.status || '') : '';
 
-    if (newText && newText.trim()) {{
-      titleEl.textContent = newText.trim();
-    }}
+    // Show modal
+    var modal = document.getElementById('kanban-modal');
+    modal.style.display = 'flex';
+    modal.dataset.mode = 'edit';
+    modal._targetCard = card;
 
-    // Prompt 2: Assignee (initials)
-    var newAssignee = prompt('Assignee initials (leave empty to remove):', currentAssignee);
-    if (newAssignee === null) return; // Cancelled
-
-    if (newAssignee && newAssignee.trim()) {{
-      var initials = newAssignee.trim().substring(0, 2).toUpperCase();
-      if (assigneeEl) {{
-        assigneeEl.textContent = initials;
-      }} else {{
-        // Create new assignee badge - v1.4.0: Use CSS variable for accent
-        var contentDiv = card.querySelector('.kanban-content');
-        if (contentDiv) {{
-          var assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
-          contentDiv.insertAdjacentHTML('beforeend', assigneeHtml);
-        }}
-      }}
-    }} else if (assigneeEl) {{
-      // Remove assignee if cleared
-      assigneeEl.remove();
-    }}
-
-    // Prompt 3: Status (v1.3.0)
-    var newStatus = prompt('Status (green/amber/red, leave empty to remove):', currentStatus);
-    if (newStatus === null) return; // Cancelled
-
-    newStatus = newStatus.toLowerCase().trim();
-    if (newStatus && (newStatus === 'green' || newStatus === 'amber' || newStatus === 'red')) {{
-      var statusColor = STATUS_COLORS[newStatus];
-      if (statusEl) {{
-        statusEl.style.background = statusColor;
-        statusEl.dataset.status = newStatus;
-      }} else {{
-        // Create new status indicator (insert before edit button)
-        var innerDiv = card.querySelector('div[style*="display:flex"]');
-        var editBtn = card.querySelector('.kanban-card-edit');
-        if (innerDiv && editBtn) {{
-          var statusHtml = '<div class="kanban-status" data-status="' + newStatus + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
-          editBtn.insertAdjacentHTML('beforebegin', statusHtml);
-        }}
-      }}
-    }} else if (statusEl) {{
-      // Remove status if cleared
-      statusEl.remove();
-    }}
+    document.getElementById('modal-task-name').focus();
   }};
 
+  // v1.5.0: Modal-based add card function
   window.addCard = function(btn) {{
     var column = btn.closest('.kanban-column');
-    var cardsContainer = column.querySelector('.kanban-cards-list');
 
-    // Prompt 1: Title
-    var newTitle = prompt('Enter card title:');
-    if (!newTitle || !newTitle.trim()) return;
+    // Clear modal fields
+    document.getElementById('modal-title').textContent = 'Add Card';
+    document.getElementById('modal-task-name').value = '';
+    document.getElementById('modal-initials').value = '';
+    document.getElementById('modal-status').value = '';
 
-    // Prompt 2: Assignee (optional) - v1.4.0: Use CSS variable for accent
-    var assignee = prompt('Assignee initials (optional, leave empty to skip):');
-    var assigneeHtml = '';
-    if (assignee && assignee.trim()) {{
-      var initials = assignee.trim().substring(0, 2).toUpperCase();
-      assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
-    }}
+    // Show modal
+    var modal = document.getElementById('kanban-modal');
+    modal.style.display = 'flex';
+    modal.dataset.mode = 'add';
+    modal._targetColumn = column;
 
-    // Prompt 3: Status (optional, v1.3.0)
-    var status = prompt('Status (green/amber/red, leave empty to skip):');
-    var statusHtml = '';
-    if (status && status.trim()) {{
-      status = status.toLowerCase().trim();
-      if (status === 'green' || status === 'amber' || status === 'red') {{
-        var statusColor = STATUS_COLORS[status];
-        statusHtml = '<div class="kanban-status" data-status="' + status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
-      }}
-    }}
-
-    // v1.4.0: Use CSS variables for live dark/light mode sync
-    var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
-      '<div style="display:flex;">' +
-      '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
-      '<div class="kanban-content" style="flex:1;padding:12px;">' +
-      '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;">' + newTitle.trim() + '</p>' +
-      assigneeHtml +
-      '</div>' +
-      statusHtml +
-      '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;color:var(--add-btn-text);" onclick="editCard(this, event)">' +
-      '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
-      '</button>' +
-      '</div></div>';
-    cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
-
-    // Re-init drag for new card
-    var newCard = cardsContainer.lastElementChild;
-    newCard.addEventListener('dragstart', function(e) {{
-      draggedCard = newCard;
-      newCard.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', '');
-    }});
-    newCard.addEventListener('dragend', function() {{
-      newCard.classList.remove('dragging');
-      container.querySelectorAll('.kanban-cards').forEach(function(c) {{ c.classList.remove('drag-over'); }});
-      draggedCard = null;
-    }});
-    updateColumnCounts();
+    document.getElementById('modal-task-name').focus();
   }};
+
+  // v1.5.0: Modal event handlers
+  function initModal() {{
+    var modal = document.getElementById('kanban-modal');
+    if (!modal) return;
+
+    // Cancel button
+    document.getElementById('modal-cancel').addEventListener('click', function() {{
+      modal.style.display = 'none';
+    }});
+
+    // Save button
+    document.getElementById('modal-save').addEventListener('click', function() {{
+      var taskName = document.getElementById('modal-task-name').value.trim();
+      var initials = document.getElementById('modal-initials').value.trim().toUpperCase().substring(0, 2);
+      var status = document.getElementById('modal-status').value;
+
+      if (!taskName) {{
+        document.getElementById('modal-task-name').focus();
+        return;
+      }}
+
+      if (modal.dataset.mode === 'edit') {{
+        // Update existing card
+        var card = modal._targetCard;
+        var titleEl = card.querySelector('.kanban-title');
+        var contentDiv = card.querySelector('.kanban-content');
+        var assigneeEl = card.querySelector('.kanban-assignee');
+        var statusEl = card.querySelector('.kanban-status');
+
+        // Update title
+        titleEl.textContent = taskName;
+
+        // Handle assignee
+        if (initials) {{
+          if (assigneeEl) {{
+            assigneeEl.textContent = initials;
+          }} else {{
+            var assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+            contentDiv.insertAdjacentHTML('beforeend', assigneeHtml);
+          }}
+        }} else if (assigneeEl) {{
+          assigneeEl.remove();
+        }}
+
+        // Handle status
+        if (status) {{
+          var statusColor = STATUS_COLORS[status];
+          if (statusEl) {{
+            statusEl.style.background = statusColor;
+            statusEl.dataset.status = status;
+          }} else {{
+            var editBtn = card.querySelector('.kanban-card-edit');
+            if (editBtn) {{
+              var statusHtml = '<div class="kanban-status" data-status="' + status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
+              editBtn.insertAdjacentHTML('beforebegin', statusHtml);
+            }}
+          }}
+        }} else if (statusEl) {{
+          statusEl.remove();
+        }}
+
+      }} else {{
+        // Create new card
+        var column = modal._targetColumn;
+        var cardsContainer = column.querySelector('.kanban-cards-list');
+
+        var assigneeHtml = '';
+        if (initials) {{
+          assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+        }}
+
+        var statusHtml = '';
+        if (status) {{
+          var statusColor = STATUS_COLORS[status];
+          statusHtml = '<div class="kanban-status" data-status="' + status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
+        }}
+
+        var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
+          '<div style="display:flex;">' +
+          '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
+          '<div class="kanban-content" style="flex:1;padding:12px;">' +
+          '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;margin:0;">' + taskName + '</p>' +
+          assigneeHtml +
+          '</div>' +
+          statusHtml +
+          '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;color:var(--add-btn-text);" onclick="editCard(this, event)">' +
+          '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
+          '</button>' +
+          '</div></div>';
+        cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+
+        // Re-init drag for new card
+        var newCard = cardsContainer.lastElementChild;
+        newCard.addEventListener('dragstart', function(e) {{
+          draggedCard = newCard;
+          newCard.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', '');
+        }});
+        newCard.addEventListener('dragend', function() {{
+          newCard.classList.remove('dragging');
+          container.querySelectorAll('.kanban-cards').forEach(function(c) {{ c.classList.remove('drag-over'); }});
+          draggedCard = null;
+        }});
+        updateColumnCounts();
+      }}
+
+      modal.style.display = 'none';
+    }});
+
+    // Close on backdrop click
+    modal.addEventListener('click', function(e) {{
+      if (e.target === modal) modal.style.display = 'none';
+    }});
+
+    // Close on Escape key
+    document.addEventListener('keydown', function(e) {{
+      if (e.key === 'Escape' && modal.style.display === 'flex') {{
+        modal.style.display = 'none';
+      }}
+      // Save on Enter key (if not in textarea)
+      if (e.key === 'Enter' && modal.style.display === 'flex' && e.target.tagName !== 'TEXTAREA') {{
+        document.getElementById('modal-save').click();
+      }}
+    }});
+  }}
 
   // Initialize on DOM ready
   if (document.readyState === 'loading') {{
-    document.addEventListener('DOMContentLoaded', initDragAndDrop);
+    document.addEventListener('DOMContentLoaded', function() {{
+      initDragAndDrop();
+      initModal();
+    }});
   }} else {{
     initDragAndDrop();
+    initModal();
   }}
 }})();
 </script>'''
