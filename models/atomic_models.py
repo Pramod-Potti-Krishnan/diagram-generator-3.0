@@ -630,6 +630,9 @@ KanbanPositionPresetType = Literal["full_content", "left_two_thirds", "right_two
 # Kanban priority type
 KanbanPriorityType = Literal["high", "medium", "low", ""]
 
+# Kanban status type (v1.3.0 - R/A/G status indicator)
+KanbanStatusType = Literal["green", "amber", "red", ""]
+
 
 # =============================================================================
 # KANBAN_BOARD Data Models
@@ -640,6 +643,7 @@ class KanbanCard(BaseModel):
     title: str = Field(..., max_length=100, description="Card title/task description")
     priority: KanbanPriorityType = Field(default="", description="Card priority (high, medium, low)")
     assignee: Optional[str] = Field(None, max_length=50, description="Assignee name or initials")
+    status: KanbanStatusType = Field(default="", description="Card status indicator (green, amber, red)")
 
 
 class KanbanColumn(BaseModel):
@@ -808,6 +812,7 @@ class KanbanAtomicResponse(BaseModel):
 
     v1.0.0: Initial response model
     v1.2.0: Added theme_mode_used field for light/dark mode indication
+    v1.3.0: Added R/A/G status indicator, CSS variable light/dark mode for headers
     """
     success: bool = Field(
         ...,

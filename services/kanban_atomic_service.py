@@ -18,6 +18,9 @@ v1.1.0: Removed board title, transparent container, headers inside columns,
         column count restrictions by position, editable assignees
 v1.2.0: Fixed column stretching with flex:1 1 0, added theme_mode for light/dark
         toggle with translucent RGBA pastel backgrounds
+v1.3.0: Added R/A/G status indicator on card right side, edit dialog prompts for
+        title/assignee/status, CSS variable light/dark mode for column headings
+        using var(--text-primary) and var(--text-secondary)
 """
 
 import logging
@@ -105,6 +108,14 @@ PRIORITY_COLORS = {
     "medium": "#F59E0B",
     "low": "#10B981",
     "": "#9CA3AF"
+}
+
+# Status colors (v1.3.0 - R/A/G status indicator)
+STATUS_COLORS = {
+    "green": "#10B981",   # Green - on track
+    "amber": "#F59E0B",   # Amber - at risk
+    "red": "#EF4444",     # Red - blocked/critical
+    "": "transparent"     # No status
 }
 
 
@@ -209,7 +220,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.2.0"
+                    version="1.3.0"
                 ),
                 grid_position=position_data
             )
@@ -330,21 +341,22 @@ class KanbanAtomicGenerator:
                 f"flex-shrink:0;"
             )
 
-            # Column name style
+            # Column name style - v1.3.0: Use CSS variable for automatic light/dark mode
+            # var(--text-primary, fallback) allows Layout Service to toggle via postMessage
             name_style = (
                 f"font-size:12px;"
                 f"font-weight:700;"
                 f"text-transform:uppercase;"
                 f"letter-spacing:0.08em;"
-                f"color:{theme_colors['header']};"
+                f"color:var(--text-primary, #111827);"
             )
 
-            # Count badge style
+            # Count badge style - v1.3.0: Use CSS variable for automatic light/dark mode
             count_style = (
                 f"font-size:11px;"
                 f"font-weight:600;"
                 f"background:{theme_colors['count_bg']};"
-                f"color:{theme_colors['count_text']};"
+                f"color:var(--text-secondary, #6B7280);"
                 f"padding:2px 8px;"
                 f"border-radius:9999px;"
                 f"min-width:20px;"
@@ -470,6 +482,21 @@ class KanbanAtomicGenerator:
                 )
                 assignee_html = f'<div class="kanban-assignee" style="{assignee_style}">{initials}</div>'
 
+            # v1.3.0: Status indicator HTML (right side of card, opposite priority bar)
+            status_html = ""
+            card_status = getattr(card, 'status', '')
+            if card_status:
+                status_color = STATUS_COLORS.get(card_status, "transparent")
+                status_style = (
+                    f"width:12px;"
+                    f"height:12px;"
+                    f"border-radius:50%;"
+                    f"background:{status_color};"
+                    f"margin:12px 12px 0 0;"
+                    f"flex-shrink:0;"
+                )
+                status_html = f'<div class="kanban-status" data-status="{card_status}" style="{status_style}"></div>'
+
             # Edit button style
             edit_btn_style = (
                 f"position:absolute;"
@@ -492,6 +519,7 @@ class KanbanAtomicGenerator:
       <p class="kanban-title" style="{title_style}">{card.title}</p>
       {assignee_html}
     </div>
+    {status_html}
     <button class="kanban-card-edit" style="{edit_btn_style}" onclick="editCard(this, event)">
       <svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
@@ -588,16 +616,26 @@ button:hover {{
     }});
   }}
 
+  // Status color mapping for v1.3.0
+  var STATUS_COLORS = {{
+    'green': '#10B981',
+    'amber': '#F59E0B',
+    'red': '#EF4444',
+    '': 'transparent'
+  }};
+
   // Global functions for onclick handlers
   window.editCard = function(btn, e) {{
     if (e) e.stopPropagation();
     var card = btn.closest('.kanban-card');
     var titleEl = card.querySelector('.kanban-title');
     var assigneeEl = card.querySelector('.kanban-assignee');
+    var statusEl = card.querySelector('.kanban-status');
     var currentText = titleEl.textContent;
     var currentAssignee = assigneeEl ? assigneeEl.textContent : '';
+    var currentStatus = statusEl ? (statusEl.dataset.status || '') : '';
 
-    // Prompt for title
+    // Prompt 1: Title
     var newText = prompt('Edit card title:', currentText);
     if (newText === null) return; // Cancelled
 
@@ -605,7 +643,7 @@ button:hover {{
       titleEl.textContent = newText.trim();
     }}
 
-    // Prompt for assignee (initials)
+    // Prompt 2: Assignee (initials)
     var newAssignee = prompt('Assignee initials (leave empty to remove):', currentAssignee);
     if (newAssignee === null) return; // Cancelled
 
@@ -625,22 +663,57 @@ button:hover {{
       // Remove assignee if cleared
       assigneeEl.remove();
     }}
+
+    // Prompt 3: Status (v1.3.0)
+    var newStatus = prompt('Status (green/amber/red, leave empty to remove):', currentStatus);
+    if (newStatus === null) return; // Cancelled
+
+    newStatus = newStatus.toLowerCase().trim();
+    if (newStatus && (newStatus === 'green' || newStatus === 'amber' || newStatus === 'red')) {{
+      var statusColor = STATUS_COLORS[newStatus];
+      if (statusEl) {{
+        statusEl.style.background = statusColor;
+        statusEl.dataset.status = newStatus;
+      }} else {{
+        // Create new status indicator (insert before edit button)
+        var innerDiv = card.querySelector('div[style*="display:flex"]');
+        var editBtn = card.querySelector('.kanban-card-edit');
+        if (innerDiv && editBtn) {{
+          var statusHtml = '<div class="kanban-status" data-status="' + newStatus + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
+          editBtn.insertAdjacentHTML('beforebegin', statusHtml);
+        }}
+      }}
+    }} else if (statusEl) {{
+      // Remove status if cleared
+      statusEl.remove();
+    }}
   }};
 
   window.addCard = function(btn) {{
     var column = btn.closest('.kanban-column');
     var cardsContainer = column.querySelector('.kanban-cards-list');
 
-    // Prompt for title
+    // Prompt 1: Title
     var newTitle = prompt('Enter card title:');
     if (!newTitle || !newTitle.trim()) return;
 
-    // Prompt for assignee (optional)
+    // Prompt 2: Assignee (optional)
     var assignee = prompt('Assignee initials (optional, leave empty to skip):');
     var assigneeHtml = '';
     if (assignee && assignee.trim()) {{
       var initials = assignee.trim().substring(0, 2).toUpperCase();
       assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:{theme_colors['accent']};color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+    }}
+
+    // Prompt 3: Status (optional, v1.3.0)
+    var status = prompt('Status (green/amber/red, leave empty to skip):');
+    var statusHtml = '';
+    if (status && status.trim()) {{
+      status = status.toLowerCase().trim();
+      if (status === 'green' || status === 'amber' || status === 'red') {{
+        var statusColor = STATUS_COLORS[status];
+        statusHtml = '<div class="kanban-status" data-status="' + status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
+      }}
     }}
 
     var cardHtml = '<div class="kanban-card" style="background:{theme_colors['card_bg']};border-radius:8px;border:1px solid {theme_colors['card_border']};box-shadow:{theme_colors['card_shadow']};overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
@@ -650,6 +723,7 @@ button:hover {{
       '<p class="kanban-title" style="font-size:14px;font-weight:500;color:{theme_colors['text']};line-height:1.4;">' + newTitle.trim() + '</p>' +
       assigneeHtml +
       '</div>' +
+      statusHtml +
       '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;" onclick="editCard(this, event)">' +
       '<svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
       '</button>' +
@@ -693,30 +767,30 @@ button:hover {{
         """
         column_names = KANBAN_COLUMN_PRESETS.get(column_count, KANBAN_COLUMN_PRESETS[4])
 
-        # Sample cards for each column type
+        # Sample cards for each column type - v1.3.0: Added status indicators
         sample_cards = {
             "Backlog": [
                 KanbanCard(title="Research competitor features", priority="low"),
-                KanbanCard(title="Draft Q2 marketing plan", priority="medium"),
+                KanbanCard(title="Draft Q2 marketing plan", priority="medium", status="green"),
                 KanbanCard(title="Review analytics dashboard design", priority="low"),
             ],
             "To Do": [
-                KanbanCard(title="Set up CI/CD pipeline", priority="high", assignee="JD"),
-                KanbanCard(title="Create API documentation", priority="medium"),
+                KanbanCard(title="Set up CI/CD pipeline", priority="high", assignee="JD", status="amber"),
+                KanbanCard(title="Create API documentation", priority="medium", status="green"),
                 KanbanCard(title="Design onboarding flow", priority="medium", assignee="SK"),
             ],
             "In Progress": [
-                KanbanCard(title="Implement user authentication", priority="high", assignee="MK"),
-                KanbanCard(title="Build notification system", priority="medium", assignee="AL"),
+                KanbanCard(title="Implement user authentication", priority="high", assignee="MK", status="green"),
+                KanbanCard(title="Build notification system", priority="medium", assignee="AL", status="red"),
             ],
             "Review": [
-                KanbanCard(title="Code review: payment module", priority="high", assignee="JD"),
-                KanbanCard(title="QA testing: dashboard", priority="medium"),
+                KanbanCard(title="Code review: payment module", priority="high", assignee="JD", status="amber"),
+                KanbanCard(title="QA testing: dashboard", priority="medium", status="green"),
             ],
             "Done": [
-                KanbanCard(title="Deploy staging environment", priority="high"),
+                KanbanCard(title="Deploy staging environment", priority="high", status="green"),
                 KanbanCard(title="Set up project repository", priority="low"),
-                KanbanCard(title="Create wireframes", priority="medium", assignee="SK"),
+                KanbanCard(title="Create wireframes", priority="medium", assignee="SK", status="green"),
             ],
         }
 
