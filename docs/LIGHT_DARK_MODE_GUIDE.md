@@ -1,148 +1,374 @@
 # Light/Dark Mode Implementation Guide
 
-## Overview
-
-This document describes the approach for implementing automatic light/dark mode switching in atomic components. The pattern uses **CSS custom properties (variables)** with fallback values, enabling the Layout Service to toggle themes without regenerating HTML.
+**Version**: 2.0
+**Last Updated**: January 2026
+**Applies To**: All Atomic Components (Diagrams, Charts, Interactive Elements)
 
 ---
 
-## Architecture
+## Executive Summary
 
-### How It Works
+This document describes the **complete architecture** for implementing live light/dark mode switching in Deckster atomic components. The system enables real-time theme changes without regenerating HTML, using a three-layer approach:
+
+1. **Layout Service** broadcasts theme changes via `postMessage`
+2. **Atomic Components** listen for messages and update CSS variables
+3. **CSS Variables** cascade through the component DOM instantly
+
+---
+
+## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                      Layout Service                              │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  Sets CSS variables via postMessage or inline styles:       ││
-│  │    --text-primary: #f8fafc (dark) or #1f2937 (light)       ││
-│  │    --text-secondary: #e2e8f0 (dark) or #374151 (light)     ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                              │                                   │
-│                              ▼                                   │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │  Atomic Component HTML                                       ││
-│  │    color: var(--text-primary, #111827)                      ││
-│  │           ▲                    ▲                             ││
-│  │           │                    │                             ││
-│  │    CSS variable         Fallback (light mode default)       ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         LAYOUT SERVICE (Parent Window)                       │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  ThemeManager.setThemeMode('dark')                                       ││
+│  │       │                                                                  ││
+│  │       ├──▶ Adds .theme-dark class to :root                              ││
+│  │       ├──▶ Stores preference in localStorage                            ││
+│  │       └──▶ Calls broadcastThemeToIframes('dark')                        ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                              │                                               │
+│                              │ postMessage                                   │
+│                              │ {type: 'deckster-theme-sync', mode, variables}│
+│                              ▼                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │  IFRAME: Atomic Component (Kanban, Code Display, Chart, etc.)           ││
+│  │  ┌───────────────────────────────────────────────────────────────────┐  ││
+│  │  │  Theme Sync Script (listens for postMessage)                      │  ││
+│  │  │       │                                                           │  ││
+│  │  │       ├──▶ Updates CSS variables on :root                         │  ││
+│  │  │       └──▶ Toggles .theme-dark/.theme-light class                 │  ││
+│  │  └───────────────────────────────────────────────────────────────────┘  ││
+│  │                              │                                           ││
+│  │                              ▼                                           ││
+│  │  ┌───────────────────────────────────────────────────────────────────┐  ││
+│  │  │  CSS Variables cascade through all elements                       │  ││
+│  │  │       color: var(--text-primary)      ──▶ instantly updates       │  ││
+│  │  │       background: var(--card-bg)      ──▶ instantly updates       │  ││
+│  │  └───────────────────────────────────────────────────────────────────┘  ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Key Principle
+---
 
-Components use CSS variables with **light mode fallbacks**:
-- When Layout Service is in **light mode**: Variables are unset, fallback colors apply
-- When Layout Service is in **dark mode**: Variables are set, dark colors override fallbacks
+## The Three Required Components
 
-**No HTML regeneration required** - the CSS cascade handles the switch automatically.
+Every atomic component that supports live theme switching MUST include these three pieces:
+
+### 1. Theme CSS Block (CSS Variable Definitions)
+
+Defines CSS variables with light mode defaults and dark mode overrides:
+
+```python
+def _generate_theme_css(self) -> str:
+    """Generate CSS variables for theme support."""
+    return '''<style>
+/* Deckster Theme Variables */
+:root {
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-body: #1F2937;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --card-border: #E5E7EB;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    --add-btn-border: #D1D5DB;
+    --add-btn-text: #6B7280;
+    --count-bg: rgba(229, 231, 235, 0.8);
+    --count-text: #6B7280;
+    --accent: #8B5CF6;
+}
+:root.theme-dark {
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+    --text-body: #F9FAFB;
+    --card-bg: rgba(75, 85, 99, 0.85);
+    --card-border: rgba(107, 114, 128, 0.6);
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --add-btn-border: #FFFFFF;
+    --add-btn-text: #D1D5DB;
+    --count-bg: rgba(75, 85, 99, 0.8);
+    --count-text: #D1D5DB;
+    --accent: #A78BFA;
+}
+</style>'''
+```
+
+**Key Points:**
+- `:root` block contains **light mode** values (the default)
+- `:root.theme-dark` block contains **dark mode** overrides
+- When `.theme-dark` class is added to `<html>`, dark values automatically apply
+
+### 2. Theme Sync Script (postMessage Listener)
+
+Listens for theme broadcasts from the Layout Service:
+
+```python
+def _generate_theme_sync_script(self) -> str:
+    """Generate postMessage listener for theme synchronization."""
+    return '''<script>
+(function(){
+    window.addEventListener('message', function(e) {
+        if (!e.data || e.data.type !== 'deckster-theme-sync') return;
+
+        var mode = e.data.mode;
+        var variables = e.data.variables;
+        var root = document.documentElement;
+
+        if (!mode || !variables) return;
+
+        // Update CSS variables directly on :root
+        for (var key in variables) {
+            if (variables.hasOwnProperty(key)) {
+                root.style.setProperty(key, variables[key]);
+            }
+        }
+
+        // Toggle theme class for CSS selector-based rules
+        root.classList.toggle('theme-dark', mode === 'dark');
+        root.classList.toggle('theme-light', mode === 'light');
+    });
+})();
+</script>'''
+```
+
+**Key Points:**
+- Must listen for `'deckster-theme-sync'` message type
+- Receives `mode` ('light' or 'dark') and `variables` (CSS variable dictionary)
+- Updates CSS variables via `style.setProperty()`
+- Toggles `.theme-dark`/`.theme-light` classes for CSS selector support
+
+### 3. CSS Variable Usage in Styles
+
+All color and theme-sensitive properties MUST use CSS variables:
+
+```python
+# CORRECT - Uses CSS variable
+header_style = f"color: var(--text-primary);"
+card_style = f"background: var(--card-bg); border: 1px solid var(--card-border);"
+
+# WRONG - Hardcoded color won't switch with theme
+header_style = f"color: #111827;"
+```
+
+---
+
+## Complete Implementation Example
+
+Here's a complete example from KANBAN_BOARD v1.5.1:
+
+```python
+class KanbanAtomicGenerator:
+    """Generator for Kanban board atomic components."""
+
+    def _generate_theme_css(self) -> str:
+        """Generate CSS variables for theme support with light defaults and dark overrides."""
+        return '''<style>
+/* Deckster Theme Variables - v1.4.0 */
+:root {
+    --text-primary: #111827;
+    --text-secondary: #6B7280;
+    --text-body: #1F2937;
+    --card-bg: rgba(255, 255, 255, 0.9);
+    --card-border: #E5E7EB;
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    --add-btn-border: #D1D5DB;
+    --add-btn-text: #6B7280;
+    --count-bg: rgba(229, 231, 235, 0.8);
+    --count-text: #6B7280;
+    --accent: #8B5CF6;
+}
+:root.theme-dark {
+    --text-primary: #FFFFFF;
+    --text-secondary: #D1D5DB;
+    --text-body: #F9FAFB;
+    --card-bg: rgba(75, 85, 99, 0.85);
+    --card-border: rgba(107, 114, 128, 0.6);
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    --add-btn-border: #FFFFFF;
+    --add-btn-text: #D1D5DB;
+    --count-bg: rgba(75, 85, 99, 0.8);
+    --count-text: #D1D5DB;
+    --accent: #A78BFA;
+}
+</style>'''
+
+    def _generate_theme_sync_script(self) -> str:
+        """Generate postMessage listener for theme synchronization from Layout Service."""
+        return '''<script>
+(function(){
+    window.addEventListener('message',function(e){
+        if(!e.data||e.data.type!=='deckster-theme-sync')return;
+        var m=e.data.mode,v=e.data.variables,r=document.documentElement;
+        if(!m||!v)return;
+        for(var k in v)if(v.hasOwnProperty(k))r.style.setProperty(k,v[k]);
+        r.classList.toggle('theme-dark',m==='dark');
+        r.classList.toggle('theme-light',m==='light');
+    });
+})();
+</script>'''
+
+    def _generate_html(self, columns, theme_colors, ...):
+        """Generate complete HTML with theme support."""
+
+        # Include theme CSS at the start
+        theme_css = self._generate_theme_css()
+
+        # Include sync script before closing container
+        theme_sync_script = self._generate_theme_sync_script()
+
+        # Use CSS variables in all styles
+        header_style = (
+            f"font-size:12px;"
+            f"font-weight:700;"
+            f"color:var(--text-primary);"  # Uses CSS variable
+        )
+
+        card_style = (
+            f"background:var(--card-bg);"          # Uses CSS variable
+            f"border:1px solid var(--card-border);" # Uses CSS variable
+            f"box-shadow:var(--card-shadow);"       # Uses CSS variable
+        )
+
+        html = f'''{theme_css}
+<div class="component-container">
+  <!-- Component HTML using CSS variables -->
+  <div style="{header_style}">Header</div>
+  <div style="{card_style}">Card Content</div>
+
+  {theme_sync_script}
+</div>'''
+
+        return html
+```
+
+---
+
+## Layout Service Side: Broadcasting Theme Changes
+
+The Layout Service's ThemeManager handles the broadcasting. Here's how it works:
+
+### Location
+`layout_builder_main/v7.5-main/src/themes/theme-manager.js`
+
+### Key Functions
+
+```javascript
+/**
+ * Set theme mode and broadcast to all iframes
+ */
+function setThemeMode(mode) {
+    const normalizedMode = (mode || 'light').toLowerCase();
+
+    // Update parent window's :root
+    if (normalizedMode === 'dark') {
+        document.documentElement.classList.add('theme-dark');
+    } else {
+        document.documentElement.classList.remove('theme-dark');
+    }
+
+    // Persist preference
+    localStorage.setItem('deckster-theme-mode', normalizedMode);
+
+    // Broadcast to all diagram/chart iframes
+    broadcastThemeToIframes(normalizedMode);
+
+    return normalizedMode;
+}
+
+/**
+ * Broadcast theme to all embedded iframes
+ */
+function broadcastThemeToIframes(mode) {
+    const themeVariables = {
+        light: {
+            '--text-primary': '#111827',
+            '--text-secondary': '#6B7280',
+            '--text-body': '#1F2937',
+            '--card-bg': 'rgba(255, 255, 255, 0.9)',
+            '--card-border': '#E5E7EB',
+            '--card-shadow': '0 1px 3px rgba(0,0,0,0.1)',
+            '--add-btn-border': '#D1D5DB',
+            '--add-btn-text': '#6B7280',
+            '--count-bg': 'rgba(229, 231, 235, 0.8)',
+            '--count-text': '#6B7280',
+            '--accent': '#8B5CF6'
+        },
+        dark: {
+            '--text-primary': '#FFFFFF',
+            '--text-secondary': '#D1D5DB',
+            '--text-body': '#F9FAFB',
+            '--card-bg': 'rgba(75, 85, 99, 0.85)',
+            '--card-border': 'rgba(107, 114, 128, 0.6)',
+            '--card-shadow': '0 1px 3px rgba(0,0,0,0.3)',
+            '--add-btn-border': '#FFFFFF',
+            '--add-btn-text': '#D1D5DB',
+            '--count-bg': 'rgba(75, 85, 99, 0.8)',
+            '--count-text': '#D1D5DB',
+            '--accent': '#A78BFA'
+        }
+    };
+
+    const variables = themeVariables[mode] || themeVariables.light;
+    const iframes = document.querySelectorAll('.inserted-diagram iframe, .inserted-chart iframe');
+
+    iframes.forEach(iframe => {
+        iframe.contentWindow.postMessage({
+            type: 'deckster-theme-sync',
+            mode: mode,
+            variables: variables
+        }, '*');
+    });
+}
+```
+
+### Usage in Layout Service
+
+```javascript
+// Toggle theme
+ThemeManager.toggleThemeMode();
+
+// Set specific mode
+ThemeManager.setThemeMode('dark');
+ThemeManager.setThemeMode('light');
+
+// Get current mode
+const currentMode = ThemeManager.getThemeMode(); // 'light' or 'dark'
+
+// Initialize on page load (restores user preference)
+ThemeManager.initThemeMode();
+```
 
 ---
 
 ## CSS Variables Reference
 
-### Core Text Variables
+### Standard Variables (All Components Should Support)
 
-| Variable | Light Mode (Fallback) | Dark Mode (Set by Layout Service) | Usage |
-|----------|----------------------|-----------------------------------|-------|
-| `--text-primary` | `#1f2937` / `#111827` | `#f8fafc` / `#ffffff` | Primary text, headings |
-| `--text-secondary` | `#374151` / `#6B7280` | `#e2e8f0` / `#d1d5db` | Secondary text, labels |
-| `--text-tertiary` | `#6b7280` | `#94a3b8` | Muted text, hints |
+| Variable | Light Mode | Dark Mode | Usage |
+|----------|------------|-----------|-------|
+| `--text-primary` | `#111827` | `#FFFFFF` | Headings, primary text |
+| `--text-secondary` | `#6B7280` | `#D1D5DB` | Labels, secondary text |
+| `--text-body` | `#1F2937` | `#F9FAFB` | Body text, paragraphs |
+| `--card-bg` | `rgba(255,255,255,0.9)` | `rgba(75,85,99,0.85)` | Card backgrounds |
+| `--card-border` | `#E5E7EB` | `rgba(107,114,128,0.6)` | Card borders |
+| `--card-shadow` | `0 1px 3px rgba(0,0,0,0.1)` | `0 1px 3px rgba(0,0,0,0.3)` | Box shadows |
+| `--accent` | `#8B5CF6` | `#A78BFA` | Accent color, highlights |
+| `--add-btn-border` | `#D1D5DB` | `#FFFFFF` | Button borders |
+| `--add-btn-text` | `#6B7280` | `#D1D5DB` | Button text |
+| `--count-bg` | `rgba(229,231,235,0.8)` | `rgba(75,85,99,0.8)` | Badge backgrounds |
+| `--count-text` | `#6B7280` | `#D1D5DB` | Badge text |
 
-### Background Variables
+### Tailwind Color Reference
 
-| Variable | Light Mode (Fallback) | Dark Mode | Usage |
-|----------|----------------------|-----------|-------|
-| `--bg-primary` | `#ffffff` | `#1e293b` | Primary backgrounds |
-| `--bg-secondary` | `#f8fafc` | `#334155` | Secondary backgrounds |
-| `--bg-tertiary` | `#f1f5f9` | `#475569` | Tertiary backgrounds |
-
-### Border Variables
-
-| Variable | Light Mode (Fallback) | Dark Mode | Usage |
-|----------|----------------------|-----------|-------|
-| `--border-primary` | `#e5e7eb` | `#475569` | Primary borders |
-| `--border-secondary` | `#d1d5db` | `#64748b` | Secondary borders |
-
----
-
-## Implementation Pattern
-
-### Basic Syntax
-
-```css
-/* Use CSS variable with light-mode fallback */
-color: var(--text-primary, #111827);
-```
-
-### Python String Formatting
-
-```python
-# In atomic service Python code
-name_style = (
-    f"font-size:12px;"
-    f"font-weight:700;"
-    f"color:var(--text-primary, #111827);"  # CSS variable with fallback
-)
-```
-
-### Complete Example (KANBAN_BOARD v1.3.0)
-
-```python
-# Column header - automatically switches with Layout Service theme
-name_style = (
-    f"font-size:12px;"
-    f"font-weight:700;"
-    f"text-transform:uppercase;"
-    f"letter-spacing:0.08em;"
-    f"color:var(--text-primary, #111827);"  # Dark text in light mode
-)
-
-# Count badge - secondary text color
-count_style = (
-    f"font-size:11px;"
-    f"font-weight:600;"
-    f"background:{theme_colors['count_bg']};"
-    f"color:var(--text-secondary, #6B7280);"  # Gray text in light mode
-    f"padding:2px 8px;"
-    f"border-radius:9999px;"
-)
-```
-
----
-
-## When to Use CSS Variables vs. Theme Colors
-
-### Use CSS Variables For:
-- **Text colors** that must be readable against any background
-- **Column headers, labels, titles** - anything that needs to flip from dark to light
-- **Borders** that need to remain visible in both modes
-- Any element where **contrast is critical**
-
-### Use Theme Colors Dict For:
-- **Backgrounds** with specific opacity/translucency (RGBA values)
-- **Accent colors** that remain consistent (purple, blue highlights)
-- **Card backgrounds** that need specific theme-aware styling
-- **Shadows** that differ between light/dark modes
-
-### Hybrid Approach Example
-
-```python
-# Theme colors for backgrounds (specific to light/dark)
-KANBAN_COLORS_LIGHT = {
-    "card_bg": "rgba(255, 255, 255, 0.9)",
-    "accent": "#8B5CF6",
-}
-
-KANBAN_COLORS_DARK = {
-    "card_bg": "rgba(75, 85, 99, 0.85)",
-    "accent": "#A78BFA",
-}
-
-# CSS variables for text (auto-switching)
-header_style = f"color:var(--text-primary, #111827);"
-```
+| Purpose | Light (Tailwind) | Dark (Tailwind) |
+|---------|------------------|-----------------|
+| Primary text | gray-900 `#111827` | white `#FFFFFF` |
+| Secondary text | gray-500 `#6B7280` | gray-300 `#D1D5DB` |
+| Body text | gray-800 `#1F2937` | gray-50 `#F9FAFB` |
+| Borders | gray-200 `#E5E7EB` | gray-500/60 |
+| Accent | violet-500 `#8B5CF6` | violet-400 `#A78BFA` |
 
 ---
 
@@ -150,96 +376,188 @@ header_style = f"color:var(--text-primary, #111827);"
 
 When adding light/dark mode support to a new atomic component:
 
-### 1. Identify Text Elements
-- [ ] Headings and titles
-- [ ] Labels and captions
-- [ ] Body text
-- [ ] Count badges / metrics
-- [ ] Button text
+### Phase 1: Add CSS Variables Block
 
-### 2. Apply CSS Variables
-- [ ] Replace hardcoded text colors with `var(--text-primary, fallback)`
-- [ ] Use appropriate fallback (light mode default)
-- [ ] Use `--text-secondary` for less prominent text
+- [ ] Create `_generate_theme_css()` method
+- [ ] Define all colors needed by component in `:root`
+- [ ] Define dark mode overrides in `:root.theme-dark`
+- [ ] Include the `<style>` block at the start of HTML output
 
-### 3. Keep Theme Colors For
-- [ ] Backgrounds (especially translucent RGBA)
-- [ ] Accent/highlight colors
-- [ ] Shadows and borders with specific opacity
+### Phase 2: Add Theme Sync Script
 
-### 4. Test Both Modes
-- [ ] Verify light mode renders correctly (fallbacks work)
-- [ ] Verify dark mode renders correctly (variables override)
-- [ ] Check contrast ratios in both modes
+- [ ] Create `_generate_theme_sync_script()` method
+- [ ] Listen for `'deckster-theme-sync'` message type
+- [ ] Update CSS variables via `style.setProperty()`
+- [ ] Toggle `.theme-dark`/`.theme-light` classes
+- [ ] Include script before closing container `</div>`
 
----
+### Phase 3: Use CSS Variables in Styles
 
-## Components Using This Pattern
+- [ ] Replace all hardcoded text colors with `var(--text-primary)`, etc.
+- [ ] Replace all hardcoded backgrounds with `var(--card-bg)`, etc.
+- [ ] Replace all hardcoded borders with `var(--card-border)`, etc.
+- [ ] Replace all hardcoded shadows with `var(--card-shadow)`, etc.
 
-| Component | Version | CSS Variables Used |
-|-----------|---------|-------------------|
-| KANBAN_BOARD | v1.3.0+ | `--text-primary`, `--text-secondary` |
-| TEXT_BOX | v1.0+ | `--text-primary`, `--text-secondary` |
-| CODE_DISPLAY | v1.2+ | `--text-primary` (header text) |
+### Phase 4: Test Both Modes
+
+- [ ] Test component renders correctly in light mode (default)
+- [ ] Test component renders correctly in dark mode
+- [ ] Test LIVE switching (toggle while component is displayed)
+- [ ] Verify contrast ratios meet accessibility standards
+- [ ] Test with different slide backgrounds
 
 ---
 
-## Fallback Color Reference
+## Theme Colors Dictionary Pattern
 
-### Recommended Light Mode Fallbacks
+For components that need static colors for backgrounds (like column colors in Kanban), use a dual dictionary approach:
 
-| Purpose | Hex Code | Tailwind Equivalent |
-|---------|----------|---------------------|
-| Primary text (darkest) | `#111827` | gray-900 |
-| Primary text (standard) | `#1f2937` | gray-800 |
-| Secondary text | `#374151` | gray-700 |
-| Tertiary/muted text | `#6B7280` | gray-500 |
-| Placeholder text | `#9CA3AF` | gray-400 |
+```python
+# Light mode theme colors - static values per theme
+COMPONENT_COLORS_LIGHT = {
+    "column_colors": [
+        "rgba(243, 244, 246, 0.6)",   # gray pastel
+        "rgba(219, 234, 254, 0.6)",   # blue pastel
+        "rgba(254, 243, 199, 0.6)",   # yellow pastel
+    ],
+    "accent": "#8B5CF6",
+}
 
-### Dark Mode Values (Set by Layout Service)
+# Dark mode theme colors - solid darker backgrounds
+COMPONENT_COLORS_DARK = {
+    "column_colors": [
+        "#374151",   # dark gray
+        "#1E3A5F",   # dark blue
+        "#78350F",   # dark amber
+    ],
+    "accent": "#A78BFA",
+}
 
-| Purpose | Hex Code | Tailwind Equivalent |
-|---------|----------|---------------------|
-| Primary text | `#f8fafc` | slate-50 |
-| Primary text (alt) | `#ffffff` | white |
-| Secondary text | `#e2e8f0` | slate-200 |
-| Tertiary text | `#94a3b8` | slate-400 |
+# Select based on theme_mode parameter
+def generate(self, request):
+    if request.theme_mode == "dark":
+        theme_colors = COMPONENT_COLORS_DARK
+    else:
+        theme_colors = COMPONENT_COLORS_LIGHT
+
+    # Use theme_colors for static values
+    # Use CSS variables for dynamic values that switch live
+```
+
+**When to use which:**
+
+| Use CSS Variables For | Use Theme Dict For |
+|-----------------------|---------------------|
+| Text colors | Column/section backgrounds |
+| Card backgrounds | Static accent shades |
+| Borders and shadows | Pre-defined color palettes |
+| Interactive element states | Chart/graph colors |
+| Anything that must switch live | Initial render values |
 
 ---
 
 ## Troubleshooting
 
-### Text Not Switching in Dark Mode
+### Theme Not Switching in Iframes
 
-**Problem**: Text stays dark when Layout Service switches to dark mode.
+**Symptom**: Parent switches but iframe content stays the same.
 
-**Solution**: Ensure you're using the CSS variable pattern:
-```python
-# Wrong - hardcoded color
-f"color:#111827;"
+**Causes & Solutions**:
 
-# Right - CSS variable with fallback
-f"color:var(--text-primary, #111827);"
-```
+1. **Missing sync script**: Add `_generate_theme_sync_script()` and include in HTML
+2. **Wrong message type**: Must listen for exactly `'deckster-theme-sync'`
+3. **Iframe selector**: Layout Service uses `.inserted-diagram iframe, .inserted-chart iframe`
+4. **Cross-origin issues**: Ensure same origin or use `'*'` for postMessage target
 
-### Fallback Not Rendering
+### CSS Variables Not Applying
 
-**Problem**: Text is invisible in light mode (no fallback).
+**Symptom**: Variables are updated but styles don't change.
 
-**Solution**: Always include the fallback value:
-```python
-# Wrong - no fallback
-f"color:var(--text-primary);"
+**Causes & Solutions**:
 
-# Right - with fallback
-f"color:var(--text-primary, #111827);"
-```
+1. **Hardcoded colors**: Replace with `var(--variable-name)`
+2. **Specificity issues**: Inline styles using variables should work; check for `!important`
+3. **Missing variable definition**: Ensure variable is defined in both `:root` and `:root.theme-dark`
 
 ### Inconsistent Appearance
 
-**Problem**: Some text switches, some doesn't.
+**Symptom**: Some elements switch, others don't.
 
-**Solution**: Audit all text elements and ensure consistent use of CSS variables for all text that should switch.
+**Solution**: Audit all style properties and ensure consistent use of CSS variables:
+
+```python
+# Audit checklist for each style block
+- [ ] color: uses --text-* variable?
+- [ ] background: uses --card-bg or --count-bg?
+- [ ] border-color: uses --card-border?
+- [ ] box-shadow: uses --card-shadow?
+```
+
+### Dark Mode Too Transparent
+
+**Symptom**: Dark mode backgrounds don't provide enough contrast.
+
+**Solution**: Use solid colors instead of transparent ones for dark mode:
+
+```python
+# Light mode - transparent works well
+"rgba(243, 244, 246, 0.6)"   # Shows slide background
+
+# Dark mode - use solid dark colors
+"#374151"   # Solid dark gray for visibility
+```
+
+---
+
+## Components Using This Pattern
+
+| Component | Version | Status | Notes |
+|-----------|---------|--------|-------|
+| KANBAN_BOARD | v1.4.0+ | Full Support | Reference implementation |
+| CODE_DISPLAY | v1.2+ | Full Support | Header text uses variables |
+| TEXT_BOX | v1.0+ | Full Support | Basic text variables |
+| CHART (ApexCharts) | v1.0+ | Partial | Chart colors need work |
+
+---
+
+## Message Protocol Reference
+
+### postMessage Format
+
+```javascript
+{
+    type: 'deckster-theme-sync',
+    mode: 'dark' | 'light',
+    variables: {
+        '--text-primary': '#FFFFFF',
+        '--text-secondary': '#D1D5DB',
+        // ... all CSS variables
+    }
+}
+```
+
+### Listener Implementation
+
+```javascript
+window.addEventListener('message', function(event) {
+    // Always validate message type
+    if (!event.data || event.data.type !== 'deckster-theme-sync') {
+        return;
+    }
+
+    const { mode, variables } = event.data;
+    const root = document.documentElement;
+
+    // Update all CSS variables
+    Object.entries(variables).forEach(([key, value]) => {
+        root.style.setProperty(key, value);
+    });
+
+    // Update class for CSS selector support
+    root.classList.toggle('theme-dark', mode === 'dark');
+    root.classList.toggle('theme-light', mode === 'light');
+});
+```
 
 ---
 
@@ -247,12 +565,26 @@ f"color:var(--text-primary, #111827);"
 
 | Date | Version | Changes |
 |------|---------|---------|
-| 2026-01-26 | 1.0 | Initial guide based on KANBAN_BOARD v1.3.0 implementation |
+| 2026-01-26 | 2.0 | Complete rewrite documenting postMessage architecture, Layout Service integration, and implementation checklist |
+| 2026-01-26 | 1.0 | Initial guide (CSS variables with fallbacks only) |
 
 ---
 
 ## Related Documentation
 
-- `docs/ATOMIC_ARCHITECTURE.md` - Overall atomic component architecture
-- `docs/CODE_DISPLAY_ARCHITECTURE.md` - CODE_DISPLAY implementation details
-- Layout Service documentation - CSS variable injection mechanism
+- `layout_builder_main/v7.5-main/src/themes/theme-manager.js` - Layout Service theme broadcasting
+- `services/kanban_atomic_service.py` - Reference implementation (KANBAN_BOARD v1.5.1)
+- `services/code_display_atomic_service.py` - CODE_DISPLAY implementation
+- `docs/CODE_DISPLAY_ATOMIC_ARCHITECTURE.md` - Code display architecture
+
+---
+
+## Best Practices Summary
+
+1. **Always include both CSS block and sync script** - Missing either breaks live switching
+2. **Use CSS variables for ALL theme-sensitive properties** - No hardcoded colors
+3. **Define variables in both `:root` and `:root.theme-dark`** - Ensures both modes work
+4. **Test live switching** - Not just initial render in each mode
+5. **Use solid colors for dark mode backgrounds** - Transparent pastels don't work well
+6. **Keep variable names consistent** - Use the standard set defined in this guide
+7. **Document theme support in version notes** - Note which version added support
