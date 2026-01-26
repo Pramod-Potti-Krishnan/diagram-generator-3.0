@@ -333,7 +333,7 @@ add_positioned_element() {
     local html=$3
     local start_col=$4
     local width=$5
-    local height=${6:-13}
+    local height=${6:-14}
     local start_row=${7:-4}
 
     # Calculate end positions for grid CSS
@@ -599,7 +599,7 @@ generate_slide() {
             \"layout\": \"C1-text\",
             \"content\": {
                 \"slide_title\": \"$NAME_ESCAPED\",
-                \"subtitle\": \"$position_info | Grid: ${width}x13 = ${element_width}x${element_height}px | Theme: $theme\",
+                \"subtitle\": \"$position_info | Grid: ${width}x14 = ${element_width}x${element_height}px | Theme: $theme\",
                 \"body\": \"\",
                 \"footer_text\": \"CODE_DISPLAY v1.2.8 Sizing Test\",
                 \"logo\": \" \"
@@ -608,7 +608,7 @@ generate_slide() {
 
         # Track ALL slides for Diagram Element API insertion
         local slide_idx=$((num - 1))
-        ALL_POSITIONED_SLIDES+=("$slide_idx:$actual_start_col:$width:13")
+        ALL_POSITIONED_SLIDES+=("$slide_idx:$actual_start_col:$width:14")
         ALL_POSITIONED_HTML+=("$CODE_HTML")
 
         # Append to slides array
