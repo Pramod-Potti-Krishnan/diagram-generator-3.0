@@ -34,6 +34,8 @@ v1.6.0: Kanban state persistence - adds extractKanbanState() and notifyStateChan
 v1.6.1: Direct API persistence - replaced postMessage/auto-save with direct fetch() calls
         to /api/kanban/update-data and /api/kanban/get-data endpoints. Added loadSavedData()
         on init to restore board state from Supabase. Mirrors chart persistence pattern.
+v1.6.2: Fixed ID detection - iframes using srcdoc can't access parent URL or data attributes.
+        Now receives presentation_id and element_id via postMessage from parent (element-manager.js).
 """
 
 import logging
@@ -142,6 +144,7 @@ class KanbanAtomicGenerator:
     v1.4.0: Added CSS variable theming with postMessage sync for live dark/light mode switching
     v1.5.0: Dark mode solid colors, white button border, modal dialog for add/edit
     v1.6.1: Direct API persistence - fetch() calls to /api/kanban/* endpoints
+    v1.6.2: Fixed ID detection - receives IDs via postMessage from parent element-manager.js
     """
 
     def __init__(self):
@@ -342,7 +345,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.6.1"
+                    version="1.6.2"
                 ),
                 grid_position=position_data
             )
@@ -811,51 +814,28 @@ button:hover {{
     return {{ columns: columns }};
   }}
 
-  // v1.6.1: Get IDs and service URL for direct API persistence
+  // v1.6.2: Get service URL and IDs for direct API persistence
   var kanbanContainer = container.closest('[data-kanban-container]') || container;
   var diagramServiceUrl = kanbanContainer.getAttribute('data-service-url') || 'https://web-production-e0ad0.up.railway.app';
 
-  // Get presentation ID from URL or parent window
-  function getPresentationId() {{
-    // Try URL params first
-    var urlParams = new URLSearchParams(window.location.search);
-    var pid = urlParams.get('presentation_id') || urlParams.get('presentationId');
-    if (pid) return pid;
+  // IDs received from parent via postMessage
+  var presentationId = '';
+  var kanbanId = '';
 
-    // Try parent URL
-    try {{
-      if (window.parent !== window) {{
-        var parentUrl = window.parent.location.href;
-        var match = parentUrl.match(/presentations\\/([a-f0-9-]+)/i);
-        if (match) return match[1];
-      }}
-    }} catch(e) {{}}
+  // v1.6.2: Listen for init message from parent with IDs
+  window.addEventListener('message', function(e) {{
+    if (!e.data || e.data.type !== 'kanban-init') return;
 
-    // Try data attribute on container hierarchy
-    var el = container;
-    while (el && el !== document.body) {{
-      var dataId = el.getAttribute('data-presentation-id');
-      if (dataId) return dataId;
-      el = el.parentElement;
+    presentationId = e.data.presentation_id || '';
+    kanbanId = e.data.element_id || '';
+
+    console.log('[Kanban] Received IDs - presentation:', presentationId, 'element:', kanbanId);
+
+    // Load saved data now that we have IDs
+    if (presentationId && kanbanId) {{
+      loadSavedData();
     }}
-
-    return '';
-  }}
-
-  // Get Kanban element ID
-  function getKanbanId() {{
-    var el = container;
-    while (el && el !== document.body) {{
-      var dataId = el.getAttribute('data-element-id') || el.getAttribute('data-kanban-id') || el.id;
-      if (dataId && dataId.length > 0) return dataId;
-      el = el.parentElement;
-    }}
-    // Generate a fallback ID
-    return 'kanban_' + Date.now();
-  }}
-
-  var presentationId = getPresentationId();
-  var kanbanId = getKanbanId();
+  }});
 
   // v1.6.1: Save Kanban state via direct API call (replaces postMessage)
   async function saveKanbanData() {{
@@ -1165,14 +1145,12 @@ button:hover {{
     document.addEventListener('DOMContentLoaded', function() {{
       initDragAndDrop();
       initModal();
-      // v1.6.1: Load saved state after a brief delay to ensure IDs are available
-      setTimeout(loadSavedData, 100);
+      // v1.6.2: loadSavedData() called from postMessage handler when IDs received
     }});
   }} else {{
     initDragAndDrop();
     initModal();
-    // v1.6.1: Load saved state after a brief delay to ensure IDs are available
-    setTimeout(loadSavedData, 100);
+    // v1.6.2: loadSavedData() called from postMessage handler when IDs received
   }}
 }})();
 </script>'''
