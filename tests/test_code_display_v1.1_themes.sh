@@ -29,7 +29,7 @@
 # v1.2.3 Changes:
 # - Element dimensions now = (grid * 60) - (2 * external_margin) to match TEXT_BOX
 # - Footer protection: end_row clamped to 17 (row 18 reserved for footer)
-# - Position presets use gridHeight=13 (not 14) for footer safety
+# - Position presets now use gridHeight=14 for more content space
 #
 # Features Tested:
 # - 5 position presets: full_content, left_half, right_half, left_third, right_third
@@ -115,8 +115,8 @@ echo ""
 declare -a ALL_POSITIONED_SLIDES
 declare -a ALL_POSITIONED_HTML
 
-# Configuration 1: GitHub Dark - full_content (1780x760 element = 30x13 grid - 2*10px margin)
-CONFIG_1_NAME="Full Content (1780x760)"
+# Configuration 1: GitHub Dark - full_content (1780x820 element = 30x14 grid - 2*10px margin)
+CONFIG_1_NAME="Full Content (1780x820)"
 CONFIG_1_THEME="github_dark"
 CONFIG_1_LANG="python"
 CONFIG_1_MARGIN=10
@@ -140,8 +140,8 @@ async def get_user(user_id: int) -> User:
         raise HTTPException(status_code=400, detail="Invalid ID")
     return User(id=user_id, name="John Doe", email="john@example.com")'
 
-# Configuration 2: Monokai - left_half (870x750 element = 15x13 grid - 2*15px margin)
-CONFIG_2_NAME="Left Half (870x750)"
+# Configuration 2: Monokai - left_half (870x810 element = 15x14 grid - 2*15px margin)
+CONFIG_2_NAME="Left Half (870x810)"
 CONFIG_2_THEME="monokai"
 CONFIG_2_LANG="javascript"
 CONFIG_2_MARGIN=15
@@ -169,8 +169,8 @@ function useLocalStorage(key, initialValue) {
   return [storedValue, setValue];
 }'
 
-# Configuration 3: Dracula - right_half (880x760 element = 15x13 grid - 2*10px margin)
-CONFIG_3_NAME="Right Half (880x760)"
+# Configuration 3: Dracula - right_half (880x820 element = 15x14 grid - 2*10px margin)
+CONFIG_3_NAME="Right Half (880x820)"
 CONFIG_3_THEME="dracula"
 CONFIG_3_LANG="typescript"
 CONFIG_3_MARGIN=10
@@ -199,8 +199,8 @@ async function fetchUsers(): Promise<ApiResponse<User[]>> {
   return { success: true, data, timestamp: new Date() };
 }'
 
-# Configuration 4: Solarized Dark - left_third (576x756 element = 10x13 grid - 2*12px margin)
-CONFIG_4_NAME="Left Third (576x756)"
+# Configuration 4: Solarized Dark - left_third (576x816 element = 10x14 grid - 2*12px margin)
+CONFIG_4_NAME="Left Third (576x816)"
 CONFIG_4_THEME="solarized_dark"
 CONFIG_4_LANG="go"
 CONFIG_4_MARGIN=12
@@ -234,8 +234,8 @@ func main() {
     log.Fatal(http.ListenAndServe(":8080", nil))
 }'
 
-# Configuration 5: GitHub Light - right_third (580x760 element = 10x13 grid - 2*10px margin)
-CONFIG_5_NAME="Right Third (580x760)"
+# Configuration 5: GitHub Light - right_third (580x820 element = 10x14 grid - 2*10px margin)
+CONFIG_5_NAME="Right Third (580x820)"
 CONFIG_5_THEME="github_light"
 CONFIG_5_LANG="sql"
 CONFIG_5_MARGIN=10
@@ -259,7 +259,7 @@ ORDER BY month DESC, revenue DESC;'
 
 # Configuration 6: Monokai - Right Two-Thirds (custom: start_col=12, gridWidth=20)
 # Element = (20*60)-(2*10) = 1180px wide
-CONFIG_6_NAME="Right Two-Thirds (1180x760)"
+CONFIG_6_NAME="Right Two-Thirds (1180x820)"
 CONFIG_6_THEME="monokai"
 CONFIG_6_LANG="rust"
 CONFIG_6_MARGIN=10
@@ -296,7 +296,7 @@ fn main() {
 
 # Configuration 7: Dracula - Narrow Right Column (custom: start_col=24, gridWidth=8)
 # Element = (8*60)-(2*8) = 464px wide
-CONFIG_7_NAME="Narrow Right (464x764)"
+CONFIG_7_NAME="Narrow Right (464x824)"
 CONFIG_7_THEME="dracula"
 CONFIG_7_LANG="bash"
 CONFIG_7_MARGIN=8
@@ -419,7 +419,7 @@ generate_slide() {
     else
         echo "  Theme: $theme | Language: $lang | Preset: $preset"
     fi
-    echo "  Size: ${width}x13 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
+    echo "  Size: ${width}x14 grid = ${element_width}x${element_height}px element | Margin: ${margin}px"
 
     # Determine if this is a right-side position (needs ContentElement API)
     # v1.2.6: Now uses ContentElement API which has NO validation
@@ -455,7 +455,7 @@ generate_slide() {
                 start_col: $start_col,
                 start_row: 4,
                 gridWidth: $width,
-                gridHeight: 13,
+                gridHeight: 14,
                 show_line_numbers: true,
                 show_copy_button: $show_copy
             }')
@@ -477,7 +477,7 @@ generate_slide() {
                 filename: $filename,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 13,
+                gridHeight: 14,
                 show_line_numbers: true,
                 show_copy_button: $show_copy
             }')
@@ -499,7 +499,7 @@ generate_slide() {
                 header_text: $header,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 13,
+                gridHeight: 14,
                 show_line_numbers: true,
                 show_copy_button: $show_copy
             }')
@@ -519,7 +519,7 @@ generate_slide() {
                 external_margin: $margin,
                 position_preset: $preset,
                 gridWidth: $width,
-                gridHeight: 13,
+                gridHeight: 14,
                 show_line_numbers: true,
                 show_copy_button: $show_copy
             }')
@@ -841,8 +841,8 @@ EOF
 # Add each theme card with preset/size info (now 7 configs including right-side custom positions)
 themes=("github_dark" "monokai" "dracula" "solarized_dark" "github_light" "monokai" "dracula")
 presets=("full_content" "left_half" "right_half" "left_third" "right_third" "right_two_thirds" "narrow_right")
-sizes=("1780x760" "870x750" "880x760" "576x756" "580x760" "1180x760" "464x764")
-grids=("30x13" "15x13" "15x13" "10x13" "10x13" "20x13" "8x13")
+sizes=("1780x820" "870x810" "880x820" "576x816" "580x820" "1180x820" "464x824")
+grids=("30x14" "15x14" "15x14" "10x14" "10x14" "20x14" "8x14")
 langs=("python" "javascript" "typescript" "go" "sql" "rust" "bash")
 positions=("preset" "preset" "preset" "preset" "preset" "start_col=12" "start_col=24")
 
@@ -896,7 +896,7 @@ cat > "$OUTPUT_DIR/test_report.json" << EOF
     "version": "1.2.8",
     "position_presets_tested": ["full_content", "left_half", "right_half", "left_third", "right_third"],
     "custom_positions_tested": ["start_col=12 (right 2/3)", "start_col=24 (narrow right)"],
-    "element_dimensions_tested": ["1780x760", "870x750", "880x760", "576x756", "580x760", "1180x760", "464x764"],
+    "element_dimensions_tested": ["1780x820", "870x810", "880x820", "576x816", "580x820", "1180x820", "464x824"],
     "themes_tested": ["github_dark", "monokai", "dracula", "solarized_dark", "github_light"],
     "features_tested": [
         "position_preset configuration",
@@ -941,15 +941,15 @@ echo "  CODE_DISPLAY v1.2.8 SIZING TEST RESULTS"
 echo "=============================================="
 echo ""
 echo "Position Presets Tested (v1.2.3: element = grid - 2*margin):"
-echo -e "  ${CYAN}1. full_content${NC}    - 30x13 grid → 1780x760 element (Python/FastAPI)"
-echo -e "  ${MAGENTA}2. left_half${NC}       - 15x13 grid → 870x750 element  (JavaScript/React)"
-echo -e "  ${MAGENTA}3. right_half${NC}      - 15x13 grid → 880x760 element  (TypeScript) [RIGHT]"
-echo -e "  ${BLUE}4. left_third${NC}      - 10x13 grid → 576x756 element  (Go/HTTP Server)"
-echo -e "  ${YELLOW}5. right_third${NC}     - 10x13 grid → 580x760 element  (SQL/Analytics) [RIGHT]"
+echo -e "  ${CYAN}1. full_content${NC}    - 30x14 grid → 1780x820 element (Python/FastAPI)"
+echo -e "  ${MAGENTA}2. left_half${NC}       - 15x14 grid → 870x810 element  (JavaScript/React)"
+echo -e "  ${MAGENTA}3. right_half${NC}      - 15x14 grid → 880x820 element  (TypeScript) [RIGHT]"
+echo -e "  ${BLUE}4. left_third${NC}      - 10x14 grid → 576x816 element  (Go/HTTP Server)"
+echo -e "  ${YELLOW}5. right_third${NC}     - 10x14 grid → 580x820 element  (SQL/Analytics) [RIGHT]"
 echo ""
 echo "Custom Right-Side Positions:"
-echo -e "  ${GREEN}6. right_two_thirds${NC} - start_col=12, 20x13 grid → 1180x760 element (Rust) [RIGHT]"
-echo -e "  ${GREEN}7. narrow_right${NC}     - start_col=24, 8x13 grid  → 464x764 element  (Bash) [RIGHT]"
+echo -e "  ${GREEN}6. right_two_thirds${NC} - start_col=12, 20x14 grid → 1180x820 element (Rust) [RIGHT]"
+echo -e "  ${GREEN}7. narrow_right${NC}     - start_col=24, 8x14 grid  → 464x824 element  (Bash) [RIGHT]"
 echo ""
 echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 7 success"
 if [ $FAIL_COUNT -gt 0 ]; then
