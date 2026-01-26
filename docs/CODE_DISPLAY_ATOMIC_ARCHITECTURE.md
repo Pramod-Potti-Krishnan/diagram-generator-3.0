@@ -23,6 +23,206 @@ The CODE_DISPLAY atomic endpoint generates styled, interactive code blocks for p
 
 ---
 
+## API Reference
+
+### Endpoint
+
+```
+POST /v1.2/atomic/CODE_DISPLAY
+Host: diagram-generator-3.0.railway.app
+Content-Type: application/json
+```
+
+### Request Parameters
+
+#### Core Code Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `code` | string | `""` | The code content to display. Can be empty if using `prompt` or `placeholder_mode` |
+| `language` | string | `"python"` | Programming language for syntax highlighting |
+
+**Supported Languages:** `python`, `javascript`, `typescript`, `java`, `go`, `rust`, `sql`, `bash`, `ruby`, `kotlin`, `swift`, `c`, `cpp`, `csharp`, `php`, `r`
+
+#### Grid & Positioning
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `gridWidth` | int | `28` | 4-32 | Width in grid units (60px per unit) |
+| `gridHeight` | int | `12` | 4-18 | Height in grid units (60px per unit) |
+| `position_preset` | string | `null` | - | Preset layout (overrides gridWidth/gridHeight) |
+| `start_col` | int | `null` | 1-32 | Starting column position |
+| `start_row` | int | `null` | 1-18 | Starting row position |
+
+**Position Presets:**
+- `full_content` - Full width (col 2, width 30, height 14)
+- `left_half` - Left half (col 2, width 15, height 14)
+- `right_half` - Right half (col 17, width 15, height 14)
+- `left_third` - Left third (col 2, width 10, height 14)
+- `center_third` - Center third (col 12, width 10, height 14)
+- `right_third` - Right third (col 22, width 10, height 14)
+- `top_half` - Top half (col 2, width 30, height 7)
+- `bottom_half` - Bottom half (col 2, row 11, width 30, height 7)
+
+#### Styling
+
+| Parameter | Type | Default | Range | Description |
+|-----------|------|---------|-------|-------------|
+| `color_theme` | string | `"github_dark"` | - | Color theme for the code block |
+| `variant` | string | `"dark"` | - | Legacy: `"light"` or `"dark"` (maps to color_theme) |
+| `external_margin` | int | `10` | 0-30 | Outer margin in pixels |
+| `border_radius` | int | `12` | 0-24 | Corner radius in pixels |
+| `corner_style` | string | `"rounded"` | - | `"rounded"` (12px) or `"square"` (0px) |
+| `font_size` | int | `14` | 10-24 | Base font size in pixels |
+| `text_size` | string | `null` | - | Preset: `"small"`, `"medium"`, `"large"` |
+
+**Color Themes:**
+- `github_dark` - GitHub dark theme (dark background, light text)
+- `github_light` - GitHub light theme (light background, dark text)
+- `monokai` - Monokai theme (classic dark theme with vibrant colors)
+- `solarized_dark` - Solarized dark theme
+- `dracula` - Dracula theme (purple accents)
+
+#### Header & Display Options
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `show_header` | bool | `true` | Show/hide the entire header section |
+| `show_copy_button` | bool | `true` | Show copy button in header |
+| `show_language_badge` | bool | `true` | Show language badge in header |
+| `show_line_numbers` | bool | `true` | Show line numbers alongside code |
+| `header_text` | string | `null` | Custom header text (replaces language badge) |
+| `filename` | string | `null` | Filename to display in header (max 100 chars) |
+| `line_number_start` | int | `1` | Starting line number |
+| `highlight_lines` | int[] | `null` | List of line numbers to highlight |
+
+#### Code Generation (LLM-Based)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `placeholder_mode` | bool | `false` | Use sample placeholder code (no LLM call) |
+| `prompt` | string | `null` | Prompt for LLM code generation (max 500 chars) |
+| `code_topic` | string | `null` | Code topic hint (e.g., "API endpoint", "algorithm") |
+| `framework` | string | `null` | Target framework (e.g., "FastAPI", "React") |
+| `complexity` | string | `"medium"` | Code complexity: `"simple"`, `"medium"`, `"advanced"` |
+| `include_comments` | bool | `true` | Include explanatory comments |
+| `include_imports` | bool | `true` | Include import statements |
+| `include_error_handling` | bool | `false` | Include try/catch error handling |
+| `max_lines` | int | `null` | Maximum lines for generated code (10-100) |
+
+#### Key Concepts (Optional Text Service Integration)
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `key_concepts_prompt` | string | `null` | Prompt for generating key concepts |
+| `key_concepts_count` | int | `5` | Number of bullets (1-7) |
+| `key_concepts_title` | string | `"Key Concepts"` | Title for key concepts section |
+| `use_text_service` | bool | `false` | Call Text Service for generation |
+
+#### Context (Optional)
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `context.slide_title` | string | Title of the slide |
+| `context.slide_purpose` | string | Purpose of the slide |
+| `context.key_message` | string | Key takeaway message |
+| `context.audience` | string | Target audience |
+| `context.tone` | string | Desired tone (default: "professional") |
+| `context.presentation_title` | string | Overall presentation title |
+
+### Response Model
+
+```json
+{
+  "success": true,
+  "html": "<div style=\"...\">...</div>",
+  "component_type": "code_display",
+  "instance_count": 1,
+  "arrangement": "single",
+  "variants_used": ["dark"],
+  "character_counts": {"code": 245, "key_concepts": 0},
+  "line_count": 8,
+  "language": "python",
+  "code_generated": false,
+  "prompt_used": null,
+  "color_theme": "github_dark",
+  "preset_used": "left_half",
+  "metadata": {
+    "generation_time_ms": 15,
+    "grid_dimensions": {"width": 15, "height": 14},
+    "pixel_dimensions": {"width": 870, "height": 810},
+    "version": "1.2.16"
+  },
+  "grid_position": {
+    "start_col": 2,
+    "start_row": 4,
+    "width": 15,
+    "height": 14,
+    "grid_row": "4/18",
+    "grid_column": "2/17"
+  }
+}
+```
+
+### Example Requests
+
+**1. Direct Code with Preset:**
+```bash
+curl -X POST "https://diagram-service.railway.app/v1.2/atomic/CODE_DISPLAY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "def hello():\n    return \"world\"",
+    "language": "python",
+    "position_preset": "left_half",
+    "color_theme": "monokai",
+    "external_margin": 15
+  }'
+```
+
+**2. LLM-Generated Code:**
+```bash
+curl -X POST "https://diagram-service.railway.app/v1.2/atomic/CODE_DISPLAY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Create a FastAPI health endpoint with version info",
+    "language": "python",
+    "framework": "FastAPI",
+    "complexity": "medium",
+    "position_preset": "full_content",
+    "color_theme": "github_dark"
+  }'
+```
+
+**3. Placeholder Mode (No LLM):**
+```bash
+curl -X POST "https://diagram-service.railway.app/v1.2/atomic/CODE_DISPLAY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "language": "javascript",
+    "placeholder_mode": true,
+    "position_preset": "right_half",
+    "color_theme": "dracula"
+  }'
+```
+
+**4. Custom Sizing with Filename:**
+```bash
+curl -X POST "https://diagram-service.railway.app/v1.2/atomic/CODE_DISPLAY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "export const config = { debug: true };",
+    "language": "typescript",
+    "gridWidth": 20,
+    "gridHeight": 10,
+    "start_col": 12,
+    "external_margin": 10,
+    "filename": "config.ts",
+    "color_theme": "solarized_dark"
+  }'
+```
+
+---
+
 ## Part 1: HTML Generation in Diagram Service
 
 ### Endpoint Definition
@@ -39,33 +239,16 @@ Host: diagram-generator-3.0.railway.app
 
 ### Request Model
 
-```python
-class CodeDisplayAtomicRequest(BaseModel):
-    # Code content
-    code: str = ""                          # Direct code or empty if using prompt
-    language: str = "python"                # Programming language
+See **[API Reference](#api-reference)** above for complete parameter documentation.
 
-    # Grid dimensions (60px per unit)
-    gridWidth: int = 28                     # Width in grid units (4-32)
-    gridHeight: int = 14                    # Height in grid units (4-18)
-
-    # Position preset (convenience)
-    position_preset: Optional[str] = None   # left_half, right_half, full_content, etc.
-
-    # Styling
-    color_theme: str = "github_dark"        # 5 themes available
-    external_margin: int = 10               # Outer margin in pixels (0-30)
-    border_radius: int = 12                 # Corner radius (0-24)
-
-    # Header options
-    show_header: bool = True
-    show_copy_button: bool = True
-    show_language_badge: bool = True
-
-    # Code generation (optional)
-    prompt: Optional[str] = None            # LLM prompt for code generation
-    placeholder_mode: bool = False          # Use sample code (no LLM)
-```
+**Key Parameters:**
+- `code` + `language` - Direct code input
+- `position_preset` - Convenience layout (e.g., `left_half`, `right_half`)
+- `gridWidth` / `gridHeight` - Custom sizing (60px per unit)
+- `color_theme` - 5 themes available
+- `external_margin` - Padding in pixels (0-30)
+- `prompt` - LLM-based code generation
+- `placeholder_mode` - Use sample code (no LLM)
 
 ### Position Presets
 
