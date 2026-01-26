@@ -31,6 +31,9 @@ v1.5.1: Status indicator shift on hover - shifts left when card hovered to preve
         overlap with edit button.
 v1.6.0: Kanban state persistence - adds extractKanbanState() and notifyStateChange() to
         enable parent window to persist interactive changes (add/edit/move cards).
+v1.6.1: Direct API persistence - replaced postMessage/auto-save with direct fetch() calls
+        to /api/kanban/update-data and /api/kanban/get-data endpoints. Added loadSavedData()
+        on init to restore board state from Supabase. Mirrors chart persistence pattern.
 """
 
 import logging
@@ -138,6 +141,7 @@ class KanbanAtomicGenerator:
 
     v1.4.0: Added CSS variable theming with postMessage sync for live dark/light mode switching
     v1.5.0: Dark mode solid colors, white button border, modal dialog for add/edit
+    v1.6.1: Direct API persistence - fetch() calls to /api/kanban/* endpoints
     """
 
     def __init__(self):
@@ -338,7 +342,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.6.0"
+                    version="1.6.1"
                 ),
                 grid_position=position_data
             )
@@ -417,9 +421,12 @@ class KanbanAtomicGenerator:
         # v1.5.0: Add modal dialog for add/edit card
         modal_html = self._generate_modal_html()
 
+        # v1.6.1: Add data attributes for direct API persistence
+        # Service URL for API calls - uses Railway production URL by default
+        # These attributes are read by the JavaScript to make direct API calls
         html = f'''{theme_css}
 {modal_html}
-<div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true">
+<div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true" data-service-url="https://web-production-e0ad0.up.railway.app">
   <div style="{columns_container_style}">
     {columns_html}
   </div>
@@ -804,22 +811,181 @@ button:hover {{
     return {{ columns: columns }};
   }}
 
-  // v1.6.0: Notify parent window of state changes for persistence
+  // v1.6.1: Get IDs and service URL for direct API persistence
+  var kanbanContainer = container.closest('[data-kanban-container]') || container;
+  var diagramServiceUrl = kanbanContainer.getAttribute('data-service-url') || 'https://web-production-e0ad0.up.railway.app';
+
+  // Get presentation ID from URL or parent window
+  function getPresentationId() {{
+    // Try URL params first
+    var urlParams = new URLSearchParams(window.location.search);
+    var pid = urlParams.get('presentation_id') || urlParams.get('presentationId');
+    if (pid) return pid;
+
+    // Try parent URL
+    try {{
+      if (window.parent !== window) {{
+        var parentUrl = window.parent.location.href;
+        var match = parentUrl.match(/presentations\\/([a-f0-9-]+)/i);
+        if (match) return match[1];
+      }}
+    }} catch(e) {{}}
+
+    // Try data attribute on container hierarchy
+    var el = container;
+    while (el && el !== document.body) {{
+      var dataId = el.getAttribute('data-presentation-id');
+      if (dataId) return dataId;
+      el = el.parentElement;
+    }}
+
+    return '';
+  }}
+
+  // Get Kanban element ID
+  function getKanbanId() {{
+    var el = container;
+    while (el && el !== document.body) {{
+      var dataId = el.getAttribute('data-element-id') || el.getAttribute('data-kanban-id') || el.id;
+      if (dataId && dataId.length > 0) return dataId;
+      el = el.parentElement;
+    }}
+    // Generate a fallback ID
+    return 'kanban_' + Date.now();
+  }}
+
+  var presentationId = getPresentationId();
+  var kanbanId = getKanbanId();
+
+  // v1.6.1: Save Kanban state via direct API call (replaces postMessage)
+  async function saveKanbanData() {{
+    if (!presentationId || !kanbanId) {{
+      console.warn('[Kanban] Missing IDs for persistence - presentationId:', presentationId, 'kanbanId:', kanbanId);
+      return;
+    }}
+
+    var payload = {{
+      kanban_id: kanbanId,
+      presentation_id: presentationId,
+      columns: extractKanbanState().columns
+    }};
+
+    try {{
+      var response = await fetch(diagramServiceUrl + '/api/kanban/update-data', {{
+        method: 'POST',
+        headers: {{'Content-Type': 'application/json'}},
+        body: JSON.stringify(payload)
+      }});
+
+      var result = await response.json();
+      if (result.persisted) {{
+        console.log('[Kanban] State saved successfully');
+      }} else {{
+        console.log('[Kanban] State save response:', result);
+      }}
+    }} catch (err) {{
+      console.error('[Kanban] Failed to save:', err);
+    }}
+  }}
+
+  // v1.6.1: Restore Kanban state from saved data
+  function restoreKanbanState(columns) {{
+    if (!columns || !Array.isArray(columns)) return;
+
+    var columnEls = container.querySelectorAll('.kanban-column');
+    if (columnEls.length !== columns.length) {{
+      console.warn('[Kanban] Column count mismatch, skipping restore');
+      return;
+    }}
+
+    columns.forEach(function(colData, colIndex) {{
+      var colEl = columnEls[colIndex];
+      if (!colEl || !colData.items) return;
+
+      var cardsContainer = colEl.querySelector('.kanban-cards-list');
+      if (!cardsContainer) return;
+
+      // Clear existing cards
+      cardsContainer.innerHTML = '';
+
+      // Rebuild cards from saved data
+      colData.items.forEach(function(cardData) {{
+        var assigneeHtml = '';
+        if (cardData.assignee) {{
+          assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + cardData.assignee + '</div>';
+        }}
+
+        var statusHtml = '';
+        if (cardData.status) {{
+          var statusColors = {{'green': '#10B981', 'amber': '#F59E0B', 'red': '#EF4444'}};
+          var statusColor = statusColors[cardData.status] || 'transparent';
+          statusHtml = '<div class="kanban-status" data-status="' + cardData.status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;transition:transform 0.15s ease;"></div>';
+        }}
+
+        var priorityColors = {{'high': '#EF4444', 'medium': '#F59E0B', 'low': '#10B981'}};
+        var priorityColor = priorityColors[cardData.priority] || '#9CA3AF';
+
+        var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
+          '<div style="display:flex;">' +
+          '<div style="width:4px;background:' + priorityColor + ';border-radius:2px 0 0 2px;"></div>' +
+          '<div class="kanban-content" style="flex:1;padding:12px;">' +
+          '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;margin:0;">' + cardData.title + '</p>' +
+          assigneeHtml +
+          '</div>' +
+          statusHtml +
+          '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;color:var(--add-btn-text);" onclick="editCard(this, event)">' +
+          '<svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
+          '</button>' +
+          '</div></div>';
+
+        cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+      }});
+
+      // Re-init drag for restored cards
+      colEl.querySelectorAll('.kanban-card').forEach(function(card) {{
+        card.addEventListener('dragstart', function(e) {{
+          draggedCard = card;
+          card.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', '');
+        }});
+        card.addEventListener('dragend', function() {{
+          card.classList.remove('dragging');
+          container.querySelectorAll('.kanban-cards').forEach(function(c) {{ c.classList.remove('drag-over'); }});
+          draggedCard = null;
+        }});
+      }});
+    }});
+
+    updateColumnCounts();
+    console.log('[Kanban] State restored from saved data');
+  }}
+
+  // v1.6.1: Load saved data on init
+  async function loadSavedData() {{
+    if (!presentationId || !kanbanId) {{
+      console.log('[Kanban] No IDs available for loading saved state');
+      return;
+    }}
+
+    try {{
+      var response = await fetch(diagramServiceUrl + '/api/kanban/get-data/' + presentationId + '/' + kanbanId);
+      var result = await response.json();
+
+      if (result.success && result.data && result.data.columns) {{
+        restoreKanbanState(result.data.columns);
+      }} else {{
+        console.log('[Kanban] No saved data found');
+      }}
+    }} catch (err) {{
+      console.log('[Kanban] Could not load saved data:', err);
+    }}
+  }}
+
+  // v1.6.1: Notify state change now calls saveKanbanData directly
   function notifyStateChange(action) {{
-    if (!window.parent || window.parent === window) return;
-    var kanbanContainer = container.closest('[data-kanban-container]') || container;
-    var elementContainer = kanbanContainer.closest('[data-element-id]') || kanbanContainer.closest('.inserted-diagram');
-    var elementId = elementContainer ? (elementContainer.getAttribute('data-element-id') || elementContainer.id) : null;
-
-    window.parent.postMessage({{
-      type: 'updateKanbanState',
-      elementId: elementId,
-      action: action,
-      kanbanData: extractKanbanState(),
-      timestamp: Date.now()
-    }}, '*');
-
-    console.log('[Kanban] State change notified: ' + action);
+    console.log('[Kanban] State change: ' + action);
+    saveKanbanData();
   }}
 
   // v1.5.0: Modal-based edit card function
@@ -999,10 +1165,14 @@ button:hover {{
     document.addEventListener('DOMContentLoaded', function() {{
       initDragAndDrop();
       initModal();
+      // v1.6.1: Load saved state after a brief delay to ensure IDs are available
+      setTimeout(loadSavedData, 100);
     }});
   }} else {{
     initDragAndDrop();
     initModal();
+    // v1.6.1: Load saved state after a brief delay to ensure IDs are available
+    setTimeout(loadSavedData, 100);
   }}
 }})();
 </script>'''
