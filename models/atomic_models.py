@@ -618,8 +618,11 @@ KANBAN_POSITION_PRESETS = {
 # Column count presets
 KanbanColumnCountType = Literal[3, 4, 5]
 
-# Kanban theme type
+# Kanban theme type (legacy - kept for backward compatibility)
 KanbanThemeType = Literal["default", "dark", "minimal"]
+
+# Theme mode type for Layout Service light/dark toggle
+KanbanThemeModeType = Literal["light", "dark"]
 
 # Kanban position preset type
 KanbanPositionPresetType = Literal["full_content", "left_two_thirds", "right_two_thirds"]
@@ -658,6 +661,9 @@ class KanbanAtomicRequest(BaseModel):
     configurable columns, themes, and grid positioning.
 
     v1.0.0: Initial KANBAN_BOARD atomic endpoint
+    v1.1.0: Removed board title, headers inside columns, editable assignees
+    v1.2.0: Fixed column stretching, added theme_mode for light/dark toggle
+            with translucent RGBA pastel backgrounds
     """
     # Board data
     title: Optional[str] = Field(
@@ -700,7 +706,11 @@ class KanbanAtomicRequest(BaseModel):
     )
     theme: KanbanThemeType = Field(
         default="default",
-        description="Design theme: default (light), dark, minimal"
+        description="Legacy design theme: default, dark, minimal (use theme_mode instead)"
+    )
+    theme_mode: KanbanThemeModeType = Field(
+        default="light",
+        description="Theme mode for Layout Service light/dark toggle. Takes priority over theme."
     )
 
     # Styling
@@ -779,6 +789,7 @@ class KanbanAtomicRequest(BaseModel):
                 "position_preset": "full_content",
                 "column_count": 4,
                 "theme": "default",
+                "theme_mode": "light",
                 "external_margin": 10,
                 "placeholder_mode": True
             }
@@ -796,6 +807,7 @@ class KanbanAtomicResponse(BaseModel):
     Returns generated Kanban board HTML along with metadata.
 
     v1.0.0: Initial response model
+    v1.2.0: Added theme_mode_used field for light/dark mode indication
     """
     success: bool = Field(
         ...,
@@ -819,7 +831,11 @@ class KanbanAtomicResponse(BaseModel):
     )
     theme_used: str = Field(
         default="default",
-        description="Theme actually applied"
+        description="Legacy theme name applied"
+    )
+    theme_mode_used: str = Field(
+        default="light",
+        description="Theme mode actually applied (light or dark)"
     )
     preset_used: Optional[str] = Field(
         default=None,
@@ -849,12 +865,13 @@ class KanbanAtomicResponse(BaseModel):
                 "column_count": 4,
                 "card_count": 12,
                 "theme_used": "default",
+                "theme_mode_used": "light",
                 "preset_used": "full_content",
                 "metadata": {
                     "generation_time_ms": 45,
                     "grid_dimensions": {"width": 30, "height": 14},
                     "pixel_dimensions": {"width": 1780, "height": 820},
-                    "version": "1.0.0"
+                    "version": "1.2.0"
                 },
                 "grid_position": {
                     "start_col": 2,

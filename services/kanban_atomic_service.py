@@ -7,7 +7,7 @@ Service layer for generating interactive Kanban board HTML with:
 - Column count presets:
   - full_content: 4 or 5 columns only
   - left_two_thirds / right_two_thirds: 3 columns only
-- Design themes (default, dark, minimal)
+- Light/dark mode theming with translucent pastel backgrounds
 - View mode interactivity (add card, move card, edit card with assignee)
 - No board title (slide title provides context)
 - No outer background (transparent container, columns use full height)
@@ -16,6 +16,8 @@ Service layer for generating interactive Kanban board HTML with:
 v1.0.0: Initial implementation following atomic endpoint pattern
 v1.1.0: Removed board title, transparent container, headers inside columns,
         column count restrictions by position, editable assignees
+v1.2.0: Fixed column stretching with flex:1 1 0, added theme_mode for light/dark
+        toggle with translucent RGBA pastel backgrounds
 """
 
 import logging
@@ -35,55 +37,59 @@ logger = logging.getLogger(__name__)
 
 
 # =============================================================================
-# Theme Color Definitions
+# Theme Color Definitions - Light/Dark Mode with Translucent Pastel Backgrounds
 # =============================================================================
 
+# Light mode colors (default) - pastel backgrounds, dark text
+# RGBA backgrounds at 60% opacity so slide background shows through
+KANBAN_COLORS_LIGHT = {
+    "column_colors": [
+        "rgba(243, 244, 246, 0.6)",   # gray pastel
+        "rgba(219, 234, 254, 0.6)",   # blue pastel
+        "rgba(254, 243, 199, 0.6)",   # yellow pastel
+        "rgba(209, 250, 229, 0.6)",   # green pastel
+        "rgba(252, 231, 243, 0.6)",   # pink pastel
+    ],
+    "header": "#111827",              # Dark header text
+    "text": "#1F2937",                # Dark card text
+    "card_bg": "rgba(255, 255, 255, 0.9)",
+    "card_border": "#E5E7EB",
+    "card_shadow": "0 1px 3px rgba(0,0,0,0.1)",
+    "accent": "#8B5CF6",
+    "add_btn_border": "#D1D5DB",
+    "add_btn_text": "#6B7280",
+    "count_bg": "rgba(229, 231, 235, 0.8)",
+    "count_text": "#6B7280",
+}
+
+# Dark mode colors - same pastel backgrounds (slightly more transparent), light text
+# Pastel colors remain visible against dark slide backgrounds
+KANBAN_COLORS_DARK = {
+    "column_colors": [
+        "rgba(243, 244, 246, 0.5)",   # gray pastel, slightly more transparent
+        "rgba(219, 234, 254, 0.5)",   # blue pastel
+        "rgba(254, 243, 199, 0.5)",   # yellow pastel
+        "rgba(209, 250, 229, 0.5)",   # green pastel
+        "rgba(252, 231, 243, 0.5)",   # pink pastel
+    ],
+    "header": "#FFFFFF",              # White header text
+    "text": "#F9FAFB",                # Light card text
+    "card_bg": "rgba(75, 85, 99, 0.85)",   # Darker translucent card
+    "card_border": "rgba(107, 114, 128, 0.6)",
+    "card_shadow": "0 1px 3px rgba(0,0,0,0.3)",
+    "accent": "#A78BFA",
+    "add_btn_border": "rgba(107, 114, 128, 0.6)",
+    "add_btn_text": "#D1D5DB",
+    "count_bg": "rgba(75, 85, 99, 0.8)",
+    "count_text": "#D1D5DB",
+}
+
+# Legacy theme mapping for backward compatibility
+# Maps old theme names to theme_mode
 KANBAN_THEME_COLORS = {
-    "default": {
-        "bg": "#FFFFFF",
-        "column_bg": "#F3F4F6",
-        "column_colors": ["#F3F4F6", "#DBEAFE", "#FEF3C7", "#D1FAE5", "#FCE7F3"],
-        "text": "#1F2937",
-        "header": "#111827",
-        "card_bg": "#FFFFFF",
-        "card_border": "#E5E7EB",
-        "card_shadow": "0 1px 3px rgba(0,0,0,0.1)",
-        "accent": "#8B5CF6",
-        "add_btn_border": "#D1D5DB",
-        "add_btn_text": "#9CA3AF",
-        "count_bg": "#E5E7EB",
-        "count_text": "#6B7280",
-    },
-    "dark": {
-        "bg": "#1F2937",
-        "column_bg": "#374151",
-        "column_colors": ["#374151", "#1E3A5F", "#3D3D00", "#1A3A2F", "#3D2F3D"],
-        "text": "#F9FAFB",
-        "header": "#FFFFFF",
-        "card_bg": "#4B5563",
-        "card_border": "#6B7280",
-        "card_shadow": "0 1px 3px rgba(0,0,0,0.3)",
-        "accent": "#A78BFA",
-        "add_btn_border": "#6B7280",
-        "add_btn_text": "#9CA3AF",
-        "count_bg": "#4B5563",
-        "count_text": "#D1D5DB",
-    },
-    "minimal": {
-        "bg": "#FAFAFA",
-        "column_bg": "#F5F5F5",
-        "column_colors": ["#F5F5F5", "#F5F5F5", "#F5F5F5", "#F5F5F5", "#F5F5F5"],
-        "text": "#404040",
-        "header": "#171717",
-        "card_bg": "#FFFFFF",
-        "card_border": "#E5E5E5",
-        "card_shadow": "0 1px 2px rgba(0,0,0,0.05)",
-        "accent": "#3B82F6",
-        "add_btn_border": "#E5E5E5",
-        "add_btn_text": "#A3A3A3",
-        "count_bg": "#E5E5E5",
-        "count_text": "#737373",
-    }
+    "default": KANBAN_COLORS_LIGHT,
+    "dark": KANBAN_COLORS_DARK,
+    "minimal": KANBAN_COLORS_LIGHT,  # minimal uses light mode colors
 }
 
 # Column name presets based on column count
@@ -157,11 +163,16 @@ class KanbanAtomicGenerator:
             else:
                 raise ValueError("No columns source provided")
 
-            # Get theme colors
-            theme_colors = KANBAN_THEME_COLORS.get(
-                request.theme,
-                KANBAN_THEME_COLORS["default"]
-            )
+            # Get theme colors based on theme_mode (priority) or legacy theme
+            theme_mode = getattr(request, 'theme_mode', 'light')
+            if theme_mode == "dark":
+                theme_colors = KANBAN_COLORS_DARK
+            else:
+                # Light mode (default), or fall back to legacy theme mapping
+                theme_colors = KANBAN_THEME_COLORS.get(
+                    request.theme,
+                    KANBAN_COLORS_LIGHT
+                )
 
             # Generate HTML with inline styles (no board title - slide title provides context)
             html_content = self._generate_html(
@@ -189,6 +200,7 @@ class KanbanAtomicGenerator:
                 column_count=column_count,
                 card_count=card_count,
                 theme_used=request.theme,
+                theme_mode_used=theme_mode,
                 preset_used=request.position_preset,
                 metadata=AtomicMetadata(
                     generation_time_ms=generation_time_ms,
@@ -197,7 +209,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.0.0"
+                    version="1.2.0"
                 ),
                 grid_position=position_data
             )
@@ -297,9 +309,10 @@ class KanbanAtomicGenerator:
             card_count = len(column.items)
 
             # Column wrapper style - full height, colored background
+            # flex:1 1 0 + min-width:0 allows columns to stretch and shrink evenly
             column_style = (
-                f"flex:1;"
-                f"min-width:180px;"
+                f"flex:1 1 0;"
+                f"min-width:0;"
                 f"display:flex;"
                 f"flex-direction:column;"
                 f"background:{col_bg};"
