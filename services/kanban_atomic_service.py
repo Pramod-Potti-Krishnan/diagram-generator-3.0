@@ -36,6 +36,9 @@ v1.6.1: Direct API persistence - replaced postMessage/auto-save with direct fetc
         on init to restore board state from Supabase. Mirrors chart persistence pattern.
 v1.6.2: Fixed ID detection - iframes using srcdoc can't access parent URL or data attributes.
         Now receives presentation_id and element_id via postMessage from parent (element-manager.js).
+v1.6.3: Restored postMessage communication for auto-save integration. Kanban now sends updateKanbanState
+        postMessage to parent instead of direct API calls. Parent handles persistence via auto-save.
+        Saved state restored via kanban-init postMessage from parent.
 """
 
 import logging
@@ -145,6 +148,7 @@ class KanbanAtomicGenerator:
     v1.5.0: Dark mode solid colors, white button border, modal dialog for add/edit
     v1.6.1: Direct API persistence - fetch() calls to /api/kanban/* endpoints
     v1.6.2: Fixed ID detection - receives IDs via postMessage from parent element-manager.js
+    v1.6.3: Restored postMessage for auto-save integration - sends updateKanbanState to parent
     """
 
     def __init__(self):
@@ -345,7 +349,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.6.2"
+                    version="1.6.3"
                 ),
                 grid_position=position_data
             )
@@ -822,7 +826,7 @@ button:hover {{
   var presentationId = '';
   var kanbanId = '';
 
-  // v1.6.2: Listen for init message from parent with IDs
+  // v1.6.3: Listen for init message from parent with IDs and saved state
   window.addEventListener('message', function(e) {{
     if (!e.data || e.data.type !== 'kanban-init') return;
 
@@ -831,42 +835,14 @@ button:hover {{
 
     console.log('[Kanban] Received IDs - presentation:', presentationId, 'element:', kanbanId);
 
-    // Load saved data now that we have IDs
-    if (presentationId && kanbanId) {{
-      loadSavedData();
+    // v1.6.3: Restore saved state if provided
+    if (e.data.saved_state && e.data.saved_state.columns) {{
+      restoreKanbanState(e.data.saved_state.columns);
     }}
   }});
 
-  // v1.6.1: Save Kanban state via direct API call (replaces postMessage)
-  async function saveKanbanData() {{
-    if (!presentationId || !kanbanId) {{
-      console.warn('[Kanban] Missing IDs for persistence - presentationId:', presentationId, 'kanbanId:', kanbanId);
-      return;
-    }}
-
-    var payload = {{
-      kanban_id: kanbanId,
-      presentation_id: presentationId,
-      columns: extractKanbanState().columns
-    }};
-
-    try {{
-      var response = await fetch(diagramServiceUrl + '/api/kanban/update-data', {{
-        method: 'POST',
-        headers: {{'Content-Type': 'application/json'}},
-        body: JSON.stringify(payload)
-      }});
-
-      var result = await response.json();
-      if (result.persisted) {{
-        console.log('[Kanban] State saved successfully');
-      }} else {{
-        console.log('[Kanban] State save response:', result);
-      }}
-    }} catch (err) {{
-      console.error('[Kanban] Failed to save:', err);
-    }}
-  }}
+  // v1.6.3: saveKanbanData removed - data now persisted via parent auto-save
+  // Parent receives updateKanbanState postMessage and handles persistence
 
   // v1.6.1: Restore Kanban state from saved data
   function restoreKanbanState(columns) {{
@@ -941,31 +917,28 @@ button:hover {{
     console.log('[Kanban] State restored from saved data');
   }}
 
-  // v1.6.1: Load saved data on init
-  async function loadSavedData() {{
-    if (!presentationId || !kanbanId) {{
-      console.log('[Kanban] No IDs available for loading saved state');
+  // v1.6.3: loadSavedData removed - state now loaded via kanban-init postMessage
+  // Parent sends saved_state in the initialization message
+
+  // v1.6.3: Notify parent of state change via postMessage for auto-save
+  function notifyStateChange(action) {{
+    if (!kanbanId) {{
+      console.warn('[Kanban] Cannot save - no element ID received');
       return;
     }}
 
-    try {{
-      var response = await fetch(diagramServiceUrl + '/api/kanban/get-data/' + presentationId + '/' + kanbanId);
-      var result = await response.json();
+    var state = extractKanbanState();
 
-      if (result.success && result.data && result.data.columns) {{
-        restoreKanbanState(result.data.columns);
-      }} else {{
-        console.log('[Kanban] No saved data found');
-      }}
-    }} catch (err) {{
-      console.log('[Kanban] Could not load saved data:', err);
-    }}
-  }}
+    // Send to parent for auto-save integration
+    window.parent.postMessage({{
+      type: 'updateKanbanState',
+      elementId: kanbanId,
+      action: action,
+      kanbanData: state,
+      timestamp: Date.now()
+    }}, '*');
 
-  // v1.6.1: Notify state change now calls saveKanbanData directly
-  function notifyStateChange(action) {{
-    console.log('[Kanban] State change: ' + action);
-    saveKanbanData();
+    console.log('[Kanban] State change sent to parent:', action);
   }}
 
   // v1.5.0: Modal-based edit card function
