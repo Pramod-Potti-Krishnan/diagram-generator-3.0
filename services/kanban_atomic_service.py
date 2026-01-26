@@ -27,6 +27,8 @@ v1.4.0: Full CSS variable theming with postMessage sync for live dark/light mode
 v1.5.0: Dark mode improvements - solid darker column colors instead of transparent
         pastels, white Add Card button border. Replaced sequential prompt() dialogs
         with single modal popup containing all fields (task name, initials, status).
+v1.5.1: Status indicator shift on hover - shifts left when card hovered to prevent
+        overlap with edit button.
 """
 
 import logging
@@ -334,7 +336,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.5.0"
+                    version="1.5.1"
                 ),
                 grid_position=position_data
             )
@@ -617,6 +619,7 @@ class KanbanAtomicGenerator:
                     f"background:{status_color};"
                     f"margin:12px 12px 0 0;"
                     f"flex-shrink:0;"
+                    f"transition:transform 0.15s ease;"
                 )
                 status_html = f'<div class="kanban-status" data-status="{card_status}" style="{status_style}"></div>'
 
@@ -676,6 +679,9 @@ class KanbanAtomicGenerator:
 }}
 .kanban-card:hover .kanban-card-edit {{
   opacity: 1 !important;
+}}
+.kanban-card:hover .kanban-status {{
+  transform: translateX(-24px);
 }}
 .kanban-card-edit:hover {{
   background: rgba(0,0,0,0.05);
