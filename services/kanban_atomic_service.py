@@ -29,6 +29,8 @@ v1.5.0: Dark mode improvements - solid darker column colors instead of transpare
         with single modal popup containing all fields (task name, initials, status).
 v1.5.1: Status indicator shift on hover - shifts left when card hovered to prevent
         overlap with edit button.
+v1.6.0: Kanban state persistence - adds extractKanbanState() and notifyStateChange() to
+        enable parent window to persist interactive changes (add/edit/move cards).
 """
 
 import logging
@@ -336,7 +338,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.5.1"
+                    version="1.6.0"
                 ),
                 grid_position=position_data
             )
@@ -742,6 +744,7 @@ button:hover {{
           if (listEl) {{
             listEl.appendChild(draggedCard);
             updateColumnCounts();
+            notifyStateChange('move');
           }}
         }}
       }});
@@ -763,6 +766,61 @@ button:hover {{
     'red': '#EF4444',
     '': 'transparent'
   }};
+
+  // v1.6.0: Extract current Kanban state for persistence
+  function extractKanbanState() {{
+    var columns = [];
+    container.querySelectorAll('.kanban-column').forEach(function(colEl) {{
+      var nameEl = colEl.querySelector('span[style*="uppercase"]');
+      var column = {{
+        name: nameEl ? nameEl.textContent : 'Column',
+        color: colEl.style.background || colEl.style.backgroundColor || '',
+        items: []
+      }};
+      colEl.querySelectorAll('.kanban-card').forEach(function(cardEl) {{
+        var titleEl = cardEl.querySelector('.kanban-title');
+        var assigneeEl = cardEl.querySelector('.kanban-assignee');
+        var statusEl = cardEl.querySelector('.kanban-status');
+        var priorityBar = cardEl.querySelector('div[style*="width:4px"]');
+
+        // Extract priority from color
+        var priority = '';
+        if (priorityBar) {{
+          var barColor = priorityBar.style.background || priorityBar.style.backgroundColor || '';
+          if (barColor.includes('#EF4444') || barColor.includes('239, 68, 68')) priority = 'high';
+          else if (barColor.includes('#F59E0B') || barColor.includes('245, 158, 11')) priority = 'medium';
+          else if (barColor.includes('#10B981') || barColor.includes('16, 185, 129')) priority = 'low';
+        }}
+
+        column.items.push({{
+          title: titleEl ? titleEl.textContent : '',
+          assignee: assigneeEl ? assigneeEl.textContent : '',
+          status: statusEl ? (statusEl.dataset.status || '') : '',
+          priority: priority
+        }});
+      }});
+      columns.push(column);
+    }});
+    return {{ columns: columns }};
+  }}
+
+  // v1.6.0: Notify parent window of state changes for persistence
+  function notifyStateChange(action) {{
+    if (!window.parent || window.parent === window) return;
+    var kanbanContainer = container.closest('[data-kanban-container]') || container;
+    var elementContainer = kanbanContainer.closest('[data-element-id]') || kanbanContainer.closest('.inserted-diagram');
+    var elementId = elementContainer ? (elementContainer.getAttribute('data-element-id') || elementContainer.id) : null;
+
+    window.parent.postMessage({{
+      type: 'updateKanbanState',
+      elementId: elementId,
+      action: action,
+      kanbanData: extractKanbanState(),
+      timestamp: Date.now()
+    }}, '*');
+
+    console.log('[Kanban] State change notified: ' + action);
+  }}
 
   // v1.5.0: Modal-based edit card function
   window.editCard = function(btn, e) {{
@@ -867,6 +925,8 @@ button:hover {{
           statusEl.remove();
         }}
 
+        notifyStateChange('edit');
+
       }} else {{
         // Create new card
         var column = modal._targetColumn;
@@ -911,6 +971,7 @@ button:hover {{
           draggedCard = null;
         }});
         updateColumnCounts();
+        notifyStateChange('add');
       }}
 
       modal.style.display = 'none';
