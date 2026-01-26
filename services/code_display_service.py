@@ -528,11 +528,11 @@ class CodeDisplayGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
-        # v1.2.12: Use relative dimensions so element adapts to container size
-        # The Layout Service container controls the actual dimensions
+        # v1.2.15: Use pixel dimensions - percentages collapse in iframes
+        # The calculated element_width/element_height are the correct pixel sizes
         outer_style = (
-            f"width:100%;"
-            f"height:100%;"
+            f"width:{element_width}px;"
+            f"height:{element_height}px;"
             f"padding:0;"
             f"margin:0;"
             f"box-sizing:border-box;"
