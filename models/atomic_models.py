@@ -603,3 +603,266 @@ def normalize_language(language: str) -> str:
     """
     lang_lower = language.lower().strip()
     return LANGUAGE_ALIASES.get(lang_lower, lang_lower)
+
+
+# =============================================================================
+# KANBAN_BOARD Position Presets
+# =============================================================================
+
+KANBAN_POSITION_PRESETS = {
+    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+    "left_two_thirds": {"start_col": 2, "start_row": 4, "gridWidth": 20, "gridHeight": 14},
+    "right_two_thirds": {"start_col": 12, "start_row": 4, "gridWidth": 20, "gridHeight": 14},
+}
+
+# Column count presets
+KanbanColumnCountType = Literal[3, 4, 5]
+
+# Kanban theme type
+KanbanThemeType = Literal["default", "dark", "minimal"]
+
+# Kanban position preset type
+KanbanPositionPresetType = Literal["full_content", "left_two_thirds", "right_two_thirds"]
+
+# Kanban priority type
+KanbanPriorityType = Literal["high", "medium", "low", ""]
+
+
+# =============================================================================
+# KANBAN_BOARD Data Models
+# =============================================================================
+
+class KanbanCard(BaseModel):
+    """Individual card in a Kanban column."""
+    title: str = Field(..., max_length=100, description="Card title/task description")
+    priority: KanbanPriorityType = Field(default="", description="Card priority (high, medium, low)")
+    assignee: Optional[str] = Field(None, max_length=50, description="Assignee name or initials")
+
+
+class KanbanColumn(BaseModel):
+    """Column in a Kanban board."""
+    name: str = Field(..., max_length=30, description="Column name (e.g., 'To Do', 'In Progress')")
+    color: Optional[str] = Field(None, description="Column background color (hex)")
+    items: List[KanbanCard] = Field(default_factory=list, description="Cards in this column")
+
+
+# =============================================================================
+# KANBAN_BOARD Request Model
+# =============================================================================
+
+class KanbanAtomicRequest(BaseModel):
+    """
+    Request model for POST /v1.2/atomic/KANBAN_BOARD
+
+    Generates an interactive Kanban board with drag-and-drop support,
+    configurable columns, themes, and grid positioning.
+
+    v1.0.0: Initial KANBAN_BOARD atomic endpoint
+    """
+    # Board data
+    title: Optional[str] = Field(
+        None,
+        max_length=100,
+        description="Board title"
+    )
+    columns: Optional[List[KanbanColumn]] = Field(
+        None,
+        description="Explicit column data (bypasses placeholder mode)"
+    )
+    prompt: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="LLM generation prompt (not implemented in v1.0.0)"
+    )
+
+    # Grid dimensions
+    gridWidth: int = Field(
+        default=30,
+        ge=10,
+        le=32,
+        description="Available width in grid units (32-grid system, 60px per unit)"
+    )
+    gridHeight: int = Field(
+        default=14,
+        ge=6,
+        le=18,
+        description="Available height in grid units (18-grid system, 60px per unit)"
+    )
+
+    # Presets
+    position_preset: Optional[KanbanPositionPresetType] = Field(
+        default=None,
+        description="Position preset: full_content, left_two_thirds, right_two_thirds"
+    )
+    column_count: KanbanColumnCountType = Field(
+        default=4,
+        description="Number of columns (3, 4, or 5)"
+    )
+    theme: KanbanThemeType = Field(
+        default="default",
+        description="Design theme: default (light), dark, minimal"
+    )
+
+    # Styling
+    external_margin: int = Field(
+        default=10,
+        ge=0,
+        le=30,
+        description="External margin in pixels (0-30, default: 10)"
+    )
+    border_radius: int = Field(
+        default=12,
+        ge=0,
+        le=24,
+        description="Border radius in pixels (0 for square corners, default: 12)"
+    )
+
+    # Grid positioning (optional, for canvas placement)
+    start_col: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=32,
+        description="Starting column position (1-32). If null, defaults to 2."
+    )
+    start_row: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=18,
+        description="Starting row position (1-18). If null, defaults to 4."
+    )
+
+    # Mode
+    placeholder_mode: bool = Field(
+        default=False,
+        description="If true, use sample placeholder data (no LLM call)"
+    )
+
+    # Optional context
+    context: Optional[AtomicContext] = Field(
+        None,
+        description="Optional slide/presentation context"
+    )
+
+    @model_validator(mode='after')
+    def validate_columns_or_placeholder(self) -> 'KanbanAtomicRequest':
+        """Validate that columns, prompt, or placeholder mode is provided."""
+        has_columns = self.columns and len(self.columns) > 0
+        has_prompt = self.prompt and self.prompt.strip()
+
+        if not self.placeholder_mode and not has_columns and not has_prompt:
+            raise ValueError(
+                "Must provide one of: columns data, prompt for generation, or placeholder_mode=True"
+            )
+        return self
+
+    @model_validator(mode='after')
+    def apply_position_preset(self) -> 'KanbanAtomicRequest':
+        """Apply position preset values where explicit values are not set."""
+        if self.position_preset and self.position_preset in KANBAN_POSITION_PRESETS:
+            preset = KANBAN_POSITION_PRESETS[self.position_preset]
+            # Only apply preset values if not explicitly set
+            if self.start_col is None:
+                object.__setattr__(self, 'start_col', preset["start_col"])
+            if self.start_row is None:
+                object.__setattr__(self, 'start_row', preset["start_row"])
+            # gridWidth/gridHeight have defaults, check if at default values
+            if self.gridWidth == 30:  # default value
+                object.__setattr__(self, 'gridWidth', preset["gridWidth"])
+            if self.gridHeight == 14:  # default value
+                object.__setattr__(self, 'gridHeight', preset["gridHeight"])
+        return self
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "title": "Sprint 14 Board",
+                "position_preset": "full_content",
+                "column_count": 4,
+                "theme": "default",
+                "external_margin": 10,
+                "placeholder_mode": True
+            }
+        }
+
+
+# =============================================================================
+# KANBAN_BOARD Response Model
+# =============================================================================
+
+class KanbanAtomicResponse(BaseModel):
+    """
+    Response model for POST /v1.2/atomic/KANBAN_BOARD
+
+    Returns generated Kanban board HTML along with metadata.
+
+    v1.0.0: Initial response model
+    """
+    success: bool = Field(
+        ...,
+        description="Whether generation succeeded"
+    )
+    html: Optional[str] = Field(
+        None,
+        description="Generated Kanban board HTML"
+    )
+    component_type: str = Field(
+        default="kanban_board",
+        description="Component identifier"
+    )
+    column_count: int = Field(
+        default=0,
+        description="Number of columns in the board"
+    )
+    card_count: int = Field(
+        default=0,
+        description="Total number of cards across all columns"
+    )
+    theme_used: str = Field(
+        default="default",
+        description="Theme actually applied"
+    )
+    preset_used: Optional[str] = Field(
+        default=None,
+        description="Position preset applied (if any)"
+    )
+
+    # Standard atomic metadata
+    metadata: Optional[AtomicMetadata] = Field(
+        None,
+        description="Generation metadata (timing, dimensions)"
+    )
+    grid_position: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Grid position: {start_col, start_row, width, height, grid_row, grid_column}"
+    )
+    error: Optional[str] = Field(
+        None,
+        description="Error message if generation failed"
+    )
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "html": "<div style=\"width:1780px;height:820px;...\">...</div>",
+                "component_type": "kanban_board",
+                "column_count": 4,
+                "card_count": 12,
+                "theme_used": "default",
+                "preset_used": "full_content",
+                "metadata": {
+                    "generation_time_ms": 45,
+                    "grid_dimensions": {"width": 30, "height": 14},
+                    "pixel_dimensions": {"width": 1780, "height": 820},
+                    "version": "1.0.0"
+                },
+                "grid_position": {
+                    "start_col": 2,
+                    "start_row": 4,
+                    "width": 30,
+                    "height": 14,
+                    "grid_row": "4/18",
+                    "grid_column": "2/32"
+                }
+            }
+        }
