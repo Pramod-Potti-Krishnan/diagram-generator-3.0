@@ -326,31 +326,32 @@ generate_slide() {
 }
 
 # ============================================
-# Generate KANBAN_BOARD Slides (7 Configs)
+# Generate KANBAN_BOARD Slides (6 Configs)
+# v1.1.0 Rules:
+# - full_content: 4 or 5 columns only
+# - left_two_thirds / right_two_thirds: 3 columns only
+# - No board title (slide title provides context)
 # ============================================
-echo "--- Generating KANBAN_BOARD Slides (7 Configs) ---"
+echo "--- Generating KANBAN_BOARD Slides (6 Configs) ---"
 echo ""
 
 # Config 1: Full Content, 4 Columns, Default Theme
-generate_slide 1 "Full Content (1780x820)" "default" 4 10 "full_content" 30 "Sprint 14 Board"
+generate_slide 1 "Full Content 4-Col (1780x820)" "default" 4 10 "full_content" 30 ""
 
-# Config 2: Full Content, 3 Columns, Dark Theme
-generate_slide 2 "Full Content Dark (1780x820)" "dark" 3 10 "full_content" 30 "Q1 Roadmap"
+# Config 2: Full Content, 5 Columns, Dark Theme
+generate_slide 2 "Full Content 5-Col Dark (1780x820)" "dark" 5 10 "full_content" 30 ""
 
-# Config 3: Full Content, 5 Columns, Minimal Theme
-generate_slide 3 "Full Content Minimal (1780x820)" "minimal" 5 10 "full_content" 30 "Product Pipeline"
+# Config 3: Full Content, 4 Columns, Minimal Theme
+generate_slide 3 "Full Content 4-Col Minimal (1780x820)" "minimal" 4 10 "full_content" 30 ""
 
-# Config 4: Left Two Thirds, 4 Columns, Default Theme
-generate_slide 4 "Left Two Thirds (1180x820)" "default" 4 10 "left_two_thirds" 20 "Team Tasks"
+# Config 4: Left Two Thirds, 3 Columns, Default Theme
+generate_slide 4 "Left Two Thirds 3-Col (1180x820)" "default" 3 10 "left_two_thirds" 20 ""
 
-# Config 5: Right Two Thirds, 4 Columns, Dark Theme
-generate_slide 5 "Right Two Thirds (1180x820)" "dark" 4 10 "right_two_thirds" 20 "Development Board"
+# Config 5: Right Two Thirds, 3 Columns, Dark Theme
+generate_slide 5 "Right Two Thirds 3-Col Dark (1180x820)" "dark" 3 10 "right_two_thirds" 20 ""
 
-# Config 6: Custom Wide (25 cols), 5 Columns, Minimal Theme
-generate_slide 6 "Custom Wide (1480x820)" "minimal" 5 10 "" 25 "Project Status" 4
-
-# Config 7: Custom Narrow (15 cols), 3 Columns, Dark Theme
-generate_slide 7 "Custom Narrow (880x820)" "dark" 3 10 "" 15 "Quick Tasks" 2
+# Config 6: Right Two Thirds, 3 Columns, Minimal Theme
+generate_slide 6 "Right Two Thirds 3-Col Minimal (1180x820)" "minimal" 3 10 "right_two_thirds" 20 ""
 
 # ============================================
 # Create Presentation via Layout Service
@@ -545,14 +546,14 @@ cat > "$OUTPUT_DIR/preview_kanban.html" << EOF
 EOF
 
 # Add each kanban card
-themes=("default" "dark" "minimal" "default" "dark" "minimal" "dark")
-presets=("full_content" "full_content" "full_content" "left_two_thirds" "right_two_thirds" "custom" "custom")
-sizes=("1780x820" "1780x820" "1780x820" "1180x820" "1180x820" "1480x820" "880x820")
-grids=("30x14" "30x14" "30x14" "20x14" "20x14" "25x14" "15x14")
-columns=("4" "3" "5" "4" "4" "5" "3")
-titles=("Sprint 14 Board" "Q1 Roadmap" "Product Pipeline" "Team Tasks" "Development Board" "Project Status" "Quick Tasks")
+themes=("default" "dark" "minimal" "default" "dark" "minimal")
+presets=("full_content" "full_content" "full_content" "left_two_thirds" "right_two_thirds" "right_two_thirds")
+sizes=("1780x820" "1780x820" "1780x820" "1180x820" "1180x820" "1180x820")
+grids=("30x14" "30x14" "30x14" "20x14" "20x14" "20x14")
+columns=("4" "5" "4" "3" "3" "3")
+titles=("4-Column Default" "5-Column Dark" "4-Column Minimal" "3-Column Default" "3-Column Dark" "3-Column Minimal")
 
-for i in 1 2 3 4 5 6 7; do
+for i in 1 2 3 4 5 6; do
     theme="${themes[$((i-1))]}"
     preset="${presets[$((i-1))]}"
     size="${sizes[$((i-1))]}"
@@ -598,24 +599,27 @@ echo "--- Generating Test Report ---"
 cat > "$OUTPUT_DIR/test_report.json" << EOF
 {
     "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-    "test_name": "kanban_board_v1.0.0",
-    "version": "1.0.0",
+    "test_name": "kanban_board_v1.1.0",
+    "version": "1.1.0",
     "position_presets_tested": ["full_content", "left_two_thirds", "right_two_thirds"],
-    "custom_positions_tested": ["start_col=4 (wide)", "start_col=2 (narrow)"],
-    "column_counts_tested": [3, 4, 5],
+    "column_count_rules": {
+        "full_content": "4 or 5 columns only",
+        "left_two_thirds": "3 columns only",
+        "right_two_thirds": "3 columns only"
+    },
     "themes_tested": ["default", "dark", "minimal"],
     "features_tested": [
         "position_preset configuration",
-        "custom start_col positioning",
+        "column_count restrictions by position",
         "element-based sizing: (grid*60)-(2*margin)",
-        "column_count configuration (3, 4, 5)",
         "theme configuration (default, dark, minimal)",
-        "external_margin configuration",
-        "board title",
+        "no board title (slide title provides context)",
+        "transparent container background",
+        "column headers inside column area",
         "placeholder mode",
         "drag-and-drop JavaScript",
-        "add card functionality",
-        "edit card functionality",
+        "add card with assignee",
+        "edit card with assignee",
         "Diagram Element API integration"
     ],
     "results": {
@@ -643,19 +647,22 @@ echo "Test Report: $OUTPUT_DIR/test_report.json"
 # ============================================
 echo ""
 echo "=============================================="
-echo "  KANBAN_BOARD v1.0.0 TEST RESULTS"
+echo "  KANBAN_BOARD v1.1.0 TEST RESULTS"
 echo "=============================================="
 echo ""
-echo "Configurations Tested:"
-echo -e "  ${CYAN}1. Full Content + Default + 4 cols${NC}  - 30x14 grid → 1780x820 element"
-echo -e "  ${MAGENTA}2. Full Content + Dark + 3 cols${NC}     - 30x14 grid → 1780x820 element"
-echo -e "  ${BLUE}3. Full Content + Minimal + 5 cols${NC}  - 30x14 grid → 1780x820 element"
-echo -e "  ${CYAN}4. Left 2/3 + Default + 4 cols${NC}      - 20x14 grid → 1180x820 element"
-echo -e "  ${MAGENTA}5. Right 2/3 + Dark + 4 cols${NC}        - 20x14 grid → 1180x820 element"
-echo -e "  ${BLUE}6. Custom Wide + Minimal + 5 cols${NC}   - 25x14 grid → 1480x820 element"
-echo -e "  ${MAGENTA}7. Custom Narrow + Dark + 3 cols${NC}    - 15x14 grid → 880x820 element"
+echo "Column Count Rules:"
+echo "  - full_content: 4 or 5 columns only"
+echo "  - left_two_thirds / right_two_thirds: 3 columns only"
 echo ""
-echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 7 success"
+echo "Configurations Tested:"
+echo -e "  ${CYAN}1. Full Content + Default + 4 cols${NC}     - 30x14 grid → 1780x820 element"
+echo -e "  ${MAGENTA}2. Full Content + Dark + 5 cols${NC}        - 30x14 grid → 1780x820 element"
+echo -e "  ${BLUE}3. Full Content + Minimal + 4 cols${NC}     - 30x14 grid → 1780x820 element"
+echo -e "  ${CYAN}4. Left 2/3 + Default + 3 cols${NC}         - 20x14 grid → 1180x820 element"
+echo -e "  ${MAGENTA}5. Right 2/3 + Dark + 3 cols${NC}           - 20x14 grid → 1180x820 element"
+echo -e "  ${BLUE}6. Right 2/3 + Minimal + 3 cols${NC}        - 20x14 grid → 1180x820 element"
+echo ""
+echo -e "Generation: ${GREEN}$SUCCESS_COUNT${NC} / 6 success"
 if [ $FAIL_COUNT -gt 0 ]; then
     echo -e "            ${RED}$FAIL_COUNT${NC} / 7 failed"
 fi

@@ -4,13 +4,18 @@ Kanban Atomic Service for Atomic KANBAN_BOARD Endpoint
 
 Service layer for generating interactive Kanban board HTML with:
 - Grid-based positioning with position presets
-- Column count presets (3, 4, 5 columns)
+- Column count presets:
+  - full_content: 4 or 5 columns only
+  - left_two_thirds / right_two_thirds: 3 columns only
 - Design themes (default, dark, minimal)
-- View mode interactivity (add card, move card)
-- Edit mode (edit card content)
-- Configurable external margin and border radius
+- View mode interactivity (add card, move card, edit card with assignee)
+- No board title (slide title provides context)
+- No outer background (transparent container, columns use full height)
+- Column headers inside column area
 
 v1.0.0: Initial implementation following atomic endpoint pattern
+v1.1.0: Removed board title, transparent container, headers inside columns,
+        column count restrictions by position, editable assignees
 """
 
 import logging
@@ -125,13 +130,30 @@ class KanbanAtomicGenerator:
         start_time = time.time()
 
         try:
+            # Validate column count based on position preset
+            column_count = request.column_count
+            preset = request.position_preset
+
+            if preset == "full_content":
+                # Full content: only 4 or 5 columns allowed
+                if column_count not in [4, 5]:
+                    column_count = 4  # Default to 4 for full content
+            elif preset in ["left_two_thirds", "right_two_thirds"]:
+                # Two-thirds width: only 3 columns allowed
+                column_count = 3
+
             # Determine columns source priority:
             # 1. Direct columns provided
             # 2. Placeholder mode
             if request.columns and len(request.columns) > 0:
                 columns = request.columns
+                # Adjust columns list if needed based on position restrictions
+                if preset == "full_content" and len(columns) < 4:
+                    pass  # Keep provided columns
+                elif preset in ["left_two_thirds", "right_two_thirds"] and len(columns) > 3:
+                    columns = columns[:3]  # Trim to 3 columns
             elif request.placeholder_mode:
-                columns = self._generate_placeholder_data(request.column_count)
+                columns = self._generate_placeholder_data(column_count)
             else:
                 raise ValueError("No columns source provided")
 
@@ -141,16 +163,14 @@ class KanbanAtomicGenerator:
                 KANBAN_THEME_COLORS["default"]
             )
 
-            # Generate HTML with inline styles
+            # Generate HTML with inline styles (no board title - slide title provides context)
             html_content = self._generate_html(
-                title=request.title,
                 columns=columns,
                 theme=request.theme,
                 theme_colors=theme_colors,
                 grid_width=request.gridWidth,
                 grid_height=request.gridHeight,
-                external_margin=request.external_margin,
-                border_radius=request.border_radius
+                external_margin=request.external_margin
             )
 
             # Calculate metrics
@@ -196,27 +216,25 @@ class KanbanAtomicGenerator:
 
     def _generate_html(
         self,
-        title: Optional[str],
         columns: List[KanbanColumn],
         theme: str,
         theme_colors: Dict[str, Any],
         grid_width: int,
         grid_height: int,
-        external_margin: int,
-        border_radius: int
+        external_margin: int
     ) -> str:
         """
         Generate complete Kanban board HTML with inline styles.
+        No board title - slide title provides context.
+        Transparent container - columns use full height with headers inside.
 
         Args:
-            title: Board title (optional)
             columns: List of KanbanColumn objects
             theme: Theme name
             theme_colors: Theme color dictionary
             grid_width: Width in grid units
             grid_height: Height in grid units
             external_margin: External margin in pixels
-            border_radius: Border radius in pixels
 
         Returns:
             Complete HTML string with all styles inline
@@ -225,13 +243,13 @@ class KanbanAtomicGenerator:
         element_width = (grid_width * 60) - (2 * external_margin)
         element_height = (grid_height * 60) - (2 * external_margin)
 
-        # Build columns HTML
-        columns_html = self._build_columns_html(columns, theme_colors)
+        # Build columns HTML (headers inside columns, no outer wrapper)
+        columns_html = self._build_columns_html(columns, theme_colors, element_height)
 
         # Build interactive JavaScript
         interactive_js = self._generate_interactive_scripts(theme_colors)
 
-        # Outer wrapper style
+        # Outer wrapper style - transparent, just for sizing
         outer_style = (
             f"width:{element_width}px;"
             f"height:{element_height}px;"
@@ -241,46 +259,19 @@ class KanbanAtomicGenerator:
             f"overflow:hidden;"
         )
 
-        # Inner container style
-        inner_style = (
-            f"background:{theme_colors['bg']};"
-            f"border-radius:{border_radius}px;"
-            f"width:100%;"
-            f"height:100%;"
-            f"padding:{external_margin}px;"
-            f"box-sizing:border-box;"
-            f"display:flex;"
-            f"flex-direction:column;"
-            f"font-family:'Inter', 'Segoe UI', 'Roboto', sans-serif;"
-        )
-
-        # Title HTML (if provided)
-        title_html = ""
-        if title:
-            title_style = (
-                f"color:{theme_colors['header']};"
-                f"font-size:20px;"
-                f"font-weight:600;"
-                f"margin-bottom:16px;"
-                f"flex-shrink:0;"
-            )
-            title_html = f'<div style="{title_style}">{title}</div>'
-
-        # Columns container style
+        # Columns container style - transparent background, columns flex to fill
         columns_container_style = (
             f"display:flex;"
             f"gap:16px;"
-            f"flex:1;"
-            f"overflow-x:auto;"
-            f"min-height:0;"
+            f"width:100%;"
+            f"height:100%;"
+            f"box-sizing:border-box;"
+            f"font-family:'Inter', 'Segoe UI', 'Roboto', sans-serif;"
         )
 
         html = f'''<div style="{outer_style}" role="region" aria-label="Kanban board" data-kanban-container="true">
-  <div style="{inner_style}">
-    {title_html}
-    <div style="{columns_container_style}">
-      {columns_html}
-    </div>
+  <div style="{columns_container_style}">
+    {columns_html}
   </div>
   {interactive_js}
 </div>'''
@@ -290,12 +281,12 @@ class KanbanAtomicGenerator:
     def _build_columns_html(
         self,
         columns: List[KanbanColumn],
-        theme_colors: Dict[str, Any]
+        theme_colors: Dict[str, Any],
+        container_height: int
     ) -> str:
-        """Build HTML for all columns."""
+        """Build HTML for all columns with headers inside the column area."""
         html_parts = []
         column_colors = theme_colors.get("column_colors", [])
-        num_columns = len(columns)
 
         for i, column in enumerate(columns):
             # Get column background color
@@ -305,56 +296,60 @@ class KanbanAtomicGenerator:
             cards_html = self._build_cards_html(column.items, theme_colors)
             card_count = len(column.items)
 
-            # Column style
+            # Column wrapper style - full height, colored background
             column_style = (
                 f"flex:1;"
-                f"min-width:200px;"
-                f"max-width:350px;"
+                f"min-width:180px;"
                 f"display:flex;"
                 f"flex-direction:column;"
+                f"background:{col_bg};"
+                f"border-radius:12px;"
+                f"height:100%;"
+                f"overflow:hidden;"
             )
 
-            # Column header style
+            # Column header style - inside the colored area at top
             header_style = (
                 f"display:flex;"
                 f"justify-content:space-between;"
                 f"align-items:center;"
-                f"margin-bottom:12px;"
-                f"padding:0 4px;"
+                f"padding:16px 16px 12px 16px;"
+                f"flex-shrink:0;"
             )
 
             # Column name style
             name_style = (
-                f"font-size:13px;"
-                f"font-weight:600;"
+                f"font-size:12px;"
+                f"font-weight:700;"
                 f"text-transform:uppercase;"
-                f"letter-spacing:0.05em;"
-                f"color:{theme_colors['text']};"
+                f"letter-spacing:0.08em;"
+                f"color:{theme_colors['header']};"
             )
 
             # Count badge style
             count_style = (
-                f"font-size:12px;"
+                f"font-size:11px;"
+                f"font-weight:600;"
                 f"background:{theme_colors['count_bg']};"
                 f"color:{theme_colors['count_text']};"
                 f"padding:2px 8px;"
                 f"border-radius:9999px;"
+                f"min-width:20px;"
+                f"text-align:center;"
             )
 
-            # Cards container style
+            # Cards container style - scrollable area for cards
             cards_container_style = (
-                f"background:{col_bg};"
-                f"border-radius:12px;"
-                f"padding:12px;"
                 f"flex:1;"
-                f"min-height:200px;"
+                f"padding:0 12px 12px 12px;"
                 f"overflow-y:auto;"
+                f"min-height:0;"
             )
 
             # Add card button style
             add_btn_style = (
-                f"width:100%;"
-                f"margin-top:8px;"
+                f"width:calc(100% - 24px);"
+                f"margin:8px 12px 12px 12px;"
                 f"padding:10px;"
                 f"border-radius:8px;"
                 f"border:2px dashed {theme_colors['add_btn_border']};"
@@ -368,6 +363,7 @@ class KanbanAtomicGenerator:
                 f"justify-content:center;"
                 f"gap:4px;"
                 f"transition:all 0.15s ease;"
+                f"flex-shrink:0;"
             )
 
             html_parts.append(f'''
@@ -380,13 +376,13 @@ class KanbanAtomicGenerator:
     <div class="kanban-cards-list" style="display:flex;flex-direction:column;gap:8px;">
       {cards_html}
     </div>
-    <button style="{add_btn_style}" onclick="addCard(this)">
-      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-      </svg>
-      Add Card
-    </button>
   </div>
+  <button style="{add_btn_style}" onclick="addCard(this)">
+    <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+    </svg>
+    Add Card
+  </button>
 </div>''')
 
         return "\n".join(html_parts)
@@ -398,13 +394,7 @@ class KanbanAtomicGenerator:
     ) -> str:
         """Build HTML for cards in a column."""
         if not cards:
-            empty_style = (
-                f"text-align:center;"
-                f"color:{theme_colors['add_btn_text']};"
-                f"font-size:13px;"
-                f"padding:16px;"
-            )
-            return f'<div style="{empty_style}">No items</div>'
+            return ""  # No placeholder text, just empty
 
         html_parts = []
 
@@ -445,6 +435,7 @@ class KanbanAtomicGenerator:
                 f"font-weight:500;"
                 f"color:{theme_colors['text']};"
                 f"line-height:1.4;"
+                f"margin:0;"
             )
 
             # Assignee HTML
@@ -464,7 +455,7 @@ class KanbanAtomicGenerator:
                     f"justify-content:center;"
                     f"margin-top:8px;"
                 )
-                assignee_html = f'<div style="{assignee_style}">{initials}</div>'
+                assignee_html = f'<div class="kanban-assignee" style="{assignee_style}">{initials}</div>'
 
             # Edit button style
             edit_btn_style = (
@@ -484,7 +475,7 @@ class KanbanAtomicGenerator:
 <div class="kanban-card" style="{card_style}" draggable="true" data-card="{i}">
   <div style="{card_inner_style}">
     <div style="{priority_bar_style}"></div>
-    <div style="{content_style}">
+    <div class="kanban-content" style="{content_style}">
       <p class="kanban-title" style="{title_style}">{card.title}</p>
       {assignee_html}
     </div>
@@ -499,7 +490,7 @@ class KanbanAtomicGenerator:
         return "\n".join(html_parts)
 
     def _generate_interactive_scripts(self, theme_colors: Dict[str, Any]) -> str:
-        """Generate JavaScript for drag-and-drop and add/edit card functionality."""
+        """Generate JavaScript for drag-and-drop and add/edit card functionality with assignee support."""
         return f'''<style>
 .kanban-card:hover {{
   transform: translateY(-2px);
@@ -589,45 +580,83 @@ button:hover {{
     if (e) e.stopPropagation();
     var card = btn.closest('.kanban-card');
     var titleEl = card.querySelector('.kanban-title');
+    var assigneeEl = card.querySelector('.kanban-assignee');
     var currentText = titleEl.textContent;
-    var newText = prompt('Edit card:', currentText);
+    var currentAssignee = assigneeEl ? assigneeEl.textContent : '';
+
+    // Prompt for title
+    var newText = prompt('Edit card title:', currentText);
+    if (newText === null) return; // Cancelled
+
     if (newText && newText.trim()) {{
       titleEl.textContent = newText.trim();
+    }}
+
+    // Prompt for assignee (initials)
+    var newAssignee = prompt('Assignee initials (leave empty to remove):', currentAssignee);
+    if (newAssignee === null) return; // Cancelled
+
+    if (newAssignee && newAssignee.trim()) {{
+      var initials = newAssignee.trim().substring(0, 2).toUpperCase();
+      if (assigneeEl) {{
+        assigneeEl.textContent = initials;
+      }} else {{
+        // Create new assignee badge
+        var contentDiv = card.querySelector('.kanban-content');
+        if (contentDiv) {{
+          var assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:{theme_colors['accent']};color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
+          contentDiv.insertAdjacentHTML('beforeend', assigneeHtml);
+        }}
+      }}
+    }} else if (assigneeEl) {{
+      // Remove assignee if cleared
+      assigneeEl.remove();
     }}
   }};
 
   window.addCard = function(btn) {{
     var column = btn.closest('.kanban-column');
     var cardsContainer = column.querySelector('.kanban-cards-list');
-    var newTitle = prompt('Enter card title:');
-    if (newTitle && newTitle.trim()) {{
-      var cardHtml = '<div class="kanban-card" style="background:{theme_colors['card_bg']};border-radius:8px;border:1px solid {theme_colors['card_border']};box-shadow:{theme_colors['card_shadow']};overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
-        '<div style="display:flex;">' +
-        '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
-        '<div style="flex:1;padding:12px;">' +
-        '<p class="kanban-title" style="font-size:14px;font-weight:500;color:{theme_colors['text']};line-height:1.4;">' + newTitle.trim() + '</p>' +
-        '</div>' +
-        '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;" onclick="editCard(this, event)">' +
-        '<svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
-        '</button>' +
-        '</div></div>';
-      cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
 
-      // Re-init drag for new card
-      var newCard = cardsContainer.lastElementChild;
-      newCard.addEventListener('dragstart', function(e) {{
-        draggedCard = newCard;
-        newCard.classList.add('dragging');
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', '');
-      }});
-      newCard.addEventListener('dragend', function() {{
-        newCard.classList.remove('dragging');
-        container.querySelectorAll('.kanban-cards').forEach(function(c) {{ c.classList.remove('drag-over'); }});
-        draggedCard = null;
-      }});
-      updateColumnCounts();
+    // Prompt for title
+    var newTitle = prompt('Enter card title:');
+    if (!newTitle || !newTitle.trim()) return;
+
+    // Prompt for assignee (optional)
+    var assignee = prompt('Assignee initials (optional, leave empty to skip):');
+    var assigneeHtml = '';
+    if (assignee && assignee.trim()) {{
+      var initials = assignee.trim().substring(0, 2).toUpperCase();
+      assigneeHtml = '<div class="kanban-assignee" style="width:24px;height:24px;border-radius:50%;background:{theme_colors['accent']};color:white;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;margin-top:8px;">' + initials + '</div>';
     }}
+
+    var cardHtml = '<div class="kanban-card" style="background:{theme_colors['card_bg']};border-radius:8px;border:1px solid {theme_colors['card_border']};box-shadow:{theme_colors['card_shadow']};overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
+      '<div style="display:flex;">' +
+      '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
+      '<div class="kanban-content" style="flex:1;padding:12px;">' +
+      '<p class="kanban-title" style="font-size:14px;font-weight:500;color:{theme_colors['text']};line-height:1.4;">' + newTitle.trim() + '</p>' +
+      assigneeHtml +
+      '</div>' +
+      '<button class="kanban-card-edit" style="position:absolute;top:4px;right:4px;padding:4px;border-radius:4px;border:none;background:transparent;cursor:pointer;opacity:0;transition:opacity 0.15s ease;" onclick="editCard(this, event)">' +
+      '<svg width="16" height="16" fill="none" stroke="{theme_colors['add_btn_text']}" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>' +
+      '</button>' +
+      '</div></div>';
+    cardsContainer.insertAdjacentHTML('beforeend', cardHtml);
+
+    // Re-init drag for new card
+    var newCard = cardsContainer.lastElementChild;
+    newCard.addEventListener('dragstart', function(e) {{
+      draggedCard = newCard;
+      newCard.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+    }});
+    newCard.addEventListener('dragend', function() {{
+      newCard.classList.remove('dragging');
+      container.querySelectorAll('.kanban-cards').forEach(function(c) {{ c.classList.remove('drag-over'); }});
+      draggedCard = null;
+    }});
+    updateColumnCounts();
   }};
 
   // Initialize on DOM ready
