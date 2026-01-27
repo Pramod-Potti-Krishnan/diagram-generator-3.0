@@ -39,6 +39,8 @@ v1.6.2: Fixed ID detection - iframes using srcdoc can't access parent URL or dat
 v1.6.3: Restored postMessage communication for auto-save integration. Kanban now sends updateKanbanState
         postMessage to parent instead of direct API calls. Parent handles persistence via auto-save.
         Saved state restored via kanban-init postMessage from parent.
+v1.7.0: Synced left border color with status indicator circle. Both now reflect the same status value
+        (green=on track, amber=at risk, red=blocked, gray=no status). Priority no longer affects left bar.
 """
 
 import logging
@@ -349,7 +351,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.6.3"
+                    version="1.7.0"
                 ),
                 grid_position=position_data
             )
@@ -565,7 +567,9 @@ class KanbanAtomicGenerator:
         html_parts = []
 
         for i, card in enumerate(cards):
-            priority_color = PRIORITY_COLORS.get(card.priority, PRIORITY_COLORS[""])
+            # v1.7.0: Left border reflects status (synced with status circle)
+            card_status = getattr(card, 'status', '')
+            left_border_color = STATUS_COLORS.get(card_status, "#9CA3AF")  # Gray if no status
 
             # Card style - v1.4.0: Use CSS variables for live dark/light mode sync
             card_style = (
@@ -582,10 +586,10 @@ class KanbanAtomicGenerator:
             # Card inner wrapper
             card_inner_style = "display:flex;"
 
-            # Priority bar style
-            priority_bar_style = (
+            # Left bar style (v1.7.0: synced with status)
+            left_bar_style = (
                 f"width:4px;"
-                f"background:{priority_color};"
+                f"background:{left_border_color};"
                 f"border-radius:2px 0 0 2px;"
             )
 
@@ -656,7 +660,7 @@ class KanbanAtomicGenerator:
             html_parts.append(f'''
 <div class="kanban-card" style="{card_style}" draggable="true" data-card="{i}">
   <div style="{card_inner_style}">
-    <div style="{priority_bar_style}"></div>
+    <div class="kanban-left-bar" style="{left_bar_style}"></div>
     <div class="kanban-content" style="{content_style}">
       <p class="kanban-title" style="{title_style}">{card.title}</p>
       {assignee_html}
@@ -878,12 +882,13 @@ button:hover {{
           statusHtml = '<div class="kanban-status" data-status="' + cardData.status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;transition:transform 0.15s ease;"></div>';
         }}
 
-        var priorityColors = {{'high': '#EF4444', 'medium': '#F59E0B', 'low': '#10B981'}};
-        var priorityColor = priorityColors[cardData.priority] || '#9CA3AF';
+        // v1.7.0: Left bar uses status color (synced with status circle)
+        var statusColors = {{'green': '#10B981', 'amber': '#F59E0B', 'red': '#EF4444'}};
+        var leftBarColor = cardData.status ? (statusColors[cardData.status] || '#9CA3AF') : '#9CA3AF';
 
         var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
           '<div style="display:flex;">' +
-          '<div style="width:4px;background:' + priorityColor + ';border-radius:2px 0 0 2px;"></div>' +
+          '<div class="kanban-left-bar" style="width:4px;background:' + leftBarColor + ';border-radius:2px 0 0 2px;"></div>' +
           '<div class="kanban-content" style="flex:1;padding:12px;">' +
           '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;margin:0;">' + cardData.title + '</p>' +
           assigneeHtml +
@@ -1044,6 +1049,12 @@ button:hover {{
           statusEl.remove();
         }}
 
+        // v1.7.0: Sync left border with status
+        var leftBar = card.querySelector('.kanban-left-bar');
+        if (leftBar) {{
+          leftBar.style.background = status ? statusColor : '#9CA3AF';
+        }}
+
         notifyStateChange('edit');
 
       }} else {{
@@ -1062,9 +1073,11 @@ button:hover {{
           statusHtml = '<div class="kanban-status" data-status="' + status + '" style="width:12px;height:12px;border-radius:50%;background:' + statusColor + ';margin:12px 12px 0 0;flex-shrink:0;"></div>';
         }}
 
+        // v1.7.0: Left bar uses status color (synced with status circle)
+        var leftBarColor = status ? statusColor : '#9CA3AF';
         var cardHtml = '<div class="kanban-card" style="background:var(--card-bg);border-radius:8px;border:1px solid var(--card-border);box-shadow:var(--card-shadow);overflow:hidden;cursor:grab;transition:transform 0.15s ease, box-shadow 0.15s ease;position:relative;" draggable="true">' +
           '<div style="display:flex;">' +
-          '<div style="width:4px;background:#9CA3AF;border-radius:2px 0 0 2px;"></div>' +
+          '<div class="kanban-left-bar" style="width:4px;background:' + leftBarColor + ';border-radius:2px 0 0 2px;"></div>' +
           '<div class="kanban-content" style="flex:1;padding:12px;">' +
           '<p class="kanban-title" style="font-size:14px;font-weight:500;color:var(--text-body);line-height:1.4;margin:0;">' + taskName + '</p>' +
           assigneeHtml +
