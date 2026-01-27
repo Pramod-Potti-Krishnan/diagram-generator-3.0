@@ -21,6 +21,7 @@ v1.2.0: Modal label fonts match header, status dropdown height fix,
 v1.3.0: Responsive container sizing - chart stretches when parent resized,
         uses 100% width/height with min constraints, ResizeObserver for
         dynamic today line and row height recalculation
+v1.3.1: Row height fix for new tasks + today line accessibility improvements
 """
 
 import logging
@@ -53,6 +54,7 @@ class GanttAtomicGenerator:
     v1.1.0: UI/UX enhancements - modal fonts, today line, status bars, dynamic sizing
     v1.2.0: Modal label fonts, status dropdown height, today line theme+drag, dynamic rows
     v1.3.0: Responsive container sizing - 100% width/height with ResizeObserver
+    v1.3.1: Row height fix for new tasks + today line accessibility (wider hit zone + header handle)
     """
 
     def __init__(self):
@@ -78,7 +80,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.3.0 */
+/* Deckster Gantt Theme Variables - v1.3.1 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -274,7 +276,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.3.0"
+                    "version": "1.3.1"
                 },
                 grid_position=position_data
             )
@@ -497,8 +499,10 @@ class GanttAtomicGenerator:
             # Store percentage in data-pct for ResizeObserver to recalculate on resize
             # Initial position uses pixels for accuracy, ResizeObserver updates on resize
             today_left_px = task_col_width + (timeline_width * today_pct / 100)
+            # v1.3.1: Wider hit zone (12px) for easier clicking + header handle for accessibility
             today_line_html = f'''
-  <div class="gantt-today-line" style="position:absolute;top:48px;bottom:44px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" data-pct="{today_pct:.4f}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>'''
+  <div class="gantt-today-line" style="position:absolute;top:48px;bottom:44px;left:{today_left_px}px;width:12px;margin-left:-6px;background:transparent;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" data-pct="{today_pct:.4f}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>
+  <div class="gantt-today-handle" style="position:absolute;top:24px;left:{today_left_px}px;width:12px;height:20px;margin-left:-6px;background:var(--gantt-today-line);border-radius:4px;cursor:ew-resize;z-index:10;opacity:0.7;transition:opacity 0.15s, transform 0.15s;" data-pct="{today_pct:.4f}" title="Drag to move reference line"></div>'''
 
         # v1.3.0: Outer wrapper style - responsive with flex column layout
         # Uses 100% width/height to fill parent container (Layout Service)
@@ -682,6 +686,11 @@ class GanttAtomicGenerator:
 .gantt-today-line.dragging {{
   border-left-width: 4px !important;
   opacity: 0.8;
+}}
+/* v1.3.1: Today line header handle hover */
+.gantt-today-handle:hover {{
+  opacity: 1 !important;
+  transform: scale(1.1);
 }}
 #modal-save:hover {{
   filter: brightness(1.1);
@@ -1103,6 +1112,9 @@ class GanttAtomicGenerator:
         }});
 
         notifyStateChange('add');
+
+        // v1.3.1: Recalculate all row heights to maintain consistency
+        recalculateRowHeights();
       }}
 
       modal.style.display = 'none';
@@ -1123,22 +1135,31 @@ class GanttAtomicGenerator:
     }});
   }}
 
-  // v1.2.0: Today line drag handler
+  // v1.3.1: Today line drag handler (supports both line and header handle)
   function initTodayLineDrag() {{
     var todayLine = container.querySelector('.gantt-today-line');
+    var todayHandle = container.querySelector('.gantt-today-handle');
     if (!todayLine) return;
 
     todayLine.addEventListener('mousedown', function(e) {{
       e.preventDefault();
       startTodayLineDrag(todayLine, e);
     }});
+
+    // v1.3.1: Handle in header is also draggable
+    if (todayHandle) {{
+      todayHandle.addEventListener('mousedown', function(e) {{
+        e.preventDefault();
+        startTodayLineDrag(todayLine, e);
+      }});
+    }}
   }}
 
   function startTodayLineDrag(line, e) {{
     line.classList.add('dragging');
+    var handle = container.querySelector('.gantt-today-handle');
     var startX = e.clientX;
     var origLeft = parseFloat(line.style.left);
-    var containerRect = container.getBoundingClientRect();
 
     function onMove(ev) {{
       var dx = ev.clientX - startX;
@@ -1147,12 +1168,16 @@ class GanttAtomicGenerator:
       var newLeft = Math.max(taskColWidth, origLeft + dx);
       newLeft = Math.min(newLeft, container.offsetWidth - 2);
       line.style.left = newLeft + 'px';
+      // v1.3.1: Move handle in sync with line
+      if (handle) handle.style.left = newLeft + 'px';
 
       // Calculate new date and percentage from position
       var pct = ((newLeft - taskColWidth) / currentTimelineWidth) * 100;
       var newDate = percentToDate(pct);
       line.dataset.date = newDate;
       line.dataset.pct = pct.toFixed(4);
+      // v1.3.1: Update handle data-pct too
+      if (handle) handle.dataset.pct = pct.toFixed(4);
       line.title = 'Reference: ' + newDate + ' (drag to change)';
     }}
 
@@ -1169,15 +1194,18 @@ class GanttAtomicGenerator:
     document.addEventListener('mouseup', onUp);
   }}
 
-  // v1.3.0: Reposition today line on container resize
+  // v1.3.1: Reposition today line and handle on container resize
   function repositionTodayLine() {{
     var todayLine = container.querySelector('.gantt-today-line');
+    var todayHandle = container.querySelector('.gantt-today-handle');
     if (!todayLine) return;
 
     var pct = parseFloat(todayLine.dataset.pct) || 0;
     var currentTimelineWidth = container.offsetWidth - taskColWidth;
     var newLeft = taskColWidth + (currentTimelineWidth * pct / 100);
     todayLine.style.left = newLeft + 'px';
+    // v1.3.1: Move handle in sync with line
+    if (todayHandle) todayHandle.style.left = newLeft + 'px';
   }}
 
   // v1.3.0: Recalculate row heights on container resize
