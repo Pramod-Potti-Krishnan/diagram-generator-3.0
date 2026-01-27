@@ -754,3 +754,144 @@ Branch: feature/frontend-templates
 996921b fix: Resize handle now works when dragging inward over iframe content (v7.5.31)
 a61d31e fix: Override Reveal.js 95% iframe constraint (v7.5.28)
 ```
+
+---
+
+## GANTT_CHART Atomic Architecture (v1.3.5)
+
+The GANTT_CHART atomic endpoint follows the same architectural patterns as CODE_DISPLAY but adds interactive state persistence for task management.
+
+### Gantt Endpoint
+
+```
+POST /v1.2/atomic/GANTT_CHART
+Host: diagram-generator-3.0.railway.app
+Content-Type: application/json
+```
+
+### Gantt-Specific Request Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `tasks` | array | `[]` | List of GanttTask objects with name, dates, progress, status, assignee |
+| `time_unit` | string | `"weeks"` | Timeline unit: "days", "weeks", or "months" |
+| `start_date` | string | auto | Chart start date (YYYY-MM-DD format) |
+| `end_date` | string | auto | Chart end date (YYYY-MM-DD format) |
+| `theme` | string | `"default"` | Color theme: "default" (purple), "ocean" (teal), "forest" (green) |
+| `theme_mode` | string | `"light"` | Theme mode: "light" or "dark" |
+| `row_height` | int | `50` | Height per task row in pixels |
+| `placeholder_mode` | bool | `false` | Generate sample data for testing |
+
+### GanttTask Object Structure
+
+```json
+{
+  "id": "t1",
+  "name": "Project Planning",
+  "start_date": "2026-01-15",
+  "end_date": "2026-01-22",
+  "progress": 75,
+  "status": "on_track",
+  "assignee": "JD"
+}
+```
+
+### Gantt Status Values
+
+| Status | Color | Description |
+|--------|-------|-------------|
+| `on_track` | Green (#10B981) | Task progressing as planned |
+| `at_risk` | Amber (#F59E0B) | Task may miss deadline |
+| `blocked` | Red (#EF4444) | Task cannot proceed |
+| `""` (empty) | None | No status indicator |
+
+### Gantt Architecture Components
+
+```
+┌─────────────────────────┐     ┌─────────────────────────┐
+│  GanttAtomicGenerator   │────▶│   Layout Service        │
+│  (gantt_atomic_service) │     │   (Element Manager)     │
+│                         │     │                         │
+│  - Task bar generation  │     │  - postMessage handler  │
+│  - Interactive modal    │     │  - gantt_data storage   │
+│  - Drag-to-resize       │     │  - State persistence    │
+│  - Today line drag      │     │  - gantt-init message   │
+└─────────────────────────┘     └─────────────────────────┘
+```
+
+### Gantt HTML Structure
+
+```html
+<div class="[theme-dark]" data-gantt-container="true" data-chart-start="..." data-chart-end="..." data-time-unit="...">
+  <!-- Today line (draggable) -->
+  <div class="gantt-today-line" data-date="..." data-pct="..."></div>
+  <div class="gantt-today-handle" data-pct="...">◀ ▶</div>
+
+  <!-- Header with time columns -->
+  <div class="gantt-header">
+    <div>Task</div>
+    <div>W1 | W2 | W3 | ...</div>
+  </div>
+
+  <!-- Task rows (scrollable body) -->
+  <div class="gantt-body">
+    <div class="gantt-row" data-task-id="t1">
+      <div class="gantt-task-name" onclick="editTask(...)">Project Planning</div>
+      <div class="gantt-timeline">
+        <div class="gantt-bar" data-start="..." data-end="..." data-progress="..." data-status="..." data-assignee="...">
+          <div class="gantt-progress"></div>
+          <span class="gantt-bar-label">Project Planning</span>
+          <div class="gantt-resize-left"></div>
+          <div class="gantt-resize-right"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Task button -->
+  <button class="gantt-add-task" onclick="addTask()">+ Add Task</button>
+
+  <!-- Modal (hidden) -->
+  <div id="gantt-modal">...</div>
+</div>
+```
+
+### Gantt Interactive Features
+
+| Feature | Trigger | Action |
+|---------|---------|--------|
+| Add Task | Click "Add Task" button | Opens modal with empty fields |
+| Edit Task | Click task name or bar | Opens modal with task data |
+| Delete Task | Click Delete in edit modal | Removes task row |
+| Resize Task | Drag bar left/right edges | Updates start/end dates |
+| Move Task | Drag bar center | Shifts task in timeline |
+| Move Today Line | Drag line or handle | Repositions reference marker |
+
+### Gantt Position Presets
+
+| Preset | Grid Dimensions | Use Case |
+|--------|-----------------|----------|
+| `full_content` | 30×13 | Full-width Gantt chart |
+| `left_four_fifths` | 24×13 | Large chart with sidebar space |
+
+### Gantt Themes
+
+| Theme | Bar Color (Light) | Bar Color (Dark) |
+|-------|-------------------|------------------|
+| `default` | #8B5CF6 (Violet) | #A78BFA |
+| `ocean` | #0EA5E9 (Sky Blue) | #38BDF8 |
+| `forest` | #22C55E (Green) | #4ADE80 |
+
+### Version History (Gantt)
+
+| Version | Date | Changes |
+|---------|------|---------|
+| v1.3.5 | Jan 2026 | Timeline readability (max 12 columns), static resize behavior |
+| v1.3.4 | Jan 2026 | Full state restoration with DOM rebuild, today_line_pct persistence |
+| v1.3.3 | Jan 2026 | Dynamic fill scaling (10% per task), bottom grip handle |
+| v1.3.2 | Jan 2026 | Simplified status dropdown styling |
+| v1.3.1 | Jan 2026 | Row height fix for new tasks, today line accessibility |
+| v1.3.0 | Jan 2026 | Responsive container sizing with ResizeObserver |
+| v1.2.0 | Jan 2026 | Modal label fonts, today line theme colors and dragging |
+| v1.1.0 | Jan 2026 | UI/UX enhancements, today line, wider status bars |
+| v1.0.0 | Jan 2026 | Initial implementation following Kanban patterns |

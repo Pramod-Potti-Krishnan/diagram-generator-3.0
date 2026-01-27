@@ -291,3 +291,177 @@ Repo: deck-builder-7.5.git
 
 feat: Enable diagram copy/font buttons in view mode (v7.5.15)
 ```
+
+---
+
+## GANTT_CHART View Mode Interactions (v1.3.5)
+
+Gantt charts are **fully interactive in view mode** by design. Unlike CODE_DISPLAY (which only exposes copy/font buttons), Gantt charts allow complete task management without entering edit mode.
+
+### Gantt View Mode Interaction Matrix
+
+| Feature | View Mode | Edit Mode | Implementation |
+|---------|-----------|-----------|----------------|
+| Add Task | ✓ | ✓ | Click "Add Task" button opens modal |
+| Edit Task | ✓ | ✓ | Click task name or bar opens modal |
+| Delete Task | ✓ | ✓ | Click Delete in edit modal |
+| Resize Task (drag) | ✓ | ✓ | Drag bar edges to adjust dates |
+| Move Task (drag) | ✓ | ✓ | Drag bar center to shift timeline |
+| Drag Today Line | ✓ | ✓ | Drag line or bottom handle |
+| Drag/Move Element | ✗ | ✓ | Layout Service controls |
+| Resize Element | ✗ | ✓ | Layout Service controls |
+| Delete Element | ✗ | ✓ | Layout Service controls |
+
+### Why Gantt is Fully Interactive in View Mode
+
+Gantt charts are designed for **live project tracking during presentations**. Users commonly:
+1. Update task progress mid-meeting
+2. Mark tasks as blocked or at-risk
+3. Adjust timelines based on discussion
+4. Add new tasks discovered during review
+
+Requiring edit mode for these actions would break the presentation flow.
+
+### Gantt Pointer Events Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  VIEW MODE: Gantt Iframe                                     │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │  pointer-events: auto (enabled by CSS override)         ││
+│  │  ┌─────────────────────────────────────────────────────┐││
+│  │  │  .gantt-bar (cursor: pointer)                       │││
+│  │  │    - mousedown → startMove() or startResize()       │││
+│  │  │    - click → editTask()                              │││
+│  │  │                                                      │││
+│  │  │  .gantt-task-name (cursor: pointer)                 │││
+│  │  │    - click → editTask()                              │││
+│  │  │                                                      │││
+│  │  │  .gantt-add-task (cursor: pointer)                  │││
+│  │  │    - click → addTask()                               │││
+│  │  │                                                      │││
+│  │  │  .gantt-today-line, .gantt-today-handle             │││
+│  │  │    - mousedown → startTodayLineDrag()               │││
+│  │  └─────────────────────────────────────────────────────┘││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Gantt Drag vs Click Disambiguation
+
+Gantt implements a **3-pixel threshold** to distinguish drag from click:
+
+```javascript
+// From gantt_atomic_service.py _generate_interactive_scripts()
+var barWasDragged = false;
+
+function onMove(ev) {
+  var dx = ev.clientX - startX;
+  // Mark as dragged if moved more than 3px
+  if (Math.abs(dx) > 3) barWasDragged = true;
+  // ... handle drag
+}
+
+bar.addEventListener('click', function(e) {
+  // Don't open edit modal if user was dragging
+  if (barWasDragged) {
+    barWasDragged = false;
+    return;
+  }
+  editTask(row);
+});
+```
+
+This prevents the modal from opening when the user intends to drag a task.
+
+### Gantt Today Line Interactions
+
+The today line (reference date marker) is draggable via two touch targets:
+
+| Element | Description | Hit Zone |
+|---------|-------------|----------|
+| `.gantt-today-line` | Vertical dashed line | 12px wide (invisible hit zone) |
+| `.gantt-today-handle` | Bottom grip with arrows | 32×18px pill with ◀ ▶ arrows |
+
+```css
+/* Today line wider hit zone for easier clicking */
+.gantt-today-line {
+  width: 12px;
+  margin-left: -6px;  /* Center on actual line */
+  background: transparent;
+  border-left: 2px dashed var(--gantt-today-line);
+  cursor: ew-resize;
+}
+
+/* Hover effect for discoverability */
+.gantt-today-line:hover {
+  border-left-width: 4px !important;
+}
+```
+
+### Gantt State Persistence in View Mode
+
+When users interact with Gantt in view mode, changes are automatically saved:
+
+```javascript
+// Every action calls notifyStateChange()
+function notifyStateChange(action) {
+  window.parent.postMessage({
+    type: 'updateGanttState',
+    elementId: ganttId,
+    action: action,  // 'add', 'edit', 'delete', 'resize', 'move', 'todayLineMove'
+    ganttData: extractGanttState(),
+    timestamp: Date.now()
+  }, '*');
+}
+```
+
+The Layout Service uses `forceInAnyMode=true` (v7.5.20+) to bypass the edit mode check:
+
+```javascript
+// element-manager.js
+markContentChanged(slideIndex, 'diagram_gantt', true);  // forceInAnyMode=true
+```
+
+### Gantt Modal in View Mode
+
+The task modal appears centered over the Gantt chart and includes:
+- Task Name (max 50 chars)
+- Start Date / End Date (date pickers)
+- Progress slider (0-100%)
+- Status dropdown (None/On Track/At Risk/Blocked)
+- Assignee initials (max 2 chars)
+- Delete button (edit mode only)
+
+```javascript
+// Modal shows/hides based on action
+window.addTask = function() {
+  document.getElementById('modal-title').textContent = 'ADD TASK';
+  document.getElementById('modal-delete').style.display = 'none';  // Hide delete for new tasks
+  modal.style.display = 'flex';
+  modal.dataset.mode = 'add';
+};
+
+window.editTask = function(row) {
+  document.getElementById('modal-title').textContent = 'EDIT TASK';
+  document.getElementById('modal-delete').style.display = 'inline-block';  // Show delete
+  modal.style.display = 'flex';
+  modal.dataset.mode = 'edit';
+};
+```
+
+### Gantt Keyboard Shortcuts
+
+| Key | Context | Action |
+|-----|---------|--------|
+| `Escape` | Modal open | Close modal without saving |
+| `Enter` | Modal open (not in textarea) | Save and close modal |
+
+### Version History (Gantt Interactions)
+
+| Version | Changes |
+|---------|---------|
+| v1.3.3 | Added bottom grip handle with ◀ ▶ arrows for today line |
+| v1.3.1 | Wider today line hit zone (12px), header handle draggable |
+| v1.1.0 | Click-to-edit on bars, 3px drag threshold |
+| v1.0.0 | Initial drag-to-resize, modal add/edit/delete |

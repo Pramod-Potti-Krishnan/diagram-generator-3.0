@@ -744,3 +744,298 @@ console.log('[AutoSave] Collecting diagrams with kanban_data');
 ---
 
 *This document should be updated when persistence architecture changes are made to either the Kanban service or Layout Service.*
+
+---
+
+## GANTT_CHART Persistence Architecture (v1.3.4)
+
+Gantt charts follow the **same persistence pattern** as Kanban boards, with identical postMessage protocol and Layout Service integration.
+
+### Gantt vs Kanban: Key Differences
+
+| Aspect | Kanban | Gantt |
+|--------|--------|-------|
+| Message type (save) | `updateKanbanState` | `updateGanttState` |
+| Message type (init) | `kanban-init` | `gantt-init` |
+| Dataset attribute | `dataset.kanbanData` | `dataset.ganttData` |
+| State structure | `{ columns: [...] }` | `{ tasks: [...], today_line_pct: ... }` |
+| Actions | add, edit, move, delete | add, edit, delete, resize, move, todayLineMove |
+
+### Gantt State Object
+
+```typescript
+interface GanttState {
+  tasks: GanttTask[];
+  time_unit: string;           // "days" | "weeks" | "months"
+  start_date: string;          // Chart start (YYYY-MM-DD)
+  end_date: string;            // Chart end (YYYY-MM-DD)
+  today_line_pct: number|null; // v1.3.4: Today line position as percentage
+}
+
+interface GanttTask {
+  id: string;            // Unique task ID (e.g., "t1", "t2_1706312345")
+  name: string;          // Task name (max 50 chars)
+  start_date: string;    // Task start (YYYY-MM-DD)
+  end_date: string;      // Task end (YYYY-MM-DD)
+  progress: number;      // 0-100 percentage
+  status: string;        // "" | "on_track" | "at_risk" | "blocked"
+  assignee: string;      // 2-char initials (e.g., "JD")
+}
+```
+
+### Gantt PostMessage Payloads
+
+#### updateGanttState (Iframe → Parent)
+
+```typescript
+interface UpdateGanttStateMessage {
+  type: 'updateGanttState';
+  elementId: string;                      // DOM element ID
+  action: 'add'|'edit'|'delete'|'resize'|'move'|'todayLineMove';
+  ganttData: GanttState;
+  timestamp: number;
+}
+```
+
+#### gantt-init (Parent → Iframe)
+
+```typescript
+interface GanttInitMessage {
+  type: 'gantt-init';
+  presentation_id: string;
+  element_id: string;
+  saved_state: GanttState | null;
+}
+```
+
+### Gantt Persistence Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  1. USER ACTION (in Gantt iframe)                                           │
+│     - Drags task bar to resize → startResize() / startMove()                │
+│     - Clicks "Add Task" → addTask() → modal save                            │
+│     - Clicks task → editTask() → modal save                                 │
+│     - Drags today line → startTodayLineDrag()                               │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  2. STATE EXTRACTION (Gantt iframe)                                         │
+│     extractGanttState() builds:                                             │
+│     {                                                                       │
+│       tasks: [{ id, name, start_date, end_date, progress, status, ... }],  │
+│       time_unit: "weeks",                                                   │
+│       start_date: "2026-01-15",                                             │
+│       end_date: "2026-02-28",                                               │
+│       today_line_pct: 45.2341  // percentage position                       │
+│     }                                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  3. NOTIFY PARENT (Gantt iframe → Layout Service)                           │
+│     window.parent.postMessage({                                             │
+│       type: 'updateGanttState',                                             │
+│       elementId: 'diagram_f49d185b',                                        │
+│       action: 'resize',                                                     │
+│       ganttData: { tasks: [...], today_line_pct: 45.2341 },                │
+│       timestamp: 1706312345678                                              │
+│     }, '*')                                                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  4. ELEMENT MANAGER RECEIVES (Layout Service)                               │
+│     window.addEventListener('message', function(e) {                        │
+│       if (e.data.type !== 'updateGanttState') return;                       │
+│       element.dataset.ganttData = JSON.stringify(e.data.ganttData);         │
+│       markContentChanged(slideIndex, 'diagram_gantt', true);                │
+│     });                                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  5. AUTO-SAVE COLLECTS (2.5s debounce)                                      │
+│     collectDiagrams() extracts:                                             │
+│       if (el.dataset.ganttData) {                                           │
+│         diagram.gantt_data = JSON.parse(el.dataset.ganttData);              │
+│       }                                                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  6. DATABASE PERSIST (Supabase)                                             │
+│     slides.diagrams[].gantt_data = {                                        │
+│       tasks: [...],                                                         │
+│       time_unit: "weeks",                                                   │
+│       today_line_pct: 45.2341                                               │
+│     }                                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Gantt State Restoration (v1.3.4)
+
+When the page loads, the full state including task positions and today line is restored:
+
+```javascript
+// From gantt_atomic_service.py - restoreGanttState()
+function restoreGanttState(state) {
+  if (!state || !state.tasks) return;
+
+  // 1. Clear existing rows
+  body.innerHTML = '';
+
+  // 2. Rebuild each task row from saved data
+  state.tasks.forEach(function(task, index) {
+    // Calculate bar position from dates
+    var leftPct = dateToPercent(task.start_date);
+    var widthPct = dateToPercent(task.end_date) - leftPct;
+
+    // Build row HTML with all properties
+    var rowHtml = '<div class="gantt-row" data-task-id="' + task.id + '">...';
+    body.insertAdjacentHTML('beforeend', rowHtml);
+  });
+
+  // 3. Re-initialize drag handlers
+  initBarResize();
+
+  // 4. Recalculate row heights
+  recalculateRowHeights();
+
+  // 5. Restore today line position if saved
+  if (state.today_line_pct !== null) {
+    var newLeft = taskColWidth + (currentTimelineWidth * state.today_line_pct / 100);
+    todayLine.style.left = newLeft + 'px';
+    todayLine.dataset.pct = state.today_line_pct.toFixed(4);
+    todayHandle.style.left = newLeft + 'px';
+  }
+}
+```
+
+### Gantt Today Line Persistence
+
+The today line position is stored as a **percentage** (not a date), because:
+1. Users may drag it to non-date positions for visual reference
+2. The percentage accurately repositions after container resize
+3. The actual date can be calculated from the percentage
+
+```javascript
+// Storing: Calculate percentage from position
+var pct = ((newLeft - taskColWidth) / currentTimelineWidth) * 100;
+todayLine.dataset.pct = pct.toFixed(4);
+
+// Restoring: Calculate position from percentage
+var newLeft = taskColWidth + (currentTimelineWidth * state.today_line_pct / 100);
+todayLine.style.left = newLeft + 'px';
+```
+
+### Layout Service: Gantt Handler Code
+
+```javascript
+// element-manager.js - v7.5.25+
+window.addEventListener('message', function(e) {
+  if (!e.data || e.data.type !== 'updateGanttState') return;
+
+  const { elementId, action, ganttData, timestamp } = e.data;
+
+  // Find element by ID or by iframe source
+  let element = document.getElementById(elementId);
+  if (!element && e.source) {
+    const diagrams = document.querySelectorAll('.inserted-diagram');
+    for (const diag of diagrams) {
+      const iframe = diag.querySelector('iframe');
+      if (iframe && iframe.contentWindow === e.source) {
+        element = diag;
+        break;
+      }
+    }
+  }
+
+  if (!element) return;
+
+  // Store state for auto-save collection
+  element.dataset.ganttData = JSON.stringify(ganttData);
+  console.log(`[ElementManager] Gantt state updated (${action}):`, elementId);
+
+  // Trigger auto-save (forceInAnyMode for view mode)
+  const slideIndex = element.closest('section')?.dataset.slideIndex || 0;
+  markContentChanged(slideIndex, 'diagram_gantt', true);
+});
+```
+
+### Database Schema (Gantt)
+
+```json
+// slides table row
+{
+  "slide_id": "uuid",
+  "presentation_id": "uuid",
+  "diagrams": [
+    {
+      "id": "diagram_f49d185b",
+      "diagram_type": "gantt_chart",
+      "html": "<div>...</div>",
+      "gantt_data": {
+        "tasks": [
+          {
+            "id": "t1",
+            "name": "Project Planning",
+            "start_date": "2026-01-15",
+            "end_date": "2026-01-22",
+            "progress": 100,
+            "status": "on_track",
+            "assignee": "JD"
+          }
+        ],
+        "time_unit": "weeks",
+        "start_date": "2026-01-01",
+        "end_date": "2026-02-28",
+        "today_line_pct": 45.2341
+      }
+    }
+  ]
+}
+```
+
+### Gantt Troubleshooting
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| State not saving | `ganttId` not set | Check `gantt-init` message is sent on iframe load |
+| Tasks not restoring | `restoreGanttState()` not called | Verify `saved_state.tasks` in init message |
+| Today line wrong position | Container resized | `repositionTodayLine()` should recalculate on resize |
+| Bars shift on resize | Percentage calculations off | Check `dateToPercent()` and `percentToDate()` |
+
+### Gantt Debug Logging
+
+```javascript
+// Gantt iframe
+console.log('[Gantt] State change sent to parent:', action);
+console.log('[Gantt] Received IDs - presentation:', presentationId, 'element:', ganttId);
+console.log('[Gantt] Restoring state with', state.tasks.length, 'tasks');
+console.log('[Gantt] State restored successfully');
+
+// Element Manager
+console.log('[ElementManager] Gantt state updated (resize):', elementId);
+
+// Auto-Save
+console.log('[AutoSave] Collecting diagrams with gantt_data');
+```
+
+### Gantt Version History (Persistence)
+
+| Version | Service | Changes |
+|---------|---------|---------|
+| v1.3.4 | Gantt | Full state restoration with DOM rebuild, today_line_pct |
+| v1.0.0 | Gantt | Initial persistence following Kanban pattern |
+| v7.5.26 | Layout | Complete Gantt restoration pathway in insertDiagram() |
+| v7.5.25 | Layout | Add Gantt postMessage handler for state updates |
+| v7.5.21 | Layout | Add gantt_data collection in auto-save |
+
+### References (Gantt)
+
+- **Gantt Atomic Service**: `diagram_generator/v3.0/services/gantt_atomic_service.py`
+- **Gantt Models**: `diagram_generator/v3.0/models/gantt_atomic_models.py`
+- **Element Manager**: `layout_builder_main/v7.5-main/src/utils/element-manager.js`
+- **Auto-Save**: `layout_builder_main/v7.5-main/src/utils/auto-save.js`

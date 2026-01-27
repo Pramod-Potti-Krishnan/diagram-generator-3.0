@@ -588,3 +588,259 @@ window.addEventListener('message', function(event) {
 5. **Use solid colors for dark mode backgrounds** - Transparent pastels don't work well
 6. **Keep variable names consistent** - Use the standard set defined in this guide
 7. **Document theme support in version notes** - Note which version added support
+
+---
+
+## GANTT_CHART Light/Dark Mode Implementation (v1.3.4)
+
+Gantt charts implement a **theme-aware** system with three color themes (default, ocean, forest), each supporting both light and dark modes.
+
+### Gantt Theme Configuration
+
+```python
+# From models/gantt_atomic_models.py
+GANTT_THEMES = {
+    "default": {
+        "light": {
+            "header_bg": "#F8FAFC",
+            "row_odd": "#FFFFFF",
+            "row_even": "#F8FAFC",
+            "bar_color": "#8B5CF6",       # Violet
+            "bar_progress": "#7C3AED",
+            "grid_line": "#E2E8F0",
+            "today_line": "#8B5CF6",
+            "text_primary": "#1E293B",
+            "text_secondary": "#64748B"
+        },
+        "dark": {
+            "header_bg": "#1E293B",
+            "row_odd": "#0F172A",
+            "row_even": "#1E293B",
+            "bar_color": "#A78BFA",
+            "bar_progress": "#8B5CF6",
+            "grid_line": "#334155",
+            "today_line": "#A78BFA",
+            "text_primary": "#F8FAFC",
+            "text_secondary": "#94A3B8"
+        }
+    },
+    "ocean": {
+        "light": {
+            "bar_color": "#0EA5E9",        # Sky Blue
+            "bar_progress": "#0284C7",
+            "today_line": "#0EA5E9",
+            # ... other colors same as default
+        },
+        "dark": {
+            "bar_color": "#38BDF8",
+            "bar_progress": "#0EA5E9",
+            "today_line": "#38BDF8",
+            # ...
+        }
+    },
+    "forest": {
+        "light": {
+            "bar_color": "#22C55E",        # Green
+            "bar_progress": "#16A34A",
+            "today_line": "#22C55E",
+            # ...
+        },
+        "dark": {
+            "bar_color": "#4ADE80",
+            "bar_progress": "#22C55E",
+            "today_line": "#4ADE80",
+            # ...
+        }
+    }
+}
+```
+
+### Gantt CSS Variables
+
+```python
+# From gantt_atomic_service.py _generate_theme_css()
+def _generate_theme_css(self, theme: str, theme_mode: str) -> str:
+    theme_config = GANTT_THEMES.get(theme, GANTT_THEMES["default"])
+    light_colors = theme_config["light"]
+    dark_colors = theme_config["dark"]
+
+    return f'''<style>
+/* Deckster Gantt Theme Variables - v1.3.4 */
+:root {{
+    --gantt-header-bg: {light_colors["header_bg"]};
+    --gantt-row-odd: {light_colors["row_odd"]};
+    --gantt-row-even: {light_colors["row_even"]};
+    --gantt-bar-color: {light_colors["bar_color"]};
+    --gantt-bar-progress: {light_colors["bar_progress"]};
+    --gantt-grid-line: {light_colors["grid_line"]};
+    --gantt-today-line: {light_colors["today_line"]};
+    --text-primary: {light_colors["text_primary"]};
+    --text-secondary: {light_colors["text_secondary"]};
+}}
+:root.theme-dark {{
+    --gantt-header-bg: {dark_colors["header_bg"]};
+    --gantt-row-odd: {dark_colors["row_odd"]};
+    --gantt-row-even: {dark_colors["row_even"]};
+    --gantt-bar-color: {dark_colors["bar_color"]};
+    --gantt-bar-progress: {dark_colors["bar_progress"]};
+    --gantt-grid-line: {dark_colors["grid_line"]};
+    --gantt-today-line: {dark_colors["today_line"]};
+    --text-primary: {dark_colors["text_primary"]};
+    --text-secondary: {dark_colors["text_secondary"]};
+}}
+</style>'''
+```
+
+### Gantt-Specific CSS Variables
+
+| Variable | Purpose | Light Default | Dark Default |
+|----------|---------|---------------|--------------|
+| `--gantt-header-bg` | Header row background | #F8FAFC | #1E293B |
+| `--gantt-row-odd` | Odd row background | #FFFFFF | #0F172A |
+| `--gantt-row-even` | Even row background | #F8FAFC | #1E293B |
+| `--gantt-bar-color` | Task bar fill | Theme-specific | Theme-specific |
+| `--gantt-bar-progress` | Progress overlay fill | Theme-specific | Theme-specific |
+| `--gantt-grid-line` | Borders and dividers | #E2E8F0 | #334155 |
+| `--gantt-today-line` | Today line color | Theme-specific | Theme-specific |
+| `--text-primary` | Task names, headers | #1E293B | #F8FAFC |
+| `--text-secondary` | Add button, time labels | #64748B | #94A3B8 |
+
+### Gantt Theme Sync Script
+
+```python
+# From gantt_atomic_service.py _generate_theme_sync_script()
+def _generate_theme_sync_script(self) -> str:
+    return '''<script>
+(function(){
+    window.addEventListener('message',function(e){
+        if(!e.data||e.data.type!=='deckster-theme-sync')return;
+        var m=e.data.mode,v=e.data.variables,r=document.documentElement;
+        if(!m||!v)return;
+        for(var k in v)if(v.hasOwnProperty(k))r.style.setProperty(k,v[k]);
+        r.classList.toggle('theme-dark',m==='dark');
+        r.classList.toggle('theme-light',m==='light');
+    });
+})();
+</script>'''
+```
+
+### Gantt CSS Variable Usage Examples
+
+```python
+# Header background
+header_style = "background: var(--gantt-header-bg);"
+
+# Row alternating backgrounds
+row_bg = "var(--gantt-row-odd)" if i % 2 == 0 else "var(--gantt-row-even)"
+
+# Task bar
+bar_style = (
+    "background: var(--gantt-bar-color);"
+    "border-radius: 4px;"
+)
+
+# Progress overlay inside bar
+progress_style = "background: var(--gantt-bar-progress);"
+
+# Grid lines and borders
+border_style = "border-bottom: 1px solid var(--gantt-grid-line);"
+
+# Today line
+today_line_style = "border-left: 2px dashed var(--gantt-today-line);"
+
+# Text colors
+header_text = "color: var(--text-primary);"
+add_button = "color: var(--text-secondary);"
+```
+
+### Gantt Status Colors (Not Theme-Dependent)
+
+Status colors remain constant across light/dark modes for consistency:
+
+```python
+GANTT_STATUS_COLORS = {
+    "on_track": "#10B981",   # Green - always green
+    "at_risk": "#F59E0B",    # Amber - always amber
+    "blocked": "#EF4444"     # Red - always red
+}
+```
+
+These are applied as border-left on task bars:
+```python
+bar_border = f"6px solid {status_color}" if task.status else "none"
+```
+
+### Gantt Modal (Fixed Dark Theme)
+
+The task add/edit modal uses a **fixed dark theme** regardless of light/dark mode setting:
+
+```html
+<div id="gantt-modal" style="
+  background: rgba(0,0,0,0.6);  /* Dark overlay */
+">
+  <div style="
+    background: #1F2937;        /* Dark surface */
+    border: 1px solid rgba(255,255,255,0.1);
+  ">
+    <h3 style="color: #FFFFFF;">Edit Task</h3>
+    <label style="color: #9CA3AF;">Task Name</label>
+    <input style="
+      background: #111827;
+      color: #F9FAFB;
+      border: 1px solid #374151;
+    ">
+  </div>
+</div>
+```
+
+This design choice ensures:
+1. Modal has consistent appearance regardless of slide theme
+2. Form elements have sufficient contrast
+3. Focus on task content, not theme adaptation
+
+### Testing Gantt Theme Switching
+
+```javascript
+// Browser console test
+// 1. Find Gantt iframe
+var ganttFrame = document.querySelector('.inserted-diagram iframe');
+
+// 2. Send dark mode message
+ganttFrame.contentWindow.postMessage({
+  type: 'deckster-theme-sync',
+  mode: 'dark',
+  variables: {
+    '--gantt-header-bg': '#1E293B',
+    '--gantt-row-odd': '#0F172A',
+    '--gantt-row-even': '#1E293B',
+    '--gantt-bar-color': '#A78BFA',
+    '--gantt-grid-line': '#334155',
+    '--gantt-today-line': '#A78BFA',
+    '--text-primary': '#F8FAFC',
+    '--text-secondary': '#94A3B8'
+  }
+}, '*');
+
+// 3. Verify: Header should darken, rows should darken, bars should lighten
+```
+
+### Gantt Theme Implementation Checklist
+
+- [x] `_generate_theme_css()` with light/dark variable blocks
+- [x] `_generate_theme_sync_script()` with postMessage listener
+- [x] All backgrounds use `var(--gantt-*)` variables
+- [x] All text uses `var(--text-primary/secondary)` variables
+- [x] Today line uses `var(--gantt-today-line)`
+- [x] Grid lines use `var(--gantt-grid-line)`
+- [x] Status colors remain constant (not theme-dependent)
+- [x] Modal uses fixed dark theme for consistency
+
+### Components Using This Pattern
+
+| Component | Version | Status | Notes |
+|-----------|---------|--------|-------|
+| KANBAN_BOARD | v1.4.0+ | Full Support | Reference implementation |
+| CODE_DISPLAY | v1.2+ | Full Support | Header text uses variables |
+| **GANTT_CHART** | **v1.3.4+** | **Full Support** | 3 themes × 2 modes |
+| TEXT_BOX | v1.0+ | Full Support | Basic text variables |
+| CHART (ApexCharts) | v1.0+ | Partial | Chart colors need work |
