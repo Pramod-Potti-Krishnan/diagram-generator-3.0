@@ -10,7 +10,22 @@ from .atomic_models import (
     CodeDisplayAtomicRequest,
     CodeDisplayAtomicResponse,
     normalize_language,
-    LANGUAGE_ALIASES
+    LANGUAGE_ALIASES,
+    # Kanban models
+    KanbanCard,
+    KanbanColumn,
+    KanbanAtomicRequest,
+    KanbanAtomicResponse,
+    KANBAN_POSITION_PRESETS
+)
+
+from .gantt_atomic_models import (
+    GanttTask,
+    GanttAtomicRequest,
+    GanttAtomicResponse,
+    GANTT_POSITION_PRESETS,
+    GANTT_THEMES,
+    GANTT_STATUS_COLORS
 )
 
 from .diagram_models import (
@@ -65,6 +80,19 @@ __all__ = [
     "CodeDisplayAtomicResponse",
     "normalize_language",
     "LANGUAGE_ALIASES",
+    # Kanban models
+    "KanbanCard",
+    "KanbanColumn",
+    "KanbanAtomicRequest",
+    "KanbanAtomicResponse",
+    "KANBAN_POSITION_PRESETS",
+    # Gantt models
+    "GanttTask",
+    "GanttAtomicRequest",
+    "GanttAtomicResponse",
+    "GANTT_POSITION_PRESETS",
+    "GANTT_THEMES",
+    "GANTT_STATUS_COLORS",
     # Existing exports
     "DiagramRequest",
     "DiagramSpec",

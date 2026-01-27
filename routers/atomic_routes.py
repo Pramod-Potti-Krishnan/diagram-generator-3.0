@@ -8,6 +8,7 @@ following the atomic endpoint pattern.
 Endpoints:
 - POST /v1.2/atomic/CODE_DISPLAY - Generate styled code block HTML
 - POST /v1.2/atomic/KANBAN_BOARD - Generate interactive Kanban board HTML
+- POST /v1.2/atomic/GANTT_CHART - Generate interactive Gantt chart HTML
 - GET /v1.2/atomic/health - Health check for atomic endpoints
 - GET /v1.2/atomic/components - List available atomic components
 
@@ -32,10 +33,20 @@ KANBAN_BOARD (v1.0.0):
 - View mode: Add card, Move card (drag-and-drop), Edit card
 - Configurable external margin and border radius
 
+GANTT_CHART (v1.0.0):
+- Interactive Gantt chart with drag-to-resize bars
+- 2 position presets: full_content, left_four_fifths
+- 3 time units: days, weeks, months
+- 3 color themes: default (purple), ocean (teal), forest (green)
+- View mode: Add task, Edit task, Delete task, Resize/move bars
+- State persistence via postMessage + auto-save
+- Light/dark mode theming with CSS variables
+
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 v1.3.0: Added KANBAN_BOARD atomic endpoint
+v1.4.0: Added GANTT_CHART atomic endpoint
 """
 
 import asyncio
@@ -50,8 +61,14 @@ from models.atomic_models import (
     KanbanAtomicResponse,
     KANBAN_POSITION_PRESETS
 )
+from models.gantt_atomic_models import (
+    GanttAtomicRequest,
+    GanttAtomicResponse,
+    GANTT_POSITION_PRESETS
+)
 from services.code_display_service import CodeDisplayGenerator
 from services.kanban_atomic_service import KanbanAtomicGenerator
+from services.gantt_atomic_service import GanttAtomicGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +78,7 @@ router = APIRouter(prefix="/v1.2/atomic", tags=["atomic", "components"])
 # Generator instances (singletons for efficiency)
 _code_generator: CodeDisplayGenerator = None
 _kanban_generator: KanbanAtomicGenerator = None
+_gantt_generator: GanttAtomicGenerator = None
 
 
 def get_code_generator() -> CodeDisplayGenerator:
@@ -77,6 +95,14 @@ def get_kanban_generator() -> KanbanAtomicGenerator:
     if _kanban_generator is None:
         _kanban_generator = KanbanAtomicGenerator()
     return _kanban_generator
+
+
+def get_gantt_generator() -> GanttAtomicGenerator:
+    """Get or create the GanttAtomicGenerator singleton."""
+    global _gantt_generator
+    if _gantt_generator is None:
+        _gantt_generator = GanttAtomicGenerator()
+    return _gantt_generator
 
 
 # =============================================================================
@@ -299,6 +325,121 @@ async def generate_kanban_board(
 
 
 # =============================================================================
+# POST /v1.2/atomic/GANTT_CHART
+# =============================================================================
+
+@router.post("/GANTT_CHART", response_model=GanttAtomicResponse)
+async def generate_gantt_chart(
+    request: GanttAtomicRequest
+) -> GanttAtomicResponse:
+    """
+    Generate GANTT_CHART atomic component (interactive Gantt chart).
+
+    The Gantt chart includes:
+    - Interactive task bars with drag-to-resize
+    - Add/edit/delete tasks via modal dialog
+    - Selectable time units (days, weeks, months)
+    - 3 color themes with light/dark mode support
+    - State persistence via postMessage
+
+    **Request Body**:
+    - title: Chart title (optional)
+    - tasks: Explicit task data (optional, for direct data input)
+    - time_unit: Time unit (days, weeks, months, default: weeks)
+    - start_date: Chart start date YYYY-MM-DD (auto-calculated if not provided)
+    - end_date: Chart end date YYYY-MM-DD (auto-calculated if not provided)
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme: Color theme (default, ocean, forest)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth: Available width in grid units (10-32)
+    - gridHeight: Available height in grid units (6-18)
+    - external_margin: Margin in pixels (0-30, default: 10)
+    - row_height: Pixels per task row (30-60, default: 40)
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Example Request (Placeholder Mode)**:
+    ```json
+    {
+        "position_preset": "full_content",
+        "time_unit": "weeks",
+        "theme": "default",
+        "theme_mode": "light",
+        "placeholder_mode": true
+    }
+    ```
+
+    **Example Request (Explicit Tasks)**:
+    ```json
+    {
+        "title": "Project Timeline",
+        "tasks": [
+            {
+                "id": "t1",
+                "name": "Planning Phase",
+                "start_date": "2026-01-01",
+                "end_date": "2026-01-15",
+                "progress": 100,
+                "status": "on_track",
+                "assignee": "JD"
+            },
+            {
+                "id": "t2",
+                "name": "Development",
+                "start_date": "2026-01-10",
+                "end_date": "2026-02-15",
+                "progress": 50,
+                "status": "at_risk",
+                "assignee": "SK"
+            }
+        ],
+        "time_unit": "weeks",
+        "theme": "ocean"
+    }
+    ```
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Color Themes**:
+    - default: Purple/Violet accent
+    - ocean: Blue/Teal accent
+    - forest: Green/Emerald accent
+
+    **Time Units**:
+    - days: Individual day columns
+    - weeks: Week columns (W1, W2, etc.)
+    - months: Month columns (Jan 2026, Feb 2026, etc.)
+
+    **View Mode Interactivity**:
+    - Click task name or bar to edit via modal
+    - Drag bar edges to resize (change start/end dates)
+    - Drag bar center to move entire task
+    - Click "+ Add Task" to add new tasks
+    - Progress slider and status dropdown in modal
+    """
+    try:
+        generator = get_gantt_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-GANTT_CHART-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-GANTT_CHART-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # GET /v1.2/atomic/health
 # =============================================================================
 
@@ -312,7 +453,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -381,6 +522,40 @@ async def atomic_health():
                     "column_count": 4,
                     "external_margin": 10,
                     "border_radius": 12
+                }
+            },
+            "GANTT_CHART": {
+                "path": "/v1.2/atomic/GANTT_CHART",
+                "component_id": "gantt_chart",
+                "count_range": "1 (single chart)",
+                "flexible_items": True,
+                "time_units": ["days", "weeks", "months"],
+                "color_themes": ["default", "ocean", "forest"],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "drag_to_resize": True,
+                    "drag_to_move": True,
+                    "add_task": True,
+                    "edit_task": True,
+                    "delete_task": True,
+                    "progress_tracking": True,
+                    "status_indicators": True,
+                    "assignee_badges": True,
+                    "placeholder_mode": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "time_unit": "weeks",
+                    "external_margin": 10,
+                    "row_height": 40
                 }
             }
         },
@@ -540,6 +715,75 @@ async def list_atomic_components():
                     "inline_styles": "All critical styles are inline for Layout Service compatibility",
                     "view_mode_interactivity": "Add, move, and edit cards without entering edit mode",
                     "theme_support": "3 design themes with consistent styling"
+                }
+            },
+            {
+                "type": "GANTT_CHART",
+                "component_id": "gantt_chart",
+                "version": "1.0.0",
+                "description": "Interactive Gantt chart with drag-to-resize bars, add/edit/delete tasks, 3 color themes, light/dark mode, and state persistence",
+                "use_cases": [
+                    "project timelines",
+                    "sprint planning",
+                    "resource scheduling",
+                    "milestone tracking",
+                    "roadmap visualization",
+                    "task dependencies"
+                ],
+                "instance_range": {"min": 1, "max": 1},
+                "color_themes": ["default", "ocean", "forest"],
+                "time_units": ["days", "weeks", "months"],
+                "position_presets": {
+                    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+                    "left_four_fifths": {"start_col": 2, "start_row": 4, "gridWidth": 24, "gridHeight": 14}
+                },
+                "flexible_items": True,
+                "supports_placeholder_mode": True,
+                "supports_prompt_generation": False,
+                "default_options": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "time_unit": "weeks",
+                    "external_margin": 10,
+                    "row_height": 40
+                },
+                "interactive_features": {
+                    "drag_to_resize": {
+                        "description": "Drag bar edges to change start or end date",
+                        "mode": "view"
+                    },
+                    "drag_to_move": {
+                        "description": "Drag bar center to move entire task (preserves duration)",
+                        "mode": "view"
+                    },
+                    "add_task": {
+                        "description": "Click '+ Add Task' button to add new tasks via modal",
+                        "mode": "view"
+                    },
+                    "edit_task": {
+                        "description": "Click task name or bar to edit via modal",
+                        "mode": "view"
+                    },
+                    "delete_task": {
+                        "description": "Delete button in edit modal",
+                        "mode": "view"
+                    }
+                },
+                "task_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "name": {"type": "string", "max_length": 50, "required": True},
+                    "start_date": {"type": "date", "format": "YYYY-MM-DD", "required": True},
+                    "end_date": {"type": "date", "format": "YYYY-MM-DD", "required": True},
+                    "progress": {"type": "integer", "min": 0, "max": 100, "default": 0},
+                    "status": {"type": "enum", "values": ["", "on_track", "at_risk", "blocked"], "default": ""},
+                    "assignee": {"type": "string", "max_length": 2, "optional": True}
+                },
+                "v1.0.0_features": {
+                    "inline_styles": "All critical styles are inline for Layout Service compatibility",
+                    "view_mode_interactivity": "Add, edit, delete, resize, and move tasks without entering edit mode",
+                    "theme_support": "3 color themes with light/dark mode via CSS variables",
+                    "state_persistence": "postMessage-based state sync for auto-save integration",
+                    "no_dependencies": "Dependency arrows not included in v1.0 (keep it simple)"
                 }
             }
         ]

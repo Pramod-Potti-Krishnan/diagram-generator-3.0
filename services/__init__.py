@@ -10,6 +10,7 @@ LLM-powered generators for creating HTML diagram content:
 Atomic component generators:
 - AtomicCodeDisplayGenerator: Atomic CODE_DISPLAY endpoint generator
 - KanbanAtomicGenerator: Atomic KANBAN_BOARD endpoint generator
+- GanttAtomicGenerator: Atomic GANTT_CHART endpoint generator
 """
 
 from .gantt_generator import GanttGenerator
@@ -18,6 +19,7 @@ from .code_generator import CodeDisplayGenerator
 from .chevron_generator import ChevronGenerator
 from .code_display_service import CodeDisplayGenerator as AtomicCodeDisplayGenerator
 from .kanban_atomic_service import KanbanAtomicGenerator
+from .gantt_atomic_service import GanttAtomicGenerator
 
 __all__ = [
     "GanttGenerator",
@@ -26,4 +28,5 @@ __all__ = [
     "ChevronGenerator",
     "AtomicCodeDisplayGenerator",
     "KanbanAtomicGenerator",
+    "GanttAtomicGenerator",
 ]
