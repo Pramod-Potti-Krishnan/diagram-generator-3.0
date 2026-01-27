@@ -18,6 +18,9 @@ v1.1.0: UI/UX enhancements - modal fonts, today line, wider status bars,
         dynamic row sizing, improved edit discoverability
 v1.2.0: Modal label fonts match header, status dropdown height fix,
         today line theme-matched colors and draggable, dynamic row sizing
+v1.3.0: Responsive container sizing - chart stretches when parent resized,
+        uses 100% width/height with min constraints, ResizeObserver for
+        dynamic today line and row height recalculation
 """
 
 import logging
@@ -49,6 +52,7 @@ class GanttAtomicGenerator:
     v1.0.0: Initial implementation with drag-to-resize, modal edit, state persistence
     v1.1.0: UI/UX enhancements - modal fonts, today line, status bars, dynamic sizing
     v1.2.0: Modal label fonts, status dropdown height, today line theme+drag, dynamic rows
+    v1.3.0: Responsive container sizing - 100% width/height with ResizeObserver
     """
 
     def __init__(self):
@@ -74,7 +78,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.2.0 */
+/* Deckster Gantt Theme Variables - v1.3.0 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -270,7 +274,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.2.0"
+                    "version": "1.3.0"
                 },
                 grid_position=position_data
             )
@@ -483,22 +487,28 @@ class GanttAtomicGenerator:
         # Modal dialog
         modal_html = self._generate_modal_html()
 
-        # v1.2.0: Calculate today line position (header_height, add_btn_height already defined above)
+        # v1.3.0: Calculate today line position with percentage data for ResizeObserver
         today = date.today()
         today_line_html = ""
         if chart_start <= today <= chart_end:
             today_offset_days = (today - chart_start).days
             today_pct = (today_offset_days / total_days) * 100
             # Today line positioned within timeline area (after task column)
+            # Store percentage in data-pct for ResizeObserver to recalculate on resize
+            # Initial position uses pixels for accuracy, ResizeObserver updates on resize
             today_left_px = task_col_width + (timeline_width * today_pct / 100)
             today_line_html = f'''
-  <div class="gantt-today-line" style="position:absolute;top:{header_height}px;bottom:{add_btn_height}px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>'''
+  <div class="gantt-today-line" style="position:absolute;top:48px;bottom:44px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" data-pct="{today_pct:.4f}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>'''
 
-        # Outer wrapper style (position:relative for today line)
+        # v1.3.0: Outer wrapper style - responsive with flex column layout
+        # Uses 100% width/height to fill parent container (Layout Service)
+        # min-width/min-height ensure minimum readable size
         outer_style = (
             f"position:relative;"
-            f"width:{element_width}px;"
-            f"height:{element_height}px;"
+            f"width:100%;"
+            f"height:100%;"
+            f"min-width:{element_width}px;"
+            f"min-height:{element_height}px;"
             f"padding:0;"
             f"margin:0;"
             f"box-sizing:border-box;"
@@ -506,6 +516,8 @@ class GanttAtomicGenerator:
             f"font-family:'Inter', 'Segoe UI', 'Roboto', sans-serif;"
             f"border-radius:12px;"
             f"background:var(--gantt-row-even);"
+            f"display:flex;"
+            f"flex-direction:column;"
         )
 
         # Add dark class if needed
@@ -515,10 +527,10 @@ class GanttAtomicGenerator:
 {modal_html}
 <div class="{root_class}" style="{outer_style}" role="region" aria-label="Gantt chart" data-gantt-container="true" data-chart-start="{chart_start.isoformat()}" data-chart-end="{chart_end.isoformat()}" data-time-unit="{time_unit}">{today_line_html}
   {header_html}
-  <div class="gantt-body" style="height:{body_height}px;overflow-y:auto;">
+  <div class="gantt-body" style="flex:1;overflow-y:auto;">
     {rows_html}
   </div>
-  <button class="gantt-add-task" style="width:100%;height:{add_btn_height}px;border:none;border-top:1px solid var(--gantt-grid-line);background:transparent;color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="addTask()">
+  <button class="gantt-add-task" style="flex:0 0 {add_btn_height}px;width:100%;border:none;border-top:1px solid var(--gantt-grid-line);background:transparent;color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="addTask()">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>
@@ -537,15 +549,15 @@ class GanttAtomicGenerator:
         timeline_width: int
     ) -> str:
         """Build header row with time column labels."""
-        col_width = timeline_width / max(len(time_columns), 1)
-
+        # v1.3.0: Use flex:1 1 0 for equal distribution instead of fixed width
+        # This allows columns to stretch/shrink with container resize
         time_headers = ""
         for col in time_columns:
             time_headers += f'''
-    <div style="flex:0 0 {col_width}px;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{col["label"]}</div>'''
+    <div style="flex:1 1 0;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:40px;">{col["label"]}</div>'''
 
         return f'''
-  <div class="gantt-header" style="display:flex;height:48px;background:var(--gantt-header-bg);border-bottom:1px solid var(--gantt-grid-line);">
+  <div class="gantt-header" style="flex:0 0 48px;display:flex;background:var(--gantt-header-bg);border-bottom:1px solid var(--gantt-grid-line);">
     <div style="flex:0 0 {task_col_width}px;display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);">Task</div>
     <div style="flex:1;display:flex;align-items:center;overflow:hidden;">
       {time_headers}
@@ -633,7 +645,7 @@ class GanttAtomicGenerator:
             Script block with interactive functionality
         """
         return f'''<style>
-/* v1.2.0: Enhanced hover effects for edit discoverability */
+/* v1.3.0: Enhanced hover effects for edit discoverability */
 .gantt-row {{
   transition: background 0.15s ease;
 }}
@@ -1130,14 +1142,17 @@ class GanttAtomicGenerator:
 
     function onMove(ev) {{
       var dx = ev.clientX - startX;
+      // v1.3.0: Use current timeline width for accurate dragging after resize
+      var currentTimelineWidth = container.offsetWidth - taskColWidth;
       var newLeft = Math.max(taskColWidth, origLeft + dx);
       newLeft = Math.min(newLeft, container.offsetWidth - 2);
       line.style.left = newLeft + 'px';
 
-      // Calculate new date from position
-      var pct = ((newLeft - taskColWidth) / timelineWidth) * 100;
+      // Calculate new date and percentage from position
+      var pct = ((newLeft - taskColWidth) / currentTimelineWidth) * 100;
       var newDate = percentToDate(pct);
       line.dataset.date = newDate;
+      line.dataset.pct = pct.toFixed(4);
       line.title = 'Reference: ' + newDate + ' (drag to change)';
     }}
 
@@ -1154,17 +1169,77 @@ class GanttAtomicGenerator:
     document.addEventListener('mouseup', onUp);
   }}
 
+  // v1.3.0: Reposition today line on container resize
+  function repositionTodayLine() {{
+    var todayLine = container.querySelector('.gantt-today-line');
+    if (!todayLine) return;
+
+    var pct = parseFloat(todayLine.dataset.pct) || 0;
+    var currentTimelineWidth = container.offsetWidth - taskColWidth;
+    var newLeft = taskColWidth + (currentTimelineWidth * pct / 100);
+    todayLine.style.left = newLeft + 'px';
+  }}
+
+  // v1.3.0: Recalculate row heights on container resize
+  function recalculateRowHeights() {{
+    var rows = container.querySelectorAll('.gantt-row');
+    if (!rows.length) return;
+
+    var headerHeight = 48;
+    var addBtnHeight = 44;
+    var bodyHeight = container.offsetHeight - headerHeight - addBtnHeight;
+
+    if (bodyHeight <= 0) return;
+
+    var taskCount = rows.length;
+    var targetFill = 0.70; // Fill 70% of body height
+    var minRowHeight = 40;
+    var maxRowHeight = 80;
+
+    // Calculate dynamic height
+    var targetHeight = Math.floor((bodyHeight * targetFill) / taskCount);
+    targetHeight = Math.max(minRowHeight, Math.min(maxRowHeight, targetHeight));
+
+    rows.forEach(function(row) {{
+      row.style.height = targetHeight + 'px';
+    }});
+  }}
+
+  // v1.3.0: ResizeObserver for responsive behavior
+  function initResizeObserver() {{
+    if (typeof ResizeObserver === 'undefined') return;
+
+    var resizeObserver = new ResizeObserver(function(entries) {{
+      // Debounce resize events
+      if (container._resizeTimeout) clearTimeout(container._resizeTimeout);
+      container._resizeTimeout = setTimeout(function() {{
+        // Update timeline width for drag calculations
+        timelineWidth = container.offsetWidth - taskColWidth;
+
+        // Reposition today line
+        repositionTodayLine();
+
+        // Recalculate row heights
+        recalculateRowHeights();
+      }}, 50);
+    }});
+
+    resizeObserver.observe(container);
+  }}
+
   // Initialize
   if (document.readyState === 'loading') {{
     document.addEventListener('DOMContentLoaded', function() {{
       initBarResize();
       initModal();
       initTodayLineDrag();
+      initResizeObserver();
     }});
   }} else {{
     initBarResize();
     initModal();
     initTodayLineDrag();
+    initResizeObserver();
   }}
 }})();
 </script>'''
