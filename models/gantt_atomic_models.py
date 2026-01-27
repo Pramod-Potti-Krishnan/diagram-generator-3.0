@@ -69,7 +69,7 @@ GANTT_THEME_DEFAULT = {
         "bar_color": "#8B5CF6",
         "bar_progress": "#6D28D9",
         "grid_line": "#E5E7EB",
-        "today_line": "#EF4444",
+        "today_line": "#8B5CF6",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#111827",
         "text_secondary": "#6B7280"
     },
@@ -80,7 +80,7 @@ GANTT_THEME_DEFAULT = {
         "bar_color": "#A78BFA",
         "bar_progress": "#8B5CF6",
         "grid_line": "#374151",
-        "today_line": "#F87171",
+        "today_line": "#A78BFA",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF"
     }
@@ -95,7 +95,7 @@ GANTT_THEME_OCEAN = {
         "bar_color": "#0891B2",
         "bar_progress": "#0E7490",
         "grid_line": "#E0F2FE",
-        "today_line": "#F59E0B",
+        "today_line": "#0891B2",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#0F172A",
         "text_secondary": "#64748B"
     },
@@ -106,7 +106,7 @@ GANTT_THEME_OCEAN = {
         "bar_color": "#22D3EE",
         "bar_progress": "#06B6D4",
         "grid_line": "#1E3A5F",
-        "today_line": "#FBBF24",
+        "today_line": "#22D3EE",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#FFFFFF",
         "text_secondary": "#94A3B8"
     }
@@ -121,7 +121,7 @@ GANTT_THEME_FOREST = {
         "bar_color": "#10B981",
         "bar_progress": "#059669",
         "grid_line": "#D1FAE5",
-        "today_line": "#EF4444",
+        "today_line": "#10B981",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#064E3B",
         "text_secondary": "#6B7280"
     },
@@ -132,7 +132,7 @@ GANTT_THEME_FOREST = {
         "bar_color": "#34D399",
         "bar_progress": "#10B981",
         "grid_line": "#065F46",
-        "today_line": "#F87171",
+        "today_line": "#34D399",  # v1.2.0: Match bar_color for visual consistency
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF"
     }

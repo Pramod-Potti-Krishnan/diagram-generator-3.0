@@ -16,6 +16,8 @@ Service layer for generating interactive Gantt chart HTML with:
 v1.0.0: Initial implementation following kanban atomic endpoint pattern
 v1.1.0: UI/UX enhancements - modal fonts, today line, wider status bars,
         dynamic row sizing, improved edit discoverability
+v1.2.0: Modal label fonts match header, status dropdown height fix,
+        today line theme-matched colors and draggable, dynamic row sizing
 """
 
 import logging
@@ -46,6 +48,7 @@ class GanttAtomicGenerator:
 
     v1.0.0: Initial implementation with drag-to-resize, modal edit, state persistence
     v1.1.0: UI/UX enhancements - modal fonts, today line, status bars, dynamic sizing
+    v1.2.0: Modal label fonts, status dropdown height, today line theme+drag, dynamic rows
     """
 
     def __init__(self):
@@ -71,7 +74,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.1.0 */
+/* Deckster Gantt Theme Variables - v1.2.0 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -141,33 +144,33 @@ class GanttAtomicGenerator:
 
     <!-- Task Name Field -->
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Task Name</label>
+      <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Task Name</label>
       <input id="modal-task-name" type="text" maxlength="50" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
     </div>
 
     <!-- Date Row: Start and End -->
     <div style="display:flex;gap:12px;margin-bottom:16px;">
       <div style="flex:1;">
-        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Start Date</label>
+        <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Start Date</label>
         <input id="modal-start-date" type="date" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
       </div>
       <div style="flex:1;">
-        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">End Date</label>
+        <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">End Date</label>
         <input id="modal-end-date" type="date" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
       </div>
     </div>
 
     <!-- Progress Slider -->
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Progress: <span id="progress-value">0</span>%</label>
+      <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Progress: <span id="progress-value">0</span>%</label>
       <input id="modal-progress" type="range" min="0" max="100" value="0" style="width:100%;accent-color:#8B5CF6;">
     </div>
 
     <!-- Status and Assignee Row -->
     <div style="display:flex;gap:12px;margin-bottom:24px;">
       <div style="flex:1;">
-        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Status</label>
-        <select id="modal-status" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;cursor:pointer;">
+        <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Status</label>
+        <select id="modal-status" style="width:100%;height:48px;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;cursor:pointer;">
           <option value="">None</option>
           <option value="on_track">On Track</option>
           <option value="at_risk">At Risk</option>
@@ -175,8 +178,8 @@ class GanttAtomicGenerator:
         </select>
       </div>
       <div style="flex:1;">
-        <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Assignee</label>
-        <input id="modal-assignee" type="text" maxlength="2" placeholder="JD" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;text-transform:uppercase;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
+        <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Assignee</label>
+        <input id="modal-assignee" type="text" maxlength="2" placeholder="JD" style="width:100%;height:48px;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;text-transform:uppercase;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
       </div>
     </div>
 
@@ -267,7 +270,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.1.0"
+                    "version": "1.2.0"
                 },
                 grid_position=position_data
             )
@@ -446,12 +449,26 @@ class GanttAtomicGenerator:
         # Total days for position calculation
         total_days = (chart_end - chart_start).days or 1
 
+        # v1.2.0: Calculate header height and body height BEFORE building rows
+        header_height = 48
+        add_btn_height = 44
+        body_height = element_height - header_height - add_btn_height
+
+        # v1.2.0: Dynamic row height to fill ~70% of body
+        task_count = len(tasks) if tasks else 1
+        target_fill = 0.70  # Fill 70% of body height
+        min_row_height = 40
+        max_row_height = 80
+        # Calculate dynamic height
+        dynamic_row_height = int((body_height * target_fill) / task_count)
+        dynamic_row_height = max(min_row_height, min(max_row_height, dynamic_row_height))
+
         # Build header row HTML
         header_html = self._build_header_html(time_columns, task_col_width, timeline_width)
 
         # Build task rows HTML
         rows_html = self._build_rows_html(
-            tasks, chart_start, total_days, task_col_width, timeline_width, row_height, theme_colors
+            tasks, chart_start, total_days, task_col_width, timeline_width, dynamic_row_height, theme_colors
         )
 
         # Build interactive JavaScript
@@ -466,12 +483,7 @@ class GanttAtomicGenerator:
         # Modal dialog
         modal_html = self._generate_modal_html()
 
-        # Calculate header height and body height
-        header_height = 48
-        add_btn_height = 44
-        body_height = element_height - header_height - add_btn_height
-
-        # v1.1.0: Calculate today line position
+        # v1.2.0: Calculate today line position (header_height, add_btn_height already defined above)
         today = date.today()
         today_line_html = ""
         if chart_start <= today <= chart_end:
@@ -480,7 +492,7 @@ class GanttAtomicGenerator:
             # Today line positioned within timeline area (after task column)
             today_left_px = task_col_width + (timeline_width * today_pct / 100)
             today_line_html = f'''
-  <div class="gantt-today-line" style="position:absolute;top:{header_height}px;bottom:{add_btn_height}px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:none;" title="Today: {today.strftime('%b %d, %Y')}"></div>'''
+  <div class="gantt-today-line" style="position:absolute;top:{header_height}px;bottom:{add_btn_height}px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>'''
 
         # Outer wrapper style (position:relative for today line)
         outer_style = (
@@ -621,7 +633,7 @@ class GanttAtomicGenerator:
             Script block with interactive functionality
         """
         return f'''<style>
-/* v1.1.0: Enhanced hover effects for edit discoverability */
+/* v1.2.0: Enhanced hover effects for edit discoverability */
 .gantt-row {{
   transition: background 0.15s ease;
 }}
@@ -650,6 +662,15 @@ class GanttAtomicGenerator:
   background: rgba(139, 92, 246, 0.1) !important;
   color: var(--text-primary) !important;
 }}
+/* v1.2.0: Today line hover and drag styles */
+.gantt-today-line:hover {{
+  border-left-width: 4px !important;
+  opacity: 1;
+}}
+.gantt-today-line.dragging {{
+  border-left-width: 4px !important;
+  opacity: 0.8;
+}}
 #modal-save:hover {{
   filter: brightness(1.1);
 }}
@@ -667,6 +688,8 @@ class GanttAtomicGenerator:
   var chartEnd = new Date('{chart_end}');
   var timeUnit = '{time_unit}';
   var totalDays = {total_days} || 1;
+  var taskColWidth = 270;  // v1.2.0: Task column width for today line drag
+  var timelineWidth = container.offsetWidth - taskColWidth;
 
   // IDs received from parent via postMessage
   var presentationId = '';
@@ -1088,15 +1111,60 @@ class GanttAtomicGenerator:
     }});
   }}
 
+  // v1.2.0: Today line drag handler
+  function initTodayLineDrag() {{
+    var todayLine = container.querySelector('.gantt-today-line');
+    if (!todayLine) return;
+
+    todayLine.addEventListener('mousedown', function(e) {{
+      e.preventDefault();
+      startTodayLineDrag(todayLine, e);
+    }});
+  }}
+
+  function startTodayLineDrag(line, e) {{
+    line.classList.add('dragging');
+    var startX = e.clientX;
+    var origLeft = parseFloat(line.style.left);
+    var containerRect = container.getBoundingClientRect();
+
+    function onMove(ev) {{
+      var dx = ev.clientX - startX;
+      var newLeft = Math.max(taskColWidth, origLeft + dx);
+      newLeft = Math.min(newLeft, container.offsetWidth - 2);
+      line.style.left = newLeft + 'px';
+
+      // Calculate new date from position
+      var pct = ((newLeft - taskColWidth) / timelineWidth) * 100;
+      var newDate = percentToDate(pct);
+      line.dataset.date = newDate;
+      line.title = 'Reference: ' + newDate + ' (drag to change)';
+    }}
+
+    function onUp() {{
+      line.classList.remove('dragging');
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+
+      // Notify parent of reference date change
+      notifyStateChange('todayLineMove');
+    }}
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }}
+
   // Initialize
   if (document.readyState === 'loading') {{
     document.addEventListener('DOMContentLoaded', function() {{
       initBarResize();
       initModal();
+      initTodayLineDrag();
     }});
   }} else {{
     initBarResize();
     initModal();
+    initTodayLineDrag();
   }}
 }})();
 </script>'''
