@@ -22,6 +22,7 @@ v1.3.0: Responsive container sizing - chart stretches when parent resized,
         uses 100% width/height with min constraints, ResizeObserver for
         dynamic today line and row height recalculation
 v1.3.1: Row height fix for new tasks + today line accessibility improvements
+v1.3.2: Simplified status dropdown styling (removed native browser chrome)
 """
 
 import logging
@@ -55,6 +56,7 @@ class GanttAtomicGenerator:
     v1.2.0: Modal label fonts, status dropdown height, today line theme+drag, dynamic rows
     v1.3.0: Responsive container sizing - 100% width/height with ResizeObserver
     v1.3.1: Row height fix for new tasks + today line accessibility (wider hit zone + header handle)
+    v1.3.2: Simplified status dropdown styling (flat design, custom arrow)
     """
 
     def __init__(self):
@@ -80,7 +82,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.3.1 */
+/* Deckster Gantt Theme Variables - v1.3.2 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -176,7 +178,7 @@ class GanttAtomicGenerator:
     <div style="display:flex;gap:12px;margin-bottom:24px;">
       <div style="flex:1;">
         <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Status</label>
-        <select id="modal-status" style="width:100%;height:48px;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;cursor:pointer;">
+        <select id="modal-status" style="width:100%;height:48px;padding:12px 32px 12px 12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827 url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%239CA3AF%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>') no-repeat right 12px center;color:#F9FAFB;box-sizing:border-box;outline:none;cursor:pointer;-webkit-appearance:none;-moz-appearance:none;appearance:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
           <option value="">None</option>
           <option value="on_track">On Track</option>
           <option value="at_risk">At Risk</option>
@@ -276,7 +278,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.3.1"
+                    "version": "1.3.2"
                 },
                 grid_position=position_data
             )
