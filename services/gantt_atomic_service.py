@@ -25,6 +25,10 @@ v1.3.1: Row height fix for new tasks + today line accessibility improvements
 v1.3.2: Simplified status dropdown styling (removed native browser chrome)
 v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle
 v1.3.4: Full state restoration - restoreGanttState rebuilds DOM, today_line_pct persisted
+v1.3.5: Timeline readability + handle alignment + static resize behavior
+        - Max 12 columns with auto-escalation (days→weeks→months)
+        - Today line handle margin-left fixed (-16px → -22px)
+        - ResizeObserver no longer recalculates task bar positions
 """
 
 import logging
@@ -61,6 +65,7 @@ class GanttAtomicGenerator:
     v1.3.2: Simplified status dropdown styling (flat design, custom arrow)
     v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle with arrows
     v1.3.4: Full state restoration - restoreGanttState rebuilds DOM, today_line_pct persisted
+    v1.3.5: Timeline readability (max 12 columns), handle alignment fix, static resize
     """
 
     def __init__(self):
@@ -360,6 +365,10 @@ class GanttAtomicGenerator:
         """
         Generate time column headers based on time unit.
 
+        v1.3.5: Limits to max 12 columns for readability.
+        If initial time_unit produces too many columns, auto-escalates
+        to coarser unit (days→weeks→months).
+
         Args:
             chart_start: Chart start date
             chart_end: Chart end date
@@ -367,6 +376,32 @@ class GanttAtomicGenerator:
 
         Returns:
             List of column definitions with label and date range
+        """
+        MAX_COLUMNS = 12  # v1.3.5: Limit for readability
+
+        columns = self._generate_columns_for_unit(chart_start, chart_end, time_unit)
+
+        # v1.3.5: If too many columns, escalate to coarser time unit
+        if len(columns) > MAX_COLUMNS:
+            if time_unit == "days":
+                columns = self._generate_columns_for_unit(chart_start, chart_end, "weeks")
+                if len(columns) > MAX_COLUMNS:
+                    columns = self._generate_columns_for_unit(chart_start, chart_end, "months")
+            elif time_unit == "weeks":
+                columns = self._generate_columns_for_unit(chart_start, chart_end, "months")
+
+        return columns
+
+    def _generate_columns_for_unit(
+        self,
+        chart_start: date,
+        chart_end: date,
+        time_unit: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Generate time columns for a specific time unit.
+
+        v1.3.5: Extracted from _generate_time_columns for reuse.
         """
         columns = []
         current = chart_start
@@ -508,7 +543,7 @@ class GanttAtomicGenerator:
             # v1.3.3: Wider hit zone (12px) for easier clicking + bottom grip handle with arrows
             today_line_html = f'''
   <div class="gantt-today-line" style="position:absolute;top:48px;bottom:44px;left:{today_left_px}px;width:12px;margin-left:-6px;background:transparent;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" data-pct="{today_pct:.4f}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>
-  <div class="gantt-today-handle" style="position:absolute;bottom:48px;left:{today_left_px}px;width:32px;height:18px;margin-left:-16px;background:var(--gantt-today-line);border-radius:9px;cursor:ew-resize;z-index:10;display:flex;align-items:center;justify-content:center;gap:2px;transition:opacity 0.15s, transform 0.15s;filter:brightness(0.85);" data-pct="{today_pct:.4f}" title="Drag to move reference line"><span style="color:rgba(255,255,255,0.9);font-size:9px;font-weight:bold;pointer-events:none;">◀ ▶</span></div>'''
+  <div class="gantt-today-handle" style="position:absolute;bottom:48px;left:{today_left_px}px;width:32px;height:18px;margin-left:-22px;background:var(--gantt-today-line);border-radius:9px;cursor:ew-resize;z-index:10;display:flex;align-items:center;justify-content:center;gap:2px;transition:opacity 0.15s, transform 0.15s;filter:brightness(0.85);" data-pct="{today_pct:.4f}" title="Drag to move reference line"><span style="color:rgba(255,255,255,0.9);font-size:9px;font-weight:bold;pointer-events:none;">◀ ▶</span></div>'''
 
         # v1.3.0: Outer wrapper style - responsive with flex column layout
         # Uses 100% width/height to fill parent container (Layout Service)
@@ -1323,7 +1358,8 @@ class GanttAtomicGenerator:
     }});
   }}
 
-  // v1.3.0: ResizeObserver for responsive behavior
+  // v1.3.5: ResizeObserver - only reposition today line and recalculate row heights
+  // Removed timelineWidth recalculation to keep task bars at fixed positions (static content)
   function initResizeObserver() {{
     if (typeof ResizeObserver === 'undefined') return;
 
@@ -1331,8 +1367,8 @@ class GanttAtomicGenerator:
       // Debounce resize events
       if (container._resizeTimeout) clearTimeout(container._resizeTimeout);
       container._resizeTimeout = setTimeout(function() {{
-        // Update timeline width for drag calculations
-        timelineWidth = container.offsetWidth - taskColWidth;
+        // v1.3.5: Removed timelineWidth update - keep task bar positions static
+        // Only update today line (percentage-based) and row heights
 
         // Reposition today line
         repositionTodayLine();
