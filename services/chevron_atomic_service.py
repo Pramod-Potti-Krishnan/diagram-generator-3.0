@@ -6,12 +6,22 @@ Service layer for generating interactive chevron maturity progression HTML with:
 - Grid-based positioning with position presets
 - Position presets: full_content, left_four_fifths
 - Configurable stages (3-6)
-- Mixed content: bullets OR metrics per chevron
+- Bullet content per chevron (v1.1.0: metrics removed)
 - Color progression: light → dark (maturity progression)
-- Interactive features: add rows, edit content
+- Interactive features: add rows, delete chevrons, edit content
+- Variable width chevrons (Gantt-style resizable)
 - Light/dark mode theming with CSS variables
 - 3 color themes: default (blue), emerald (green), purple
 - State persistence via postMessage + auto-save
+
+v1.1.0: Major UX improvements
+- Variable width chevrons with drag-to-resize handles
+- Increased row height: 100px default (+25%)
+- Responsive row sizing based on row count
+- Text positioning fix: better padding within clip-path
+- Delete individual chevrons (min 1 per row)
+- Simplified modal: bullets only
+- Complete persistence with left_pct/width_pct
 
 v1.0.0: Initial implementation following gantt/kanban atomic endpoint pattern
 """
@@ -25,11 +35,11 @@ from models.chevron_atomic_models import (
     ChevronAtomicRequest,
     ChevronAtomicResponse,
     ChevronContent,
-    ChevronMetric,
     MaturityRow,
     CHEVRON_POSITION_PRESETS,
     CHEVRON_THEMES,
-    CHEVRON_OPACITY_LEVELS
+    CHEVRON_OPACITY_LEVELS,
+    calculate_row_height
 )
 
 logger = logging.getLogger(__name__)
@@ -42,6 +52,7 @@ class ChevronAtomicGenerator:
     Generates interactive chevron maturity progression HTML with inline styles
     for Layout Service compatibility.
 
+    v1.1.0: Variable width chevrons, taller rows, delete functionality, bullets only
     v1.0.0: Initial implementation with edit modal, state persistence
     """
 
@@ -68,7 +79,7 @@ class ChevronAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Chevron Maturity Theme Variables - v1.0.0 */
+/* Deckster Chevron Maturity Theme Variables - v1.1.0 */
 :root {{
     --chevron-header-bg: {light_colors["header_bg"]};
     --chevron-row-label-bg: {light_colors["row_label_bg"]};
@@ -120,8 +131,7 @@ class ChevronAtomicGenerator:
         """
         Generate reusable modal dialog HTML for edit chevron content.
 
-        Includes fields for: content type toggle, bullets, metrics.
-        Delete row button visible in edit mode.
+        v1.1.0: Simplified to bullets only, added delete chevron button.
 
         Returns:
             str: Modal HTML structure with solid dark theme
@@ -136,44 +146,21 @@ class ChevronAtomicGenerator:
       <span id="modal-stage-label" style="font-size:12px;color:#9CA3AF;font-weight:500;"></span>
     </div>
 
-    <!-- Content Type Toggle -->
-    <div style="margin-bottom:16px;">
-      <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Content Type</label>
-      <div style="display:flex;gap:8px;">
-        <button id="modal-type-bullets" style="flex:1;padding:10px;border:1px solid #374151;border-radius:8px;background:#111827;color:#F9FAFB;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onclick="setContentType('bullets')">Bullets</button>
-        <button id="modal-type-metrics" style="flex:1;padding:10px;border:1px solid #374151;border-radius:8px;background:#111827;color:#F9FAFB;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s ease;" onclick="setContentType('metrics')">Metrics</button>
-      </div>
-    </div>
-
-    <!-- Bullets Section -->
+    <!-- Bullets Section (v1.1.0: simplified, bullets only) -->
     <div id="modal-bullets-section" style="margin-bottom:16px;">
       <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Bullet Points (max 3)</label>
-      <input id="modal-bullet-1" type="text" maxlength="50" placeholder="First bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;margin-bottom:8px;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-      <input id="modal-bullet-2" type="text" maxlength="50" placeholder="Second bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;margin-bottom:8px;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-      <input id="modal-bullet-3" type="text" maxlength="50" placeholder="Third bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
+      <input id="modal-bullet-1" type="text" maxlength="100" placeholder="First bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;margin-bottom:8px;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
+      <input id="modal-bullet-2" type="text" maxlength="100" placeholder="Second bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;margin-bottom:8px;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
+      <input id="modal-bullet-3" type="text" maxlength="100" placeholder="Third bullet point" style="width:100%;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
     </div>
 
-    <!-- Metrics Section (hidden by default) -->
-    <div id="modal-metrics-section" style="display:none;margin-bottom:16px;">
-      <label style="display:block;font-family:'Inter','Segoe UI',sans-serif;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Metrics (max 3)</label>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input id="modal-metric-label-1" type="text" maxlength="30" placeholder="Label" style="flex:1;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-        <input id="modal-metric-value-1" type="text" maxlength="20" placeholder="Value" style="width:100px;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
+    <!-- Action Buttons (v1.1.0: added Delete button) -->
+    <div style="display:flex;justify-content:space-between;gap:12px;">
+      <button id="modal-delete" style="padding:10px 16px;border:1px solid #EF4444;border-radius:8px;background:transparent;color:#EF4444;font-size:13px;font-weight:600;cursor:pointer;">Delete</button>
+      <div style="display:flex;gap:12px;">
+        <button id="modal-cancel" style="padding:10px 20px;border:1px solid #374151;border-radius:8px;background:transparent;color:#9CA3AF;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+        <button id="modal-save" style="padding:10px 20px;border:none;border-radius:8px;background:#3B82F6;color:white;font-size:13px;font-weight:600;cursor:pointer;">Save</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:8px;">
-        <input id="modal-metric-label-2" type="text" maxlength="30" placeholder="Label" style="flex:1;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-        <input id="modal-metric-value-2" type="text" maxlength="20" placeholder="Value" style="width:100px;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-      </div>
-      <div style="display:flex;gap:8px;">
-        <input id="modal-metric-label-3" type="text" maxlength="30" placeholder="Label" style="flex:1;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-        <input id="modal-metric-value-3" type="text" maxlength="20" placeholder="Value" style="width:100px;padding:10px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#3B82F6'" onblur="this.style.borderColor='#374151'">
-      </div>
-    </div>
-
-    <!-- Action Buttons -->
-    <div style="display:flex;justify-content:flex-end;gap:12px;">
-      <button id="modal-cancel" style="padding:10px 20px;border:1px solid #374151;border-radius:8px;background:transparent;color:#9CA3AF;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
-      <button id="modal-save" style="padding:10px 20px;border:none;border-radius:8px;background:#3B82F6;color:white;font-size:13px;font-weight:600;cursor:pointer;">Save</button>
     </div>
   </div>
 </div>
@@ -230,9 +217,15 @@ class ChevronAtomicGenerator:
                 if len(row.chevrons) < request.num_stages:
                     # Pad with empty chevrons
                     for _ in range(request.num_stages - len(row.chevrons)):
-                        row.chevrons.append(ChevronContent(content_type="bullets", bullets=[]))
+                        row.chevrons.append(ChevronContent(bullets=[]))
                 elif len(row.chevrons) > request.num_stages:
                     row.chevrons = row.chevrons[:request.num_stages]
+
+            # v1.1.0: Calculate responsive row height based on number of rows
+            effective_row_height = calculate_row_height(len(rows), request.gridHeight * 60)
+            # Allow explicit override
+            if request.row_height != 100:  # Non-default value specified
+                effective_row_height = request.row_height
 
             # Get stage labels
             stage_labels = request.stage_labels
@@ -255,7 +248,7 @@ class ChevronAtomicGenerator:
                 grid_width=request.gridWidth,
                 grid_height=request.gridHeight,
                 external_margin=request.external_margin,
-                row_height=request.row_height
+                row_height=effective_row_height
             )
 
             # Calculate grid position
@@ -279,7 +272,8 @@ class ChevronAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.0.0"
+                    "row_height_used": effective_row_height,
+                    "version": "1.1.0"
                 },
                 grid_position=position_data
             )
@@ -441,10 +435,11 @@ class ChevronAtomicGenerator:
             # Build chevrons HTML
             chevrons_html = self._build_chevrons_html(row.chevrons, num_stages, opacity_levels)
 
+            # v1.1.0: Use relative positioning container for absolute-positioned chevrons
             rows_html += f'''
     <div class="maturity-row" style="display:flex;height:{row_height}px;background:{row_bg};border-bottom:1px solid var(--chevron-grid-line);" data-row-id="{row.id}">
       <div class="row-label" style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">{row.label}</div>
-      <div class="chevrons-container" style="flex:1;display:flex;align-items:center;padding:8px 12px;gap:0;overflow:hidden;">
+      <div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">
         {chevrons_html}
       </div>
     </div>'''
@@ -457,32 +452,55 @@ class ChevronAtomicGenerator:
         num_stages: int,
         opacity_levels: List[float]
     ) -> str:
-        """Build chevrons HTML for a row."""
+        """
+        Build chevrons HTML for a row.
+
+        v1.1.0: Uses absolute positioning with percentages for variable widths.
+        Each chevron can have custom left_pct and width_pct for Gantt-style sizing.
+        """
         chevrons_html = ""
+
+        # Calculate default widths if not specified
+        # Allow 2% overlap between chevrons for visual effect
+        overlap_pct = 2
+        total_overlap = overlap_pct * (num_stages - 1) if num_stages > 1 else 0
+        default_width_pct = (100 + total_overlap) / num_stages
 
         for stage_idx, chevron in enumerate(chevrons):
             opacity = opacity_levels[stage_idx] if stage_idx < len(opacity_levels) else 0.9
 
-            # Build content HTML based on type
-            if chevron.content_type == "metrics" and chevron.metrics:
-                content_html = self._build_metrics_content(chevron.metrics)
+            # Build content HTML (v1.1.0: bullets only)
+            content_html = self._build_bullets_content(chevron.bullets or [])
+
+            # Calculate position and width
+            # Use stored values if available, otherwise calculate defaults
+            if chevron.left_pct is not None:
+                left_pct = chevron.left_pct
             else:
-                content_html = self._build_bullets_content(chevron.bullets or [])
+                # Default: evenly spaced with overlap
+                left_pct = max(0, stage_idx * (default_width_pct - overlap_pct))
+
+            if chevron.width_pct is not None:
+                width_pct = chevron.width_pct
+            else:
+                width_pct = default_width_pct
 
             # Chevron shape using clip-path with overlapping effect
             # First chevron has flat left edge, others have arrow indentation
             if stage_idx == 0:
                 clip_path = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)"
-                margin_left = "0"
             else:
                 clip_path = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)"
-                margin_left = "-20px"
 
+            # v1.1.0: Absolute positioning with percentage widths
+            # v1.1.0: Fixed text positioning - increased padding to stay within clip-path
             chevrons_html += f'''
-        <div class="chevron" style="flex:1 1 0;min-width:80px;height:calc(100% - 8px);background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};margin-left:{margin_left};padding:8px 20px 8px 28px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease;position:relative;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-content-type="{chevron.content_type}" onclick="editChevron(this)">
-          <div class="chevron-content" style="overflow:hidden;">
+        <div class="chevron" style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-left-pct="{left_pct:.1f}" data-width-pct="{width_pct:.1f}" onclick="editChevron(this)">
+          <div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">
             {content_html}
           </div>
+          <div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,'left')"></div>
+          <div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,'right')"></div>
         </div>'''
 
         return chevrons_html
@@ -498,23 +516,12 @@ class ChevronAtomicGenerator:
 
         return f'''<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">{items}</ul>'''
 
-    def _build_metrics_content(self, metrics: List[ChevronMetric]) -> str:
-        """Build metrics content HTML."""
-        if not metrics:
-            return '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>'
-
-        items = ""
-        for metric in metrics[:3]:
-            items += f'''<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
-              <span style="font-size:10px;opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">{metric.label}</span>
-              <span style="font-size:12px;font-weight:700;">{metric.value}</span>
-            </div>'''
-
-        return f'''<div style="color:var(--chevron-text);">{items}</div>'''
 
     def _generate_interactive_scripts(self, num_stages: int, row_terminology: str) -> str:
         """
-        Generate JavaScript for modal, edit, and state persistence.
+        Generate JavaScript for modal, edit, resize, delete, and state persistence.
+
+        v1.1.0: Added resize handles, delete chevron, simplified to bullets only.
 
         Args:
             num_stages: Number of stages
@@ -526,7 +533,7 @@ class ChevronAtomicGenerator:
         singular_term = row_terminology.rstrip('s') if row_terminology.endswith('s') else row_terminology
 
         return f'''<style>
-/* v1.0.0: Enhanced hover effects */
+/* v1.1.0: Enhanced hover effects with resize handles */
 .maturity-row {{
   transition: background 0.15s ease;
 }}
@@ -541,12 +548,15 @@ class ChevronAtomicGenerator:
   color: var(--chevron-base-color) !important;
 }}
 .chevron {{
-  transition: transform 0.15s ease, filter 0.15s ease;
+  transition: transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;
 }}
 .chevron:hover {{
   filter: brightness(1.1);
-  transform: scale(1.02);
   z-index: 100 !important;
+}}
+.chevron:hover .resize-handle {{
+  opacity: 1 !important;
+  background: rgba(255,255,255,0.3);
 }}
 .chevron-add-row:hover {{
   background: rgba(59, 130, 246, 0.1) !important;
@@ -558,12 +568,8 @@ class ChevronAtomicGenerator:
 #modal-cancel:hover, #row-modal-cancel:hover {{
   background: rgba(255,255,255,0.05);
 }}
-#row-modal-delete:hover {{
+#modal-delete:hover, #row-modal-delete:hover {{
   background: rgba(239, 68, 68, 0.1);
-}}
-#modal-type-bullets.active, #modal-type-metrics.active {{
-  background: #3B82F6 !important;
-  border-color: #3B82F6 !important;
 }}
 </style>
 <script>
@@ -577,31 +583,22 @@ class ChevronAtomicGenerator:
   var presentationId = '';
   var chevronId = '';
 
+  // v1.1.0: Resize state
+  var resizeState = null;
+
   // Listen for init message from parent
   window.addEventListener('message', function(e) {{
     if (!e.data || e.data.type !== 'chevron-init') return;
     presentationId = e.data.presentation_id || '';
     chevronId = e.data.element_id || '';
-    console.log('[Chevron] Received IDs - presentation:', presentationId, 'element:', chevronId);
+    console.log('[Chevron v1.1.0] Received IDs - presentation:', presentationId, 'element:', chevronId);
 
     if (e.data.saved_state && e.data.saved_state.rows) {{
       restoreChevronState(e.data.saved_state);
     }}
   }});
 
-  // Current content type for modal
-  var currentContentType = 'bullets';
-
-  // Set content type in modal
-  window.setContentType = function(type) {{
-    currentContentType = type;
-    document.getElementById('modal-type-bullets').classList.toggle('active', type === 'bullets');
-    document.getElementById('modal-type-metrics').classList.toggle('active', type === 'metrics');
-    document.getElementById('modal-bullets-section').style.display = type === 'bullets' ? 'block' : 'none';
-    document.getElementById('modal-metrics-section').style.display = type === 'metrics' ? 'block' : 'none';
-  }};
-
-  // Extract current state for persistence
+  // v1.1.0: Extract current state for persistence (includes left_pct/width_pct)
   function extractChevronState() {{
     var rows = [];
     container.querySelectorAll('.maturity-row').forEach(function(rowEl) {{
@@ -613,25 +610,17 @@ class ChevronAtomicGenerator:
       }};
 
       rowEl.querySelectorAll('.chevron').forEach(function(chevronEl) {{
-        var contentType = chevronEl.dataset.contentType || 'bullets';
-        var chevron = {{ content_type: contentType }};
+        var bullets = [];
+        chevronEl.querySelectorAll('li').forEach(function(li) {{
+          bullets.push(li.textContent);
+        }});
 
-        if (contentType === 'bullets') {{
-          var bullets = [];
-          chevronEl.querySelectorAll('li').forEach(function(li) {{
-            bullets.push(li.textContent);
-          }});
-          chevron.bullets = bullets;
-        }} else {{
-          var metrics = [];
-          chevronEl.querySelectorAll('.chevron-content > div > div').forEach(function(metricDiv) {{
-            var spans = metricDiv.querySelectorAll('span');
-            if (spans.length >= 2) {{
-              metrics.push({{ label: spans[0].textContent, value: spans[1].textContent }});
-            }}
-          }});
-          chevron.metrics = metrics;
-        }}
+        var chevron = {{
+          stage: parseInt(chevronEl.dataset.stage) || 0,
+          bullets: bullets,
+          left_pct: parseFloat(chevronEl.dataset.leftPct) || 0,
+          width_pct: parseFloat(chevronEl.dataset.widthPct) || 20
+        }};
 
         row.chevrons.push(chevron);
       }});
@@ -660,13 +649,13 @@ class ChevronAtomicGenerator:
       chevronData: state,
       timestamp: Date.now()
     }}, '*');
-    console.log('[Chevron] State change sent to parent:', action);
+    console.log('[Chevron v1.1.0] State change sent to parent:', action);
   }}
 
-  // Restore state from saved data
+  // v1.1.0: Restore state from saved data (with variable widths)
   function restoreChevronState(state) {{
     if (!state || !state.rows) return;
-    console.log('[Chevron] Restoring state with', state.rows.length, 'rows');
+    console.log('[Chevron v1.1.0] Restoring state with', state.rows.length, 'rows');
 
     var body = container.querySelector('.chevron-body');
     if (!body) return;
@@ -683,16 +672,13 @@ class ChevronAtomicGenerator:
       row.chevrons.forEach(function(chevron, stageIdx) {{
         var opacity = opacities[stageIdx] || 0.9;
         var clipPath = stageIdx === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
-        var marginLeft = stageIdx === 0 ? '0' : '-20px';
         var contentHtml = '';
 
-        if (chevron.content_type === 'metrics' && chevron.metrics && chevron.metrics.length > 0) {{
-          var metricsItems = '';
-          chevron.metrics.forEach(function(m) {{
-            metricsItems += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><span style="font-size:10px;opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + m.label + '</span><span style="font-size:12px;font-weight:700;">' + m.value + '</span></div>';
-          }});
-          contentHtml = '<div style="color:var(--chevron-text);">' + metricsItems + '</div>';
-        }} else if (chevron.bullets && chevron.bullets.length > 0) {{
+        // v1.1.0: Use saved position or calculate defaults
+        var leftPct = chevron.left_pct !== undefined ? chevron.left_pct : (stageIdx * 18);
+        var widthPct = chevron.width_pct !== undefined ? chevron.width_pct : 22;
+
+        if (chevron.bullets && chevron.bullets.length > 0) {{
           var bulletItems = '';
           chevron.bullets.forEach(function(b) {{
             bulletItems += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
@@ -702,21 +688,117 @@ class ChevronAtomicGenerator:
           contentHtml = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
         }}
 
-        chevronsHtml += '<div class="chevron" style="flex:1 1 0;min-width:80px;height:calc(100% - 8px);background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';margin-left:' + marginLeft + ';padding:8px 20px 8px 28px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease;position:relative;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-content-type="' + (chevron.content_type || 'bullets') + '" onclick="editChevron(this)"><div class="chevron-content" style="overflow:hidden;">' + contentHtml + '</div></div>';
+        chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" onclick="editChevron(this)">' +
+          '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">' + contentHtml + '</div>' +
+          '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
+          '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
+          '</div>';
       }});
 
-      var rowHtml = '<div class="maturity-row" style="display:flex;height:80px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + row.id + '">' +
+      var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + row.id + '">' +
         '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">' + row.label + '</div>' +
-        '<div class="chevrons-container" style="flex:1;display:flex;align-items:center;padding:8px 12px;gap:0;overflow:hidden;">' + chevronsHtml + '</div></div>';
+        '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
       body.insertAdjacentHTML('beforeend', rowHtml);
     }});
 
-    console.log('[Chevron] State restored successfully');
+    console.log('[Chevron v1.1.0] State restored successfully');
   }}
 
-  // Edit chevron content
+  // v1.1.0: Start resize operation
+  window.startResize = function(e, chevronEl, edge) {{
+    e.stopPropagation();
+    e.preventDefault();
+
+    var containerEl = chevronEl.closest('.chevrons-container');
+    var containerWidth = containerEl.offsetWidth;
+
+    resizeState = {{
+      chevron: chevronEl,
+      edge: edge,
+      startX: e.clientX,
+      startLeft: parseFloat(chevronEl.dataset.leftPct) || 0,
+      startWidth: parseFloat(chevronEl.dataset.widthPct) || 20,
+      containerWidth: containerWidth
+    }};
+
+    document.addEventListener('mousemove', onResizeMove);
+    document.addEventListener('mouseup', onResizeEnd);
+  }};
+
+  function onResizeMove(e) {{
+    if (!resizeState) return;
+
+    var deltaX = e.clientX - resizeState.startX;
+    var deltaPct = (deltaX / resizeState.containerWidth) * 100;
+
+    if (resizeState.edge === 'left') {{
+      // Moving left edge: adjust left position and width
+      var newLeft = Math.max(0, resizeState.startLeft + deltaPct);
+      var newWidth = resizeState.startWidth - deltaPct;
+      if (newWidth >= 5) {{
+        resizeState.chevron.style.left = newLeft + '%';
+        resizeState.chevron.style.width = newWidth + '%';
+        resizeState.chevron.dataset.leftPct = newLeft.toFixed(1);
+        resizeState.chevron.dataset.widthPct = newWidth.toFixed(1);
+      }}
+    }} else {{
+      // Moving right edge: adjust width only
+      var newWidth = Math.max(5, Math.min(100 - resizeState.startLeft, resizeState.startWidth + deltaPct));
+      resizeState.chevron.style.width = newWidth + '%';
+      resizeState.chevron.dataset.widthPct = newWidth.toFixed(1);
+    }}
+  }}
+
+  function onResizeEnd(e) {{
+    if (resizeState) {{
+      notifyStateChange('resize');
+      resizeState = null;
+    }}
+    document.removeEventListener('mousemove', onResizeMove);
+    document.removeEventListener('mouseup', onResizeEnd);
+  }}
+
+  // v1.1.0: Delete chevron
+  window.deleteChevron = function(chevronEl) {{
+    var row = chevronEl.closest('.maturity-row');
+    var chevrons = row.querySelectorAll('.chevron');
+
+    if (chevrons.length <= 1) {{
+      alert('Cannot delete the last chevron. Delete the row instead.');
+      return;
+    }}
+
+    chevronEl.remove();
+    redistributeChevronWidths(row);
+    notifyStateChange('deleteChevron');
+  }};
+
+  // v1.1.0: Redistribute chevron widths after deletion
+  function redistributeChevronWidths(rowEl) {{
+    var chevrons = rowEl.querySelectorAll('.chevron');
+    var count = chevrons.length;
+    if (count === 0) return;
+
+    var overlap = 2;
+    var totalOverlap = overlap * (count - 1);
+    var defaultWidth = (100 + totalOverlap) / count;
+
+    chevrons.forEach(function(chev, idx) {{
+      var leftPct = Math.max(0, idx * (defaultWidth - overlap));
+      chev.style.left = leftPct + '%';
+      chev.style.width = defaultWidth + '%';
+      chev.dataset.leftPct = leftPct.toFixed(1);
+      chev.dataset.widthPct = defaultWidth.toFixed(1);
+      chev.dataset.stage = idx;
+    }});
+  }}
+
+  // Edit chevron content (v1.1.0: bullets only)
   window.editChevron = function(chevronEl) {{
+    // Don't open modal if we just finished resizing
+    if (resizeState) return;
+
     var modal = document.getElementById('chevron-modal');
     var row = chevronEl.closest('.maturity-row');
     var rowLabel = row.querySelector('.row-label').textContent;
@@ -727,35 +809,16 @@ class ChevronAtomicGenerator:
     document.getElementById('modal-title').textContent = 'Edit Chevron';
     document.getElementById('modal-stage-label').textContent = rowLabel + ' - ' + stageName;
 
-    // Get current content type and data
-    var contentType = chevronEl.dataset.contentType || 'bullets';
-    setContentType(contentType);
-
     // Clear all fields
     for (var i = 1; i <= 3; i++) {{
       document.getElementById('modal-bullet-' + i).value = '';
-      document.getElementById('modal-metric-label-' + i).value = '';
-      document.getElementById('modal-metric-value-' + i).value = '';
     }}
 
     // Populate current data
-    if (contentType === 'bullets') {{
-      var bullets = chevronEl.querySelectorAll('li');
-      bullets.forEach(function(li, idx) {{
-        if (idx < 3) document.getElementById('modal-bullet-' + (idx + 1)).value = li.textContent;
-      }});
-    }} else {{
-      var metricsDiv = chevronEl.querySelectorAll('.chevron-content > div > div');
-      metricsDiv.forEach(function(metricEl, idx) {{
-        if (idx < 3) {{
-          var spans = metricEl.querySelectorAll('span');
-          if (spans.length >= 2) {{
-            document.getElementById('modal-metric-label-' + (idx + 1)).value = spans[0].textContent;
-            document.getElementById('modal-metric-value-' + (idx + 1)).value = spans[1].textContent;
-          }}
-        }}
-      }});
-    }}
+    var bullets = chevronEl.querySelectorAll('li');
+    bullets.forEach(function(li, idx) {{
+      if (idx < 3) document.getElementById('modal-bullet-' + (idx + 1)).value = li.textContent;
+    }});
 
     modal.style.display = 'flex';
     modal._targetChevron = chevronEl;
@@ -776,7 +839,7 @@ class ChevronAtomicGenerator:
     document.getElementById('row-modal-label').focus();
   }};
 
-  // Add new row
+  // Add new row (v1.1.0: with variable width chevrons)
   window.addRow = function() {{
     var body = container.querySelector('.chevron-body');
     var rows = body.querySelectorAll('.maturity-row');
@@ -787,23 +850,33 @@ class ChevronAtomicGenerator:
     var opacityLevels = {{3: [0.35, 0.60, 0.90], 4: [0.30, 0.50, 0.70, 0.90], 5: [0.30, 0.45, 0.60, 0.75, 0.90], 6: [0.25, 0.40, 0.55, 0.70, 0.85, 0.95]}};
     var opacities = opacityLevels[numStages] || opacityLevels[5];
 
+    // v1.1.0: Calculate default widths
+    var overlap = 2;
+    var totalOverlap = overlap * (numStages - 1);
+    var defaultWidth = (100 + totalOverlap) / numStages;
+
     var chevronsHtml = '';
     for (var i = 0; i < numStages; i++) {{
       var opacity = opacities[i] || 0.9;
       var clipPath = i === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
-      var marginLeft = i === 0 ? '0' : '-20px';
-      chevronsHtml += '<div class="chevron" style="flex:1 1 0;min-width:80px;height:calc(100% - 8px);background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';margin-left:' + marginLeft + ';padding:8px 20px 8px 28px;display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease;position:relative;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-content-type="bullets" onclick="editChevron(this)"><div class="chevron-content" style="overflow:hidden;"><span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div></div>';
+      var leftPct = Math.max(0, i * (defaultWidth - overlap));
+
+      chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" onclick="editChevron(this)">' +
+        '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
+        '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
+        '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
+        '</div>';
     }}
 
-    var rowHtml = '<div class="maturity-row" style="display:flex;height:80px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + newId + '">' +
+    var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + newId + '">' +
       '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New ' + singularTerm + '</div>' +
-      '<div class="chevrons-container" style="flex:1;display:flex;align-items:center;padding:8px 12px;gap:0;overflow:hidden;">' + chevronsHtml + '</div></div>';
+      '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
     body.insertAdjacentHTML('beforeend', rowHtml);
     notifyStateChange('addRow');
   }};
 
-  // Modal event handlers
+  // Modal event handlers (v1.1.0: simplified, bullets only, delete button)
   function initModals() {{
     var chevronModal = document.getElementById('chevron-modal');
     var rowModal = document.getElementById('row-label-modal');
@@ -813,47 +886,36 @@ class ChevronAtomicGenerator:
       chevronModal.style.display = 'none';
     }});
 
-    // Chevron modal - Save
+    // v1.1.0: Chevron modal - Delete
+    document.getElementById('modal-delete').addEventListener('click', function() {{
+      var chevron = chevronModal._targetChevron;
+      if (chevron && confirm('Delete this chevron?')) {{
+        chevronModal.style.display = 'none';
+        deleteChevron(chevron);
+      }}
+    }});
+
+    // Chevron modal - Save (v1.1.0: bullets only)
     document.getElementById('modal-save').addEventListener('click', function() {{
       var chevron = chevronModal._targetChevron;
       if (!chevron) return;
 
       var contentDiv = chevron.querySelector('.chevron-content');
-      chevron.dataset.contentType = currentContentType;
 
-      if (currentContentType === 'bullets') {{
-        var bullets = [];
-        for (var i = 1; i <= 3; i++) {{
-          var val = document.getElementById('modal-bullet-' + i).value.trim();
-          if (val) bullets.push(val);
-        }}
+      var bullets = [];
+      for (var i = 1; i <= 3; i++) {{
+        var val = document.getElementById('modal-bullet-' + i).value.trim();
+        if (val) bullets.push(val);
+      }}
 
-        if (bullets.length === 0) {{
-          contentDiv.innerHTML = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
-        }} else {{
-          var items = '';
-          bullets.forEach(function(b) {{
-            items += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
-          }});
-          contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
-        }}
+      if (bullets.length === 0) {{
+        contentDiv.innerHTML = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
       }} else {{
-        var metrics = [];
-        for (var i = 1; i <= 3; i++) {{
-          var label = document.getElementById('modal-metric-label-' + i).value.trim();
-          var value = document.getElementById('modal-metric-value-' + i).value.trim();
-          if (label && value) metrics.push({{ label: label, value: value }});
-        }}
-
-        if (metrics.length === 0) {{
-          contentDiv.innerHTML = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
-        }} else {{
-          var items = '';
-          metrics.forEach(function(m) {{
-            items += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><span style="font-size:10px;opacity:0.9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%;">' + m.label + '</span><span style="font-size:12px;font-weight:700;">' + m.value + '</span></div>';
-          }});
-          contentDiv.innerHTML = '<div style="color:var(--chevron-text);">' + items + '</div>';
-        }}
+        var items = '';
+        bullets.forEach(function(b) {{
+          items += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
+        }});
+        contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
       }}
 
       chevronModal.style.display = 'none';
@@ -930,6 +992,8 @@ class ChevronAtomicGenerator:
         """
         Generate sample placeholder data for testing.
 
+        v1.1.0: Simplified to bullets only, includes default position values.
+
         Args:
             num_stages: Number of maturity stages
 
@@ -968,34 +1032,23 @@ class ChevronAtomicGenerator:
 
         content_sets = stage_content.get(num_stages, stage_content[5])
 
-        # Sample row data
+        # Sample row data (v1.1.0: bullets only)
         sample_rows = [
-            ("Data Management", "bullets"),
-            ("Process Automation", "metrics"),
-            ("Customer Experience", "bullets"),
-            ("Risk & Compliance", "metrics"),
+            "Data Management",
+            "Process Automation",
+            "Customer Experience",
+            "Risk & Compliance",
         ]
 
         rows = []
-        for i, (label, content_type) in enumerate(sample_rows):
+        for i, label in enumerate(sample_rows):
             chevrons = []
             for stage_idx in range(num_stages):
-                if content_type == "bullets":
-                    bullets = content_sets[stage_idx] if stage_idx < len(content_sets) else ["Content"]
-                    chevrons.append(ChevronContent(
-                        content_type="bullets",
-                        bullets=bullets
-                    ))
-                else:
-                    # Metrics content
-                    metrics = [
-                        ChevronMetric(label="Maturity", value=f"{20 + stage_idx * 15}%"),
-                        ChevronMetric(label="Coverage", value=f"{10 + stage_idx * 20}%"),
-                    ]
-                    chevrons.append(ChevronContent(
-                        content_type="metrics",
-                        metrics=metrics
-                    ))
+                bullets = content_sets[stage_idx] if stage_idx < len(content_sets) else ["Content"]
+                chevrons.append(ChevronContent(
+                    bullets=bullets
+                    # left_pct and width_pct default to None, will be calculated at render time
+                ))
 
             rows.append(MaturityRow(
                 id=f"row_{i+1}",

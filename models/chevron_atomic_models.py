@@ -5,6 +5,15 @@ Chevron Maturity Atomic Models for Diagram Generator v3
 Pydantic models for the /v1.2/atomic/CHEVRON_MATURITY endpoint that provides
 interactive chevron maturity progression visualization.
 
+v1.1.0: Major UX improvements
+- Variable width chevrons (Gantt-style resizable)
+- Increased row height: 100px default (+25% from v1.0.0)
+- Responsive row sizing: 7 rows = 70% screen, auto-scale to max 12 rows
+- Text positioning fix: Indent 25-30px right to stay within clip-path
+- Delete chevron functionality
+- Bullets only (metrics option removed for simplicity)
+- Complete persistence with left_pct/width_pct per chevron
+
 v1.0.0: Initial CHEVRON_MATURITY atomic endpoint
 - Configurable stages (3-6 range, default 5)
 - Mixed content per chevron: bullets OR metrics
@@ -44,7 +53,6 @@ CHEVRON_POSITION_PRESETS = {
 ChevronPositionPresetType = Literal["full_content", "left_four_fifths"]
 ChevronThemeType = Literal["default", "emerald", "purple"]
 ChevronThemeModeType = Literal["light", "dark"]
-ChevronContentType = Literal["bullets", "metrics"]
 
 
 # =============================================================================
@@ -150,53 +158,61 @@ CHEVRON_OPACITY_LEVELS = {
 # Chevron Content Model
 # =============================================================================
 
-class ChevronMetric(BaseModel):
-    """Single metric within a chevron."""
-    label: str = Field(
-        ...,
-        max_length=30,
-        description="Metric label (max 30 chars)"
-    )
-    value: str = Field(
-        ...,
-        max_length=20,
-        description="Metric value (max 20 chars)"
-    )
-
-
 class ChevronContent(BaseModel):
-    """Content for a single chevron - either bullets or metrics."""
-    content_type: ChevronContentType = Field(
-        default="bullets",
-        description="Type of content: 'bullets' or 'metrics'"
-    )
-    bullets: Optional[List[str]] = Field(
-        None,
+    """
+    Content for a single chevron with position/width data.
+
+    v1.1.0: Simplified to bullets only, added position fields for Gantt-style resizing.
+    """
+    bullets: List[str] = Field(
+        default_factory=list,
         max_length=3,
-        description="List of bullet points (max 3, each max 50 chars)"
+        description="List of bullet points (max 3, each max 100 chars)"
     )
-    metrics: Optional[List[ChevronMetric]] = Field(
-        None,
-        max_length=3,
-        description="List of metrics with label/value pairs (max 3)"
+    left_pct: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="Left position as percentage of row width (0-100)"
+    )
+    width_pct: Optional[float] = Field(
+        default=None,
+        ge=5.0,
+        le=100.0,
+        description="Width as percentage of row width (5-100, min 5% to be visible)"
     )
 
     @model_validator(mode='after')
     def validate_content(self) -> 'ChevronContent':
-        """Ensure content matches content_type."""
-        if self.content_type == "bullets":
-            if self.bullets is None:
-                self.bullets = []
-            # Truncate bullets to max 3
-            if len(self.bullets) > 3:
-                self.bullets = self.bullets[:3]
-        elif self.content_type == "metrics":
-            if self.metrics is None:
-                self.metrics = []
-            # Truncate metrics to max 3
-            if len(self.metrics) > 3:
-                self.metrics = self.metrics[:3]
+        """Ensure bullets list is properly bounded."""
+        if self.bullets is None:
+            self.bullets = []
+        # Truncate bullets to max 3
+        if len(self.bullets) > 3:
+            self.bullets = self.bullets[:3]
         return self
+
+
+def calculate_row_height(num_rows: int, container_height: int = 780) -> int:
+    """
+    Calculate responsive row height based on number of rows.
+
+    v1.1.0: New responsive sizing logic.
+
+    Args:
+        num_rows: Number of rows in the maturity matrix
+        container_height: Available container height in pixels (default ~13 grid units)
+
+    Returns:
+        int: Row height in pixels
+        - ≤7 rows: 100px each (25% taller than v1.0.0)
+        - 8-12 rows: Scale to fit 70% of container
+        - Minimum: 45px per row
+    """
+    if num_rows <= 7:
+        return 100
+    max_height = int(container_height * 0.7)
+    return max(45, max_height // num_rows)
 
 
 # =============================================================================
@@ -229,8 +245,9 @@ class ChevronAtomicRequest(BaseModel):
     Request model for POST /v1.2/atomic/CHEVRON_MATURITY
 
     Generates an interactive chevron maturity progression chart with
-    configurable stages, mixed content types, and state persistence.
+    configurable stages, bullet content, and state persistence.
 
+    v1.1.0: Major UX improvements - variable widths, taller rows, delete functionality
     v1.0.0: Initial CHEVRON_MATURITY atomic endpoint
     """
     # Stage configuration
@@ -312,10 +329,10 @@ class ChevronAtomicRequest(BaseModel):
         description="External margin in pixels (0-30, default: 10)"
     )
     row_height: int = Field(
-        default=80,
-        ge=60,
-        le=120,
-        description="Pixels per row (60-120, default: 80)"
+        default=100,
+        ge=45,
+        le=150,
+        description="Pixels per row (45-150, default: 100). v1.1.0: Increased from 80 for better readability."
     )
 
     @model_validator(mode='after')
@@ -385,6 +402,7 @@ class ChevronAtomicResponse(BaseModel):
 
     Returns generated chevron maturity chart HTML along with metadata.
 
+    v1.1.0: Updated for variable widths, taller rows, simplified content
     v1.0.0: Initial response model
     """
     success: bool = Field(
