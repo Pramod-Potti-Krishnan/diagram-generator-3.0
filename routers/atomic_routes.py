@@ -9,6 +9,7 @@ Endpoints:
 - POST /v1.2/atomic/CODE_DISPLAY - Generate styled code block HTML
 - POST /v1.2/atomic/KANBAN_BOARD - Generate interactive Kanban board HTML
 - POST /v1.2/atomic/GANTT_CHART - Generate interactive Gantt chart HTML
+- POST /v1.2/atomic/CHEVRON_MATURITY - Generate interactive chevron maturity chart HTML
 - GET /v1.2/atomic/health - Health check for atomic endpoints
 - GET /v1.2/atomic/components - List available atomic components
 
@@ -42,11 +43,23 @@ GANTT_CHART (v1.0.0):
 - State persistence via postMessage + auto-save
 - Light/dark mode theming with CSS variables
 
+CHEVRON_MATURITY (v1.0.0):
+- Interactive chevron maturity progression chart
+- 2 position presets: full_content, left_four_fifths
+- Configurable stages (3-6 range, default 5)
+- Mixed content per chevron: bullets OR metrics
+- Color progression: light → dark (maturity stages)
+- 3 color themes: default (blue), emerald (green), purple
+- View mode: Add row, Edit content, Edit row labels
+- State persistence via postMessage + auto-save
+- Light/dark mode theming with CSS variables
+
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 v1.3.0: Added KANBAN_BOARD atomic endpoint
 v1.4.0: Added GANTT_CHART atomic endpoint
+v1.5.0: Added CHEVRON_MATURITY atomic endpoint
 """
 
 import asyncio
@@ -66,9 +79,15 @@ from models.gantt_atomic_models import (
     GanttAtomicResponse,
     GANTT_POSITION_PRESETS
 )
+from models.chevron_atomic_models import (
+    ChevronAtomicRequest,
+    ChevronAtomicResponse,
+    CHEVRON_POSITION_PRESETS
+)
 from services.code_display_service import CodeDisplayGenerator
 from services.kanban_atomic_service import KanbanAtomicGenerator
 from services.gantt_atomic_service import GanttAtomicGenerator
+from services.chevron_atomic_service import ChevronAtomicGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +98,7 @@ router = APIRouter(prefix="/v1.2/atomic", tags=["atomic", "components"])
 _code_generator: CodeDisplayGenerator = None
 _kanban_generator: KanbanAtomicGenerator = None
 _gantt_generator: GanttAtomicGenerator = None
+_chevron_generator: ChevronAtomicGenerator = None
 
 
 def get_code_generator() -> CodeDisplayGenerator:
@@ -103,6 +123,14 @@ def get_gantt_generator() -> GanttAtomicGenerator:
     if _gantt_generator is None:
         _gantt_generator = GanttAtomicGenerator()
     return _gantt_generator
+
+
+def get_chevron_generator() -> ChevronAtomicGenerator:
+    """Get or create the ChevronAtomicGenerator singleton."""
+    global _chevron_generator
+    if _chevron_generator is None:
+        _chevron_generator = ChevronAtomicGenerator()
+    return _chevron_generator
 
 
 # =============================================================================
@@ -440,6 +468,115 @@ async def generate_gantt_chart(
 
 
 # =============================================================================
+# POST /v1.2/atomic/CHEVRON_MATURITY
+# =============================================================================
+
+@router.post("/CHEVRON_MATURITY", response_model=ChevronAtomicResponse)
+async def generate_chevron_maturity(
+    request: ChevronAtomicRequest
+) -> ChevronAtomicResponse:
+    """
+    Generate CHEVRON_MATURITY atomic component (interactive maturity progression chart).
+
+    The chevron maturity chart includes:
+    - Configurable number of stages (3-6)
+    - Mixed content per chevron: bullet points OR metrics
+    - Color progression from light to dark (maturity stages)
+    - Add/edit rows and chevron content
+    - 3 color themes with light/dark mode support
+
+    **Request Body**:
+    - num_stages: Number of maturity stages (3-6, default: 5)
+    - stage_labels: Custom stage labels (optional)
+    - row_terminology: Term for rows (e.g., "Work Streams", "Domains")
+    - rows: Explicit row data (optional, for direct data input)
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme: Color theme (default, emerald, purple)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth: Available width in grid units (10-32)
+    - gridHeight: Available height in grid units (6-18)
+    - external_margin: Margin in pixels (0-30, default: 10)
+    - row_height: Height per row in pixels (60-120, default: 80)
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Example Request (Placeholder Mode)**:
+    ```json
+    {
+        "position_preset": "full_content",
+        "num_stages": 5,
+        "stage_labels": ["Initial", "Developing", "Defined", "Managed", "Optimized"],
+        "row_terminology": "Capabilities",
+        "theme": "default",
+        "theme_mode": "light",
+        "placeholder_mode": true
+    }
+    ```
+
+    **Example Request (Explicit Rows)**:
+    ```json
+    {
+        "num_stages": 5,
+        "row_terminology": "Work Streams",
+        "rows": [
+            {
+                "id": "row_1",
+                "label": "Data Management",
+                "chevrons": [
+                    {"content_type": "bullets", "bullets": ["Ad-hoc processes", "No documentation"]},
+                    {"content_type": "bullets", "bullets": ["Basic procedures", "Initial metrics"]},
+                    {"content_type": "metrics", "metrics": [{"label": "Coverage", "value": "45%"}]},
+                    {"content_type": "bullets", "bullets": ["Standardized", "Measured"]},
+                    {"content_type": "metrics", "metrics": [{"label": "Maturity", "value": "95%"}]}
+                ]
+            }
+        ],
+        "theme": "emerald"
+    }
+    ```
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Color Themes**:
+    - default: Blue accent (#3B82F6)
+    - emerald: Green accent (#10B981)
+    - purple: Purple accent (#8B5CF6)
+
+    **Stage Presets** (used if stage_labels not provided):
+    - 3 stages: Stage 1, Stage 2, Stage 3
+    - 4 stages: Stage 1, Stage 2, Stage 3, Stage 4
+    - 5 stages: Stage 1, Stage 2, Stage 3, Stage 4, Stage 5 (default)
+    - 6 stages: Stage 1, Stage 2, Stage 3, Stage 4, Stage 5, Stage 6
+
+    **View Mode Interactivity**:
+    - Click chevron to edit content (bullets or metrics)
+    - Click row label to edit label or delete row
+    - Click "+ Add Row" to add new rows
+    - Toggle between bullets and metrics content types
+    """
+    try:
+        generator = get_chevron_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-CHEVRON_MATURITY-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-CHEVRON_MATURITY-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # GET /v1.2/atomic/health
 # =============================================================================
 
@@ -453,7 +590,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -556,6 +693,40 @@ async def atomic_health():
                     "time_unit": "weeks",
                     "external_margin": 10,
                     "row_height": 40
+                }
+            },
+            "CHEVRON_MATURITY": {
+                "path": "/v1.2/atomic/CHEVRON_MATURITY",
+                "component_id": "chevron_maturity",
+                "count_range": "1 (single chart)",
+                "flexible_items": True,
+                "stage_counts": [3, 4, 5, 6],
+                "color_themes": ["default", "emerald", "purple"],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "add_row": True,
+                    "edit_chevron": True,
+                    "edit_row_label": True,
+                    "delete_row": True,
+                    "bullets_content": True,
+                    "metrics_content": True,
+                    "configurable_stages": True,
+                    "placeholder_mode": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "num_stages": 5,
+                    "row_terminology": "Work Streams",
+                    "external_margin": 10,
+                    "row_height": 80
                 }
             }
         },
@@ -784,6 +955,74 @@ async def list_atomic_components():
                     "theme_support": "3 color themes with light/dark mode via CSS variables",
                     "state_persistence": "postMessage-based state sync for auto-save integration",
                     "no_dependencies": "Dependency arrows not included in v1.0 (keep it simple)"
+                }
+            },
+            {
+                "type": "CHEVRON_MATURITY",
+                "component_id": "chevron_maturity",
+                "version": "1.0.0",
+                "description": "Interactive chevron maturity progression chart with configurable stages (3-6), mixed content (bullets or metrics), 3 color themes, light/dark mode, and state persistence",
+                "use_cases": [
+                    "maturity assessments",
+                    "capability mapping",
+                    "transformation roadmaps",
+                    "skill progression",
+                    "process maturity",
+                    "digital transformation"
+                ],
+                "instance_range": {"min": 1, "max": 1},
+                "color_themes": ["default", "emerald", "purple"],
+                "stage_counts": [3, 4, 5, 6],
+                "position_presets": {
+                    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+                    "left_four_fifths": {"start_col": 2, "start_row": 4, "gridWidth": 24, "gridHeight": 14}
+                },
+                "flexible_items": True,
+                "supports_placeholder_mode": True,
+                "supports_prompt_generation": False,
+                "default_options": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "num_stages": 5,
+                    "row_terminology": "Work Streams",
+                    "external_margin": 10,
+                    "row_height": 80
+                },
+                "interactive_features": {
+                    "edit_chevron": {
+                        "description": "Click chevron to edit content (bullets or metrics)",
+                        "mode": "view"
+                    },
+                    "edit_row_label": {
+                        "description": "Click row label to edit or delete row",
+                        "mode": "view"
+                    },
+                    "add_row": {
+                        "description": "Click '+ Add Row' button to add new rows",
+                        "mode": "view"
+                    },
+                    "content_type_toggle": {
+                        "description": "Toggle between bullets and metrics content types in edit modal",
+                        "mode": "view"
+                    }
+                },
+                "row_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "label": {"type": "string", "max_length": 50, "required": True},
+                    "chevrons": {"type": "array", "items": "ChevronContent"}
+                },
+                "chevron_properties": {
+                    "content_type": {"type": "enum", "values": ["bullets", "metrics"], "default": "bullets"},
+                    "bullets": {"type": "array", "max_items": 3, "item_max_length": 50},
+                    "metrics": {"type": "array", "max_items": 3, "item_properties": {"label": "string", "value": "string"}}
+                },
+                "v1.0.0_features": {
+                    "inline_styles": "All critical styles are inline for Layout Service compatibility",
+                    "view_mode_interactivity": "Add rows, edit chevrons, edit row labels without entering edit mode",
+                    "theme_support": "3 color themes with light/dark mode via CSS variables",
+                    "state_persistence": "postMessage-based state sync for auto-save integration",
+                    "mixed_content": "Each chevron can have bullets OR metrics (user chooses per chevron)",
+                    "configurable_stages": "Support for 3-6 maturity stages with custom labels"
                 }
             }
         ]
