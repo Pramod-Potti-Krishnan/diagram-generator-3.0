@@ -41,6 +41,8 @@ v1.6.3: Restored postMessage communication for auto-save integration. Kanban now
         Saved state restored via kanban-init postMessage from parent.
 v1.7.0: Synced left border color with status indicator circle. Both now reflect the same status value
         (green=on track, amber=at risk, red=blocked, gray=no status). Priority no longer affects left bar.
+v1.8.0: Modal UI redesign - solid dark background (#1F2937), uppercase headings matching column headers,
+        cleaner input/dropdown styling, and delete card button visible only in edit mode.
 """
 
 import logging
@@ -226,38 +228,49 @@ class KanbanAtomicGenerator:
 
         v1.5.0: Replaces sequential prompt() calls with a single modal
         containing all fields: task name, initials, and status.
+        v1.8.0: Redesigned modal with solid background, uppercase headings,
+        cleaner styling, and delete button for edit mode.
 
         Returns:
-            str: Modal HTML structure with CSS variable theming
+            str: Modal HTML structure with solid dark theme
         """
         return '''
-<div id="kanban-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:var(--card-bg);border-radius:12px;padding:24px;min-width:320px;max-width:400px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);border:1px solid var(--card-border);">
-    <h3 id="modal-title" style="margin:0 0 20px 0;font-size:18px;font-weight:600;color:var(--text-primary);">Edit Card</h3>
+<div id="kanban-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1F2937;border-radius:12px;padding:24px;min-width:320px;max-width:400px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.1);">
 
-    <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Task Name</label>
-      <input id="modal-task-name" type="text" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:transparent;color:var(--text-body);box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+    <!-- Header with Delete button (edit mode only) -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h3 id="modal-title" style="margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#FFFFFF;">Edit Card</h3>
+      <button id="modal-delete" style="display:none;padding:6px 12px;border:1px solid #EF4444;border-radius:6px;background:transparent;color:#EF4444;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;">Delete</button>
     </div>
 
+    <!-- Task Name Field -->
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Assignee Initials</label>
-      <input id="modal-initials" type="text" maxlength="2" placeholder="e.g. JD" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:transparent;color:var(--text-body);box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--card-border)'">
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Task Name</label>
+      <input id="modal-task-name" type="text" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
     </div>
 
+    <!-- Assignee Field -->
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Assignee</label>
+      <input id="modal-initials" type="text" maxlength="2" placeholder="JD" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;" onfocus="this.style.borderColor='#8B5CF6'" onblur="this.style.borderColor='#374151'">
+    </div>
+
+    <!-- Status Field -->
     <div style="margin-bottom:24px;">
-      <label style="display:block;font-size:13px;font-weight:500;color:var(--text-secondary);margin-bottom:6px;">Status</label>
-      <select id="modal-status" style="width:100%;padding:10px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:14px;background:var(--card-bg);color:var(--text-body);box-sizing:border-box;outline:none;cursor:pointer;">
+      <label style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#9CA3AF;margin-bottom:8px;">Status</label>
+      <select id="modal-status" style="width:100%;padding:12px;border:1px solid #374151;border-radius:8px;font-size:14px;background:#111827;color:#F9FAFB;box-sizing:border-box;outline:none;cursor:pointer;-webkit-appearance:none;-moz-appearance:none;appearance:none;">
         <option value="">None</option>
-        <option value="green">Green - On Track</option>
-        <option value="amber">Amber - At Risk</option>
-        <option value="red">Red - Blocked</option>
+        <option value="green">On Track</option>
+        <option value="amber">At Risk</option>
+        <option value="red">Blocked</option>
       </select>
     </div>
 
+    <!-- Action Buttons -->
     <div style="display:flex;justify-content:flex-end;gap:12px;">
-      <button id="modal-cancel" style="padding:10px 20px;border:1px solid var(--card-border);border-radius:8px;background:transparent;color:var(--text-secondary);font-size:14px;font-weight:500;cursor:pointer;">Cancel</button>
-      <button id="modal-save" style="padding:10px 20px;border:none;border-radius:8px;background:var(--accent);color:white;font-size:14px;font-weight:500;cursor:pointer;">Save</button>
+      <button id="modal-cancel" style="padding:10px 20px;border:1px solid #374151;border-radius:8px;background:transparent;color:#9CA3AF;font-size:13px;font-weight:600;cursor:pointer;">Cancel</button>
+      <button id="modal-save" style="padding:10px 20px;border:none;border-radius:8px;background:#8B5CF6;color:white;font-size:13px;font-weight:600;cursor:pointer;">Save</button>
     </div>
   </div>
 </div>'''
@@ -351,7 +364,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.7.0"
+                    version="1.8.0"
                 ),
                 grid_position=position_data
             )
@@ -947,6 +960,7 @@ button:hover {{
   }}
 
   // v1.5.0: Modal-based edit card function
+  // v1.8.0: Shows delete button in edit mode
   window.editCard = function(btn, e) {{
     if (e) e.stopPropagation();
     var card = btn.closest('.kanban-card');
@@ -955,10 +969,13 @@ button:hover {{
     var statusEl = card.querySelector('.kanban-status');
 
     // Populate modal with current values
-    document.getElementById('modal-title').textContent = 'Edit Card';
+    document.getElementById('modal-title').textContent = 'EDIT CARD';
     document.getElementById('modal-task-name').value = titleEl.textContent;
     document.getElementById('modal-initials').value = assigneeEl ? assigneeEl.textContent : '';
     document.getElementById('modal-status').value = statusEl ? (statusEl.dataset.status || '') : '';
+
+    // v1.8.0: Show delete button in edit mode
+    document.getElementById('modal-delete').style.display = 'inline-block';
 
     // Show modal
     var modal = document.getElementById('kanban-modal');
@@ -970,14 +987,18 @@ button:hover {{
   }};
 
   // v1.5.0: Modal-based add card function
+  // v1.8.0: Hides delete button in add mode
   window.addCard = function(btn) {{
     var column = btn.closest('.kanban-column');
 
     // Clear modal fields
-    document.getElementById('modal-title').textContent = 'Add Card';
+    document.getElementById('modal-title').textContent = 'ADD CARD';
     document.getElementById('modal-task-name').value = '';
     document.getElementById('modal-initials').value = '';
     document.getElementById('modal-status').value = '';
+
+    // v1.8.0: Hide delete button in add mode
+    document.getElementById('modal-delete').style.display = 'none';
 
     // Show modal
     var modal = document.getElementById('kanban-modal');
@@ -989,6 +1010,7 @@ button:hover {{
   }};
 
   // v1.5.0: Modal event handlers
+  // v1.8.0: Added delete button handler
   function initModal() {{
     var modal = document.getElementById('kanban-modal');
     if (!modal) return;
@@ -996,6 +1018,17 @@ button:hover {{
     // Cancel button
     document.getElementById('modal-cancel').addEventListener('click', function() {{
       modal.style.display = 'none';
+    }});
+
+    // v1.8.0: Delete button handler
+    document.getElementById('modal-delete').addEventListener('click', function() {{
+      var card = modal._targetCard;
+      if (card && confirm('Delete this card?')) {{
+        card.remove();
+        updateColumnCounts();
+        notifyStateChange('delete');
+        modal.style.display = 'none';
+      }}
     }});
 
     // Save button
