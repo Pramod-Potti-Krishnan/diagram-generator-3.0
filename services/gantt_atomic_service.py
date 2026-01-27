@@ -14,6 +14,8 @@ Service layer for generating interactive Gantt chart HTML with:
 - No dependency arrows in v1.0 (keep it simple)
 
 v1.0.0: Initial implementation following kanban atomic endpoint pattern
+v1.1.0: UI/UX enhancements - modal fonts, today line, wider status bars,
+        dynamic row sizing, improved edit discoverability
 """
 
 import logging
@@ -43,6 +45,7 @@ class GanttAtomicGenerator:
     for Layout Service compatibility.
 
     v1.0.0: Initial implementation with drag-to-resize, modal edit, state persistence
+    v1.1.0: UI/UX enhancements - modal fonts, today line, status bars, dynamic sizing
     """
 
     def __init__(self):
@@ -68,7 +71,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.0.0 */
+/* Deckster Gantt Theme Variables - v1.1.0 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -132,7 +135,7 @@ class GanttAtomicGenerator:
 
     <!-- Header with Delete button (edit mode only) -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
-      <h3 id="modal-title" style="margin:0;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#FFFFFF;">Edit Task</h3>
+      <h3 id="modal-title" style="margin:0;font-family:'Inter','Segoe UI',sans-serif;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#FFFFFF;">Edit Task</h3>
       <button id="modal-delete" style="display:none;padding:6px 12px;border:1px solid #EF4444;border-radius:6px;background:transparent;color:#EF4444;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;cursor:pointer;">Delete</button>
     </div>
 
@@ -264,7 +267,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.0.0"
+                    "version": "1.1.0"
                 },
                 grid_position=position_data
             )
@@ -436,7 +439,8 @@ class GanttAtomicGenerator:
         time_columns = self._generate_time_columns(chart_start, chart_end, time_unit)
 
         # Calculate task name column width (fixed) and timeline width (remaining)
-        task_col_width = 180
+        # v1.1.0: Increased from 180px to 270px for better readability
+        task_col_width = 270
         timeline_width = element_width - task_col_width
 
         # Total days for position calculation
@@ -467,8 +471,20 @@ class GanttAtomicGenerator:
         add_btn_height = 44
         body_height = element_height - header_height - add_btn_height
 
-        # Outer wrapper style
+        # v1.1.0: Calculate today line position
+        today = date.today()
+        today_line_html = ""
+        if chart_start <= today <= chart_end:
+            today_offset_days = (today - chart_start).days
+            today_pct = (today_offset_days / total_days) * 100
+            # Today line positioned within timeline area (after task column)
+            today_left_px = task_col_width + (timeline_width * today_pct / 100)
+            today_line_html = f'''
+  <div class="gantt-today-line" style="position:absolute;top:{header_height}px;bottom:{add_btn_height}px;left:{today_left_px}px;width:0;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:none;" title="Today: {today.strftime('%b %d, %Y')}"></div>'''
+
+        # Outer wrapper style (position:relative for today line)
         outer_style = (
+            f"position:relative;"
             f"width:{element_width}px;"
             f"height:{element_height}px;"
             f"padding:0;"
@@ -485,7 +501,7 @@ class GanttAtomicGenerator:
 
         html = f'''{theme_css}
 {modal_html}
-<div class="{root_class}" style="{outer_style}" role="region" aria-label="Gantt chart" data-gantt-container="true" data-chart-start="{chart_start.isoformat()}" data-chart-end="{chart_end.isoformat()}" data-time-unit="{time_unit}">
+<div class="{root_class}" style="{outer_style}" role="region" aria-label="Gantt chart" data-gantt-container="true" data-chart-start="{chart_start.isoformat()}" data-chart-end="{chart_end.isoformat()}" data-time-unit="{time_unit}">{today_line_html}
   {header_html}
   <div class="gantt-body" style="height:{body_height}px;overflow-y:auto;">
     {rows_html}
@@ -556,9 +572,9 @@ class GanttAtomicGenerator:
             # Row background alternating
             row_bg = "var(--gantt-row-odd)" if i % 2 == 0 else "var(--gantt-row-even)"
 
-            # Status color for bar border
+            # Status color for bar border (6px for visibility per v1.1.0)
             status_color = GANTT_STATUS_COLORS.get(task.status, "transparent")
-            bar_border = f"2px solid {status_color}" if task.status else "none"
+            bar_border = f"6px solid {status_color}" if task.status else "none"
 
             # Progress bar width
             progress_width = task.progress
@@ -570,11 +586,11 @@ class GanttAtomicGenerator:
 
             rows_html += f'''
     <div class="gantt-row" style="display:flex;height:{row_height}px;background:{row_bg};border-bottom:1px solid var(--gantt-grid-line);" data-task-id="{task.id}">
-      <div class="gantt-task-name" style="flex:0 0 {task_col_width}px;display:flex;align-items:center;padding:0 16px;font-size:13px;font-weight:500;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editTask(this.parentElement)">{task.name}</div>
+      <div class="gantt-task-name" style="flex:0 0 {task_col_width}px;display:flex;align-items:center;padding:0 16px;font-size:16px;font-weight:500;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editTask(this.parentElement)">{task.name}</div>
       <div class="gantt-timeline" style="flex:1;position:relative;overflow:hidden;">
-        <div class="gantt-bar" style="position:absolute;top:8px;bottom:8px;left:{left_pct}%;width:{width_pct}%;background:var(--gantt-bar-color);border-radius:4px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,0.2);border-left:{bar_border};min-width:20px;" data-start="{task.start_date}" data-end="{task.end_date}" data-progress="{task.progress}" data-status="{task.status}" data-assignee="{task.assignee or ''}">
+        <div class="gantt-bar" style="position:absolute;top:8px;bottom:8px;left:{left_pct}%;width:{width_pct}%;background:var(--gantt-bar-color);border-radius:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);border-left:{bar_border};min-width:20px;" data-start="{task.start_date}" data-end="{task.end_date}" data-progress="{task.progress}" data-status="{task.status}" data-assignee="{task.assignee or ''}">
           <div class="gantt-progress" style="position:absolute;top:0;left:0;bottom:0;width:{progress_width}%;background:var(--gantt-bar-progress);border-radius:4px 0 0 4px;pointer-events:none;"></div>
-          <span class="gantt-bar-label" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:white;font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);pointer-events:none;">{task.name}</span>
+          <span class="gantt-bar-label" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:white;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);pointer-events:none;">{task.name}</span>
           {assignee_html}
           <!-- Resize handles -->
           <div class="gantt-resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;"></div>
@@ -605,11 +621,26 @@ class GanttAtomicGenerator:
             Script block with interactive functionality
         """
         return f'''<style>
+/* v1.1.0: Enhanced hover effects for edit discoverability */
+.gantt-row {{
+  transition: background 0.15s ease;
+}}
 .gantt-row:hover {{
-  background: rgba(139, 92, 246, 0.05) !important;
+  background: rgba(139, 92, 246, 0.08) !important;
+}}
+.gantt-task-name {{
+  transition: color 0.15s ease;
+}}
+.gantt-task-name:hover {{
+  text-decoration: underline;
+  color: var(--gantt-bar-color) !important;
+}}
+.gantt-bar {{
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
 }}
 .gantt-bar:hover {{
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  transform: translateY(-1px);
 }}
 .gantt-bar.dragging {{
   opacity: 0.7;
@@ -726,12 +757,16 @@ class GanttAtomicGenerator:
     return d.toISOString().split('T')[0];
   }}
 
-  // Init bar drag-to-resize
+  // Track if bar was dragged (to prevent click-to-edit after drag)
+  var barWasDragged = false;
+
+  // Init bar drag-to-resize and click-to-edit
   function initBarResize() {{
     container.querySelectorAll('.gantt-bar').forEach(function(bar) {{
       var leftHandle = bar.querySelector('.gantt-resize-left');
       var rightHandle = bar.querySelector('.gantt-resize-right');
       var timeline = bar.parentElement;
+      var row = bar.closest('.gantt-row');
 
       if (leftHandle) {{
         leftHandle.addEventListener('mousedown', function(e) {{
@@ -751,13 +786,26 @@ class GanttAtomicGenerator:
       bar.addEventListener('mousedown', function(e) {{
         if (e.target.classList.contains('gantt-resize-left') ||
             e.target.classList.contains('gantt-resize-right')) return;
+        barWasDragged = false;
         startMove(bar, timeline, e);
+      }});
+
+      // v1.1.0: Click on bar to edit (if not dragging)
+      bar.addEventListener('click', function(e) {{
+        if (e.target.classList.contains('gantt-resize-left') ||
+            e.target.classList.contains('gantt-resize-right')) return;
+        if (barWasDragged) {{
+          barWasDragged = false;
+          return;
+        }}
+        editTask(row);
       }});
     }});
   }}
 
   function startResize(bar, timeline, edge, e) {{
     bar.classList.add('dragging');
+    barWasDragged = false;
     var timelineRect = timeline.getBoundingClientRect();
     var startX = e.clientX;
     var origLeft = parseFloat(bar.style.left);
@@ -765,6 +813,8 @@ class GanttAtomicGenerator:
 
     function onMove(ev) {{
       var dx = ev.clientX - startX;
+      // v1.1.0: Mark as dragged if resized more than 3px
+      if (Math.abs(dx) > 3) barWasDragged = true;
       var dPct = (dx / timelineRect.width) * 100;
 
       if (edge === 'left') {{
@@ -805,6 +855,8 @@ class GanttAtomicGenerator:
 
     function onMove(ev) {{
       var dx = ev.clientX - startX;
+      // v1.1.0: Mark as dragged if moved more than 3px
+      if (Math.abs(dx) > 3) barWasDragged = true;
       var dPct = (dx / timelineRect.width) * 100;
       var newLeft = Math.max(0, Math.min(origLeft + dPct, 100 - barWidth));
       bar.style.left = newLeft + '%';
@@ -936,7 +988,7 @@ class GanttAtomicGenerator:
 
         // Update status border
         var statusColors = {{'on_track': '#10B981', 'at_risk': '#F59E0B', 'blocked': '#EF4444'}};
-        bar.style.borderLeft = status ? '2px solid ' + (statusColors[status] || 'transparent') : 'none';
+        bar.style.borderLeft = status ? '6px solid ' + (statusColors[status] || 'transparent') : 'none';
 
         // Update assignee
         var assigneeEl = bar.querySelector('span[style*="border-radius:50%"]');
@@ -965,7 +1017,7 @@ class GanttAtomicGenerator:
         widthPct = Math.max(2, widthPct);
 
         var statusColors = {{'on_track': '#10B981', 'at_risk': '#F59E0B', 'blocked': '#EF4444'}};
-        var barBorder = status ? '2px solid ' + (statusColors[status] || 'transparent') : 'none';
+        var barBorder = status ? '6px solid ' + (statusColors[status] || 'transparent') : 'none';
 
         var assigneeHtml = '';
         if (assignee) {{
@@ -973,11 +1025,11 @@ class GanttAtomicGenerator:
         }}
 
         var rowHtml = '<div class="gantt-row" style="display:flex;height:40px;background:' + rowBg + ';border-bottom:1px solid var(--gantt-grid-line);" data-task-id="' + newId + '">' +
-          '<div class="gantt-task-name" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:13px;font-weight:500;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editTask(this.parentElement)">' + name + '</div>' +
+          '<div class="gantt-task-name" style="flex:0 0 270px;display:flex;align-items:center;padding:0 16px;font-size:16px;font-weight:500;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editTask(this.parentElement)">' + name + '</div>' +
           '<div class="gantt-timeline" style="flex:1;position:relative;overflow:hidden;">' +
-          '<div class="gantt-bar" style="position:absolute;top:8px;bottom:8px;left:' + leftPct + '%;width:' + widthPct + '%;background:var(--gantt-bar-color);border-radius:4px;cursor:grab;box-shadow:0 1px 3px rgba(0,0,0,0.2);border-left:' + barBorder + ';min-width:20px;" data-start="' + startDate + '" data-end="' + endDate + '" data-progress="' + progress + '" data-status="' + status + '" data-assignee="' + assignee + '">' +
+          '<div class="gantt-bar" style="position:absolute;top:8px;bottom:8px;left:' + leftPct + '%;width:' + widthPct + '%;background:var(--gantt-bar-color);border-radius:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);border-left:' + barBorder + ';min-width:20px;" data-start="' + startDate + '" data-end="' + endDate + '" data-progress="' + progress + '" data-status="' + status + '" data-assignee="' + assignee + '">' +
           '<div class="gantt-progress" style="position:absolute;top:0;left:0;bottom:0;width:' + progress + '%;background:var(--gantt-bar-progress);border-radius:4px 0 0 4px;pointer-events:none;"></div>' +
-          '<span class="gantt-bar-label" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:white;font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);pointer-events:none;">' + name + '</span>' +
+          '<span class="gantt-bar-label" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:white;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);pointer-events:none;">' + name + '</span>' +
           assigneeHtml +
           '<div class="gantt-resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;"></div>' +
           '<div class="gantt-resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;"></div>' +
@@ -985,7 +1037,7 @@ class GanttAtomicGenerator:
 
         body.insertAdjacentHTML('beforeend', rowHtml);
 
-        // Re-init resize for new bar
+        // Re-init resize and click handlers for new bar
         var newRow = body.lastElementChild;
         var newBar = newRow.querySelector('.gantt-bar');
         var timeline = newBar.parentElement;
@@ -1001,7 +1053,18 @@ class GanttAtomicGenerator:
         newBar.addEventListener('mousedown', function(e) {{
           if (e.target.classList.contains('gantt-resize-left') ||
               e.target.classList.contains('gantt-resize-right')) return;
+          barWasDragged = false;
           startMove(newBar, timeline, e);
+        }});
+        // v1.1.0: Click on bar to edit
+        newBar.addEventListener('click', function(e) {{
+          if (e.target.classList.contains('gantt-resize-left') ||
+              e.target.classList.contains('gantt-resize-right')) return;
+          if (barWasDragged) {{
+            barWasDragged = false;
+            return;
+          }}
+          editTask(newRow);
         }});
 
         notifyStateChange('add');
