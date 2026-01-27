@@ -24,6 +24,7 @@ v1.3.0: Responsive container sizing - chart stretches when parent resized,
 v1.3.1: Row height fix for new tasks + today line accessibility improvements
 v1.3.2: Simplified status dropdown styling (removed native browser chrome)
 v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle
+v1.3.4: Full state restoration - restoreGanttState rebuilds DOM, today_line_pct persisted
 """
 
 import logging
@@ -59,6 +60,7 @@ class GanttAtomicGenerator:
     v1.3.1: Row height fix for new tasks + today line accessibility (wider hit zone + header handle)
     v1.3.2: Simplified status dropdown styling (flat design, custom arrow)
     v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle with arrows
+    v1.3.4: Full state restoration - restoreGanttState rebuilds DOM, today_line_pct persisted
     """
 
     def __init__(self):
@@ -84,7 +86,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.3.3 */
+/* Deckster Gantt Theme Variables - v1.3.4 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -280,7 +282,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.3.3"
+                    "version": "1.3.4"
                 },
                 grid_position=position_data
             )
@@ -759,11 +761,17 @@ class GanttAtomicGenerator:
         assignee: bar.dataset.assignee || ''
       }});
     }});
+
+    // v1.3.4: Get today line position if it exists
+    var todayLine = container.querySelector('.gantt-today-line');
+    var todayLinePct = todayLine ? parseFloat(todayLine.dataset.pct) : null;
+
     return {{
       tasks: tasks,
       time_unit: timeUnit,
       start_date: chartStart.toISOString().split('T')[0],
-      end_date: chartEnd.toISOString().split('T')[0]
+      end_date: chartEnd.toISOString().split('T')[0],
+      today_line_pct: todayLinePct
     }};
   }}
 
@@ -784,11 +792,87 @@ class GanttAtomicGenerator:
     console.log('[Gantt] State change sent to parent:', action);
   }}
 
-  // Restore state from saved data
+  // v1.3.4: Restore state from saved data - full DOM rebuild
   function restoreGanttState(state) {{
     if (!state || !state.tasks) return;
     console.log('[Gantt] Restoring state with', state.tasks.length, 'tasks');
-    // For now, just log - full restore would require rebuilding rows
+
+    // Get the body container and clear existing rows
+    var body = container.querySelector('.gantt-body');
+    if (!body) {{
+      console.warn('[Gantt] Cannot restore - no body container found');
+      return;
+    }}
+
+    // Clear all existing rows
+    body.innerHTML = '';
+
+    // Status color mapping
+    var statusColors = {{'on_track': '#10B981', 'at_risk': '#F59E0B', 'blocked': '#EF4444'}};
+
+    // Rebuild each task row
+    state.tasks.forEach(function(task, index) {{
+      var rowBg = index % 2 === 0 ? 'var(--gantt-row-odd)' : 'var(--gantt-row-even)';
+
+      // Calculate bar position from dates
+      var leftPct = dateToPercent(task.start_date);
+      var widthPct = dateToPercent(task.end_date) - leftPct;
+      widthPct = Math.max(2, widthPct);
+
+      // Status border
+      var barBorder = task.status ? '6px solid ' + (statusColors[task.status] || 'transparent') : 'none';
+
+      // Assignee badge HTML
+      var assigneeHtml = '';
+      if (task.assignee) {{
+        assigneeHtml = '<span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.3);color:white;font-size:9px;font-weight:600;display:flex;align-items:center;justify-content:center;">' + task.assignee + '</span>';
+      }}
+
+      // Build row HTML (matching "Add new task" template structure)
+      var rowHtml = '<div class="gantt-row" style="display:flex;height:40px;background:' + rowBg + ';border-bottom:1px solid var(--gantt-grid-line);" data-task-id="' + task.id + '">' +
+        '<div class="gantt-task-name" style="flex:0 0 270px;display:flex;align-items:center;padding:0 16px;font-size:16px;font-weight:500;color:var(--text-primary);border-right:1px solid var(--gantt-grid-line);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editTask(this.parentElement)">' + task.name + '</div>' +
+        '<div class="gantt-timeline" style="flex:1;position:relative;overflow:hidden;">' +
+        '<div class="gantt-bar" style="position:absolute;top:8px;bottom:8px;left:' + leftPct + '%;width:' + widthPct + '%;background:var(--gantt-bar-color);border-radius:4px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.2);border-left:' + barBorder + ';min-width:20px;" data-start="' + task.start_date + '" data-end="' + task.end_date + '" data-progress="' + (task.progress || 0) + '" data-status="' + (task.status || '') + '" data-assignee="' + (task.assignee || '') + '">' +
+        '<div class="gantt-progress" style="position:absolute;top:0;left:0;bottom:0;width:' + (task.progress || 0) + '%;background:var(--gantt-bar-progress);border-radius:4px 0 0 4px;pointer-events:none;"></div>' +
+        '<span class="gantt-bar-label" style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:white;font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 40px);pointer-events:none;">' + task.name + '</span>' +
+        assigneeHtml +
+        '<div class="gantt-resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;"></div>' +
+        '<div class="gantt-resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;"></div>' +
+        '</div></div></div>';
+
+      body.insertAdjacentHTML('beforeend', rowHtml);
+    }});
+
+    // Re-initialize drag handlers for all restored bars
+    initBarResize();
+
+    // Recalculate row heights for dynamic fill scaling
+    recalculateRowHeights();
+
+    // v1.3.4: Restore today line position if saved
+    if (state.today_line_pct !== null && state.today_line_pct !== undefined) {{
+      var todayLine = container.querySelector('.gantt-today-line');
+      var todayHandle = container.querySelector('.gantt-today-handle');
+      if (todayLine) {{
+        var currentTimelineWidth = container.offsetWidth - taskColWidth;
+        var newLeft = taskColWidth + (currentTimelineWidth * state.today_line_pct / 100);
+        todayLine.style.left = newLeft + 'px';
+        todayLine.dataset.pct = state.today_line_pct.toFixed(4);
+
+        // Update the date based on position
+        var newDate = percentToDate(state.today_line_pct);
+        todayLine.dataset.date = newDate;
+        todayLine.title = 'Reference: ' + newDate + ' (drag to change)';
+
+        // Update handle position and data
+        if (todayHandle) {{
+          todayHandle.style.left = newLeft + 'px';
+          todayHandle.dataset.pct = state.today_line_pct.toFixed(4);
+        }}
+      }}
+    }}
+
+    console.log('[Gantt] State restored successfully');
   }}
 
   // Helper: date to percentage position
