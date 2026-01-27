@@ -23,6 +23,7 @@ v1.3.0: Responsive container sizing - chart stretches when parent resized,
         dynamic today line and row height recalculation
 v1.3.1: Row height fix for new tasks + today line accessibility improvements
 v1.3.2: Simplified status dropdown styling (removed native browser chrome)
+v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle
 """
 
 import logging
@@ -57,6 +58,7 @@ class GanttAtomicGenerator:
     v1.3.0: Responsive container sizing - 100% width/height with ResizeObserver
     v1.3.1: Row height fix for new tasks + today line accessibility (wider hit zone + header handle)
     v1.3.2: Simplified status dropdown styling (flat design, custom arrow)
+    v1.3.3: Dynamic fill scaling (10% per task, capped at 95%) + bottom grip handle with arrows
     """
 
     def __init__(self):
@@ -82,7 +84,7 @@ class GanttAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Gantt Theme Variables - v1.3.2 */
+/* Deckster Gantt Theme Variables - v1.3.3 */
 :root {{
     --gantt-header-bg: {light_colors["header_bg"]};
     --gantt-row-odd: {light_colors["row_odd"]};
@@ -278,7 +280,7 @@ class GanttAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    "version": "1.3.2"
+                    "version": "1.3.3"
                 },
                 grid_position=position_data
             )
@@ -462,9 +464,9 @@ class GanttAtomicGenerator:
         add_btn_height = 44
         body_height = element_height - header_height - add_btn_height
 
-        # v1.2.0: Dynamic row height to fill ~70% of body
+        # v1.3.3: Dynamic fill - 10% per task, capped at 95%
         task_count = len(tasks) if tasks else 1
-        target_fill = 0.70  # Fill 70% of body height
+        target_fill = min(0.95, task_count * 0.10)
         min_row_height = 40
         max_row_height = 80
         # Calculate dynamic height
@@ -501,10 +503,10 @@ class GanttAtomicGenerator:
             # Store percentage in data-pct for ResizeObserver to recalculate on resize
             # Initial position uses pixels for accuracy, ResizeObserver updates on resize
             today_left_px = task_col_width + (timeline_width * today_pct / 100)
-            # v1.3.1: Wider hit zone (12px) for easier clicking + header handle for accessibility
+            # v1.3.3: Wider hit zone (12px) for easier clicking + bottom grip handle with arrows
             today_line_html = f'''
   <div class="gantt-today-line" style="position:absolute;top:48px;bottom:44px;left:{today_left_px}px;width:12px;margin-left:-6px;background:transparent;border-left:2px dashed var(--gantt-today-line);z-index:5;pointer-events:auto;cursor:ew-resize;transition:border-left-width 0.15s ease;" data-date="{today.isoformat()}" data-pct="{today_pct:.4f}" title="Reference: {today.strftime('%b %d, %Y')} (drag to change)"></div>
-  <div class="gantt-today-handle" style="position:absolute;top:24px;left:{today_left_px}px;width:12px;height:20px;margin-left:-6px;background:var(--gantt-today-line);border-radius:4px;cursor:ew-resize;z-index:10;opacity:0.7;transition:opacity 0.15s, transform 0.15s;" data-pct="{today_pct:.4f}" title="Drag to move reference line"></div>'''
+  <div class="gantt-today-handle" style="position:absolute;bottom:48px;left:{today_left_px}px;width:32px;height:18px;margin-left:-16px;background:var(--gantt-today-line);border-radius:9px;cursor:ew-resize;z-index:10;display:flex;align-items:center;justify-content:center;gap:2px;transition:opacity 0.15s, transform 0.15s;filter:brightness(0.85);" data-pct="{today_pct:.4f}" title="Drag to move reference line"><span style="color:rgba(255,255,255,0.9);font-size:9px;font-weight:bold;pointer-events:none;">◀ ▶</span></div>'''
 
         # v1.3.0: Outer wrapper style - responsive with flex column layout
         # Uses 100% width/height to fill parent container (Layout Service)
@@ -689,10 +691,11 @@ class GanttAtomicGenerator:
   border-left-width: 4px !important;
   opacity: 0.8;
 }}
-/* v1.3.1: Today line header handle hover */
+/* v1.3.3: Today line bottom grip handle hover */
 .gantt-today-handle:hover {{
-  opacity: 1 !important;
+  filter: brightness(0.75) !important;
   transform: scale(1.1);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.25);
 }}
 #modal-save:hover {{
   filter: brightness(1.1);
@@ -1222,7 +1225,8 @@ class GanttAtomicGenerator:
     if (bodyHeight <= 0) return;
 
     var taskCount = rows.length;
-    var targetFill = 0.70; // Fill 70% of body height
+    // v1.3.3: Dynamic fill - 10% per task, capped at 95%
+    var targetFill = Math.min(0.95, taskCount * 0.10);
     var minRowHeight = 40;
     var maxRowHeight = 80;
 
