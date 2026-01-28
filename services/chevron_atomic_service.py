@@ -494,11 +494,11 @@ class ChevronAtomicGenerator:
             # v1.2.0: Add subtle grid line between columns (not after last)
             border_style = "border-right:1px solid var(--chevron-grid-line);" if i < num_labels - 1 else ""
             stage_headers += f'''
-    <div class="timeline-column" style="flex:1 1 0;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px;{border_style}" data-column="{i}">{label}</div>'''
+    <div class="timeline-column" style="flex:1 1 0;text-align:center;font-size:15px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px;{border_style}" data-column="{i}">{label}</div>'''
 
         return f'''
   <div class="chevron-header" style="flex:0 0 56px;display:flex;background:var(--chevron-header-bg);border-bottom:1px solid var(--chevron-grid-line);" data-time-unit="{time_unit}">
-    <div style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);">{row_terminology}</div>
+    <div style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);">{row_terminology}</div>
     <div class="timeline-columns" style="flex:1;display:flex;align-items:center;overflow:hidden;padding:0 12px;position:relative;">
       {stage_headers}
     </div>
@@ -583,7 +583,7 @@ class ChevronAtomicGenerator:
             # v1.1.0: Use relative positioning container for absolute-positioned chevrons
             rows_html += f'''
     <div class="maturity-row" style="display:flex;height:{row_height}px;background:{row_bg};border-bottom:1px solid var(--chevron-grid-line);" data-row-id="{row.id}">
-      <div class="row-label" style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">{row.label}</div>
+      <div class="row-label" style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">{row.label}</div>
       <div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">
         {chevrons_html}
       </div>
@@ -677,13 +677,13 @@ class ChevronAtomicGenerator:
         text_color_var = "var(--chevron-text)"
 
         if not bullets:
-            return f'<span style="color:{text_color_var};font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>'
+            return f'<span style="color:{text_color_var};font-size:15px;opacity:0.7;font-style:italic;">Click to edit</span>'
 
         items = ""
         for bullet in bullets[:3]:
             items += f'<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{bullet}</li>'
 
-        return f'''<ul style="margin:0;padding:0 0 0 14px;color:{text_color_var};font-size:11px;line-height:1.4;list-style-type:disc;">{items}</ul>'''
+        return f'''<ul style="margin:0;padding:0 0 0 14px;color:{text_color_var};font-size:15px;line-height:1.4;list-style-type:disc;">{items}</ul>'''
 
 
     def _generate_interactive_scripts(
@@ -983,9 +983,9 @@ class ChevronAtomicGenerator:
           chevron.bullets.forEach(function(b) {{
             bulletItems += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
           }});
-          contentHtml = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:11px;line-height:1.4;list-style-type:disc;">' + bulletItems + '</ul>';
+          contentHtml = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:15px;line-height:1.4;list-style-type:disc;">' + bulletItems + '</ul>';
         }} else {{
-          contentHtml = '<span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
+          contentHtml = '<span style="color:' + textColorVar + ';font-size:15px;opacity:0.7;font-style:italic;">Click to edit</span>';
         }}
 
         chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" onclick="editChevron(this)">' +
@@ -996,7 +996,7 @@ class ChevronAtomicGenerator:
       }});
 
       var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + row.id + '">' +
-        '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">' + row.label + '</div>' +
+        '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">' + row.label + '</div>' +
         '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
       body.insertAdjacentHTML('beforeend', rowHtml);
@@ -1230,7 +1230,7 @@ class ChevronAtomicGenerator:
       var leftPct = Math.max(0, i * (defaultWidth - overlap));
 
       chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" onclick="editChevron(this)">' +
-        '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
+        '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:' + textColorVar + ';font-size:15px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
         '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
         '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
         '</div>';
@@ -1238,7 +1238,7 @@ class ChevronAtomicGenerator:
 
     // v1.2.1: Generic "New Row" label instead of singularTerm
     var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + newId + '">' +
-      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New Row</div>' +
+      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New Row</div>' +
       '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
     body.insertAdjacentHTML('beforeend', rowHtml);
@@ -1281,13 +1281,13 @@ class ChevronAtomicGenerator:
       }}
 
       if (bullets.length === 0) {{
-        contentDiv.innerHTML = '<span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
+        contentDiv.innerHTML = '<span style="color:' + textColorVar + ';font-size:15px;opacity:0.7;font-style:italic;">Click to edit</span>';
       }} else {{
         var items = '';
         bullets.forEach(function(b) {{
           items += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
         }});
-        contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:11px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
+        contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:15px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
       }}
 
       chevronModal.style.display = 'none';
