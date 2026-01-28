@@ -14,6 +14,14 @@ Service layer for generating interactive chevron maturity progression HTML with:
 - 3 color themes: default (blue), emerald (green), purple
 - State persistence via postMessage + auto-save
 
+v1.2.0: Font contrast fix + Timeline header with Gantt-style features
+- Dynamic font color: dark text on lighter chevrons (opacity < 0.50)
+- Subtler color progression: 0.25 → 0.65 opacity
+- Timeline header: Quarters, Months, Years, or Stages
+- Movable "Now" reference line (Gantt-style)
+- Push-resize: expanding chevron pushes subsequent chevrons right
+- New state fields: time_unit, time_labels, now_line_pct
+
 v1.1.0: Major UX improvements
 - Variable width chevrons with drag-to-resize handles
 - Increased row height: 100px default (+25%)
@@ -39,6 +47,7 @@ from models.chevron_atomic_models import (
     CHEVRON_POSITION_PRESETS,
     CHEVRON_THEMES,
     CHEVRON_OPACITY_LEVELS,
+    CHEVRON_TEXT_OPACITY_THRESHOLD,
     calculate_row_height
 )
 
@@ -52,6 +61,7 @@ class ChevronAtomicGenerator:
     Generates interactive chevron maturity progression HTML with inline styles
     for Layout Service compatibility.
 
+    v1.2.0: Font contrast, timeline header, now line, push-resize
     v1.1.0: Variable width chevrons, taller rows, delete functionality, bullets only
     v1.0.0: Initial implementation with edit modal, state persistence
     """
@@ -60,12 +70,39 @@ class ChevronAtomicGenerator:
         """Initialize the Chevron Maturity generator."""
         pass
 
+    def _get_time_labels(self, time_unit: str, num_stages: int) -> list:
+        """
+        Generate time labels based on time_unit setting.
+
+        v1.2.0: New function for timeline header support.
+
+        Args:
+            time_unit: Type of time labels (quarters, months, years, stages)
+            num_stages: Number of stages/columns
+
+        Returns:
+            List of label strings
+        """
+        if time_unit == "quarters":
+            return [f"Q{i+1}" for i in range(num_stages)]
+        elif time_unit == "months":
+            months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+            return months[:num_stages]
+        elif time_unit == "years":
+            current_year = 2026
+            return [f"Y{current_year + i}" for i in range(num_stages)]
+        else:  # stages (default)
+            return [f"Stage {i+1}" for i in range(num_stages)]
+
     def _generate_theme_css(self, theme: str, theme_mode: str) -> str:
         """
         Generate CSS variables for theme support with light defaults and dark overrides.
 
         Enables live dark/light mode switching via Layout Service postMessage.
         CSS variables are updated by the theme sync script when parent broadcasts changes.
+
+        v1.2.0: Added --chevron-text-dark for contrast on lighter chevrons.
 
         Args:
             theme: Color theme (default, emerald, purple)
@@ -79,7 +116,7 @@ class ChevronAtomicGenerator:
         dark_colors = theme_config["dark"]
 
         return f'''<style>
-/* Deckster Chevron Maturity Theme Variables - v1.1.0 */
+/* Deckster Chevron Maturity Theme Variables - v1.2.0 */
 :root {{
     --chevron-header-bg: {light_colors["header_bg"]};
     --chevron-row-label-bg: {light_colors["row_label_bg"]};
@@ -90,6 +127,7 @@ class ChevronAtomicGenerator:
     --text-primary: {light_colors["text_primary"]};
     --text-secondary: {light_colors["text_secondary"]};
     --chevron-text: {light_colors["chevron_text"]};
+    --chevron-text-dark: {light_colors["chevron_text_dark"]};
 }}
 :root.theme-dark {{
     --chevron-header-bg: {dark_colors["header_bg"]};
@@ -101,6 +139,7 @@ class ChevronAtomicGenerator:
     --text-primary: {dark_colors["text_primary"]};
     --text-secondary: {dark_colors["text_secondary"]};
     --chevron-text: {dark_colors["chevron_text"]};
+    --chevron-text-dark: {dark_colors["chevron_text_dark"]};
 }}
 </style>'''
 
@@ -227,10 +266,21 @@ class ChevronAtomicGenerator:
             if request.row_height != 100:  # Non-default value specified
                 effective_row_height = request.row_height
 
-            # Get stage labels
-            stage_labels = request.stage_labels
-            if not stage_labels:
-                stage_labels = [f"Stage {i+1}" for i in range(request.num_stages)]
+            # v1.2.0: Get time labels (prioritize custom time_labels, then stage_labels, then auto-generate)
+            if request.time_labels:
+                time_labels = request.time_labels
+            elif request.stage_labels:
+                time_labels = request.stage_labels
+            else:
+                time_labels = self._get_time_labels(request.time_unit, request.num_stages)
+
+            # Ensure time_labels length matches num_stages
+            if len(time_labels) < request.num_stages:
+                # Pad with auto-generated labels
+                auto_labels = self._get_time_labels(request.time_unit, request.num_stages)
+                time_labels = time_labels + auto_labels[len(time_labels):]
+            elif len(time_labels) > request.num_stages:
+                time_labels = time_labels[:request.num_stages]
 
             # Get theme colors
             theme_config = CHEVRON_THEMES.get(request.theme, CHEVRON_THEMES["default"])
@@ -240,7 +290,7 @@ class ChevronAtomicGenerator:
             html_content = self._generate_html(
                 rows=rows,
                 num_stages=request.num_stages,
-                stage_labels=stage_labels,
+                stage_labels=time_labels,  # v1.2.0: renamed to time_labels internally
                 row_terminology=request.row_terminology,
                 theme=request.theme,
                 theme_mode=request.theme_mode,
@@ -248,7 +298,9 @@ class ChevronAtomicGenerator:
                 grid_width=request.gridWidth,
                 grid_height=request.gridHeight,
                 external_margin=request.external_margin,
-                row_height=effective_row_height
+                row_height=effective_row_height,
+                time_unit=request.time_unit,
+                now_line_pct=request.now_line_pct
             )
 
             # Calculate grid position
@@ -273,7 +325,10 @@ class ChevronAtomicGenerator:
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
                     "row_height_used": effective_row_height,
-                    "version": "1.1.0"
+                    "time_unit": request.time_unit,
+                    "time_labels": time_labels,
+                    "now_line_pct": request.now_line_pct,
+                    "version": "1.2.0"
                 },
                 grid_position=position_data
             )
@@ -303,15 +358,19 @@ class ChevronAtomicGenerator:
         grid_width: int,
         grid_height: int,
         external_margin: int,
-        row_height: int
+        row_height: int,
+        time_unit: str = "stages",
+        now_line_pct: Optional[float] = None
     ) -> str:
         """
         Generate complete Chevron Maturity chart HTML with inline styles.
 
+        v1.2.0: Added time_unit and now_line_pct parameters.
+
         Args:
             rows: List of MaturityRow objects
             num_stages: Number of maturity stages
-            stage_labels: Labels for each stage
+            stage_labels: Labels for each stage (time labels in v1.2.0)
             row_terminology: Term for rows (e.g., "Work Streams")
             theme: Theme name
             theme_mode: Theme mode (light/dark)
@@ -320,6 +379,8 @@ class ChevronAtomicGenerator:
             grid_height: Height in grid units
             external_margin: External margin in pixels
             row_height: Height per row in pixels
+            time_unit: Type of time labels (quarters, months, years, stages)
+            now_line_pct: Position of now line as percentage (None = no line)
 
         Returns:
             Complete HTML string with all styles inline
@@ -337,16 +398,27 @@ class ChevronAtomicGenerator:
         row_label_width = 180
         chevron_area_width = element_width - row_label_width
 
-        # Build header row HTML
-        header_html = self._build_header_html(stage_labels, row_label_width, chevron_area_width, row_terminology)
+        # Build header row HTML (v1.2.0: with timeline columns and grid lines)
+        header_html = self._build_header_html(
+            stage_labels, row_label_width, chevron_area_width, row_terminology, time_unit
+        )
+
+        # v1.2.0: Build now line HTML if position is set
+        now_line_html = ""
+        if now_line_pct is not None:
+            now_line_html = self._build_now_line_html(
+                now_line_pct, row_label_width, chevron_area_width, header_height, add_btn_height
+            )
 
         # Build maturity rows HTML
         rows_html = self._build_rows_html(
             rows, num_stages, row_label_width, chevron_area_width, row_height, theme_colors
         )
 
-        # Build interactive JavaScript
-        interactive_js = self._generate_interactive_scripts(num_stages, row_terminology)
+        # Build interactive JavaScript (v1.2.0: added time_unit, now_line_pct)
+        interactive_js = self._generate_interactive_scripts(
+            num_stages, row_terminology, time_unit, now_line_pct
+        )
 
         # Theme CSS and sync script
         theme_css = self._generate_theme_css(theme, theme_mode)
@@ -378,11 +450,12 @@ class ChevronAtomicGenerator:
 
         html = f'''{theme_css}
 {modal_html}
-<div class="{root_class}" style="{outer_style}" role="region" aria-label="Chevron Maturity Chart" data-chevron-container="true" data-num-stages="{num_stages}" data-row-terminology="{row_terminology}">
+<div class="{root_class}" style="{outer_style}" role="region" aria-label="Chevron Maturity Chart" data-chevron-container="true" data-num-stages="{num_stages}" data-row-terminology="{row_terminology}" data-time-unit="{time_unit}" data-row-label-width="{row_label_width}">
   {header_html}
-  <div class="chevron-body" style="flex:1;overflow-y:auto;">
+  <div class="chevron-body" style="flex:1;overflow-y:auto;position:relative;">
     {rows_html}
   </div>
+  {now_line_html}
   <button class="chevron-add-row" style="flex:0 0 {add_btn_height}px;width:100%;border:none;border-top:1px solid var(--chevron-grid-line);background:transparent;color:var(--text-secondary);font-size:13px;font-weight:500;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="addRow()">
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -399,20 +472,86 @@ class ChevronAtomicGenerator:
         self,
         stage_labels: List[str],
         row_label_width: int,
-        chevron_area_width: int
-    , row_terminology: str) -> str:
-        """Build header row with stage labels."""
+        chevron_area_width: int,
+        row_terminology: str,
+        time_unit: str = "stages"
+    ) -> str:
+        """
+        Build header row with timeline columns and grid lines.
+
+        v1.2.0: Updated for Gantt-style timeline header with grid lines between columns.
+        """
         stage_headers = ""
-        for label in stage_labels:
+        num_labels = len(stage_labels)
+
+        for i, label in enumerate(stage_labels):
+            # v1.2.0: Add subtle grid line between columns (not after last)
+            border_style = "border-right:1px solid var(--chevron-grid-line);" if i < num_labels - 1 else ""
             stage_headers += f'''
-    <div style="flex:1 1 0;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px;">{label}</div>'''
+    <div class="timeline-column" style="flex:1 1 0;text-align:center;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:60px;{border_style}" data-column="{i}">{label}</div>'''
 
         return f'''
-  <div class="chevron-header" style="flex:0 0 56px;display:flex;background:var(--chevron-header-bg);border-bottom:1px solid var(--chevron-grid-line);">
+  <div class="chevron-header" style="flex:0 0 56px;display:flex;background:var(--chevron-header-bg);border-bottom:1px solid var(--chevron-grid-line);" data-time-unit="{time_unit}">
     <div style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);">{row_terminology}</div>
-    <div style="flex:1;display:flex;align-items:center;overflow:hidden;padding:0 20px;">
+    <div class="timeline-columns" style="flex:1;display:flex;align-items:center;overflow:hidden;padding:0 12px;position:relative;">
       {stage_headers}
     </div>
+  </div>'''
+
+    def _build_now_line_html(
+        self,
+        now_line_pct: float,
+        row_label_width: int,
+        chevron_area_width: int,
+        header_height: int,
+        add_btn_height: int
+    ) -> str:
+        """
+        Build the "Now" reference line HTML (Gantt-style).
+
+        v1.2.0: New function for movable now line marker.
+
+        Args:
+            now_line_pct: Position as percentage of timeline area (0-100)
+            row_label_width: Width of row label column in pixels
+            chevron_area_width: Width of chevron area in pixels
+            header_height: Height of header in pixels
+            add_btn_height: Height of add button in pixels
+
+        Returns:
+            HTML string for now line and handle
+        """
+        # Calculate the left offset: row_label_width + padding + percentage of timeline
+        # The chevrons-container has 12px padding on each side
+        timeline_padding = 12
+        timeline_width = chevron_area_width - (timeline_padding * 2)
+
+        return f'''
+  <!-- v1.2.0: Now Line (Gantt-style reference marker) -->
+  <div class="chevron-now-line"
+       style="position:absolute;top:{header_height}px;bottom:{add_btn_height}px;
+              left:calc({row_label_width}px + {timeline_padding}px + ({timeline_width}px * {now_line_pct / 100}));
+              width:12px;margin-left:-6px;background:transparent;
+              border-left:2px dashed var(--chevron-base-color);
+              z-index:15;pointer-events:auto;cursor:ew-resize;
+              transition:left 0.1s ease;"
+       data-pct="{now_line_pct:.2f}"
+       data-row-label-width="{row_label_width}"
+       data-timeline-padding="{timeline_padding}"
+       data-timeline-width="{timeline_width}"
+       title="Current position (drag to move)"></div>
+
+  <div class="chevron-now-handle"
+       style="position:absolute;bottom:{add_btn_height + 4}px;
+              left:calc({row_label_width}px + {timeline_padding}px + ({timeline_width}px * {now_line_pct / 100}));
+              width:40px;height:20px;margin-left:-26px;
+              background:var(--chevron-base-color);border-radius:10px;
+              cursor:ew-resize;z-index:16;display:flex;
+              align-items:center;justify-content:center;
+              transition:left 0.1s ease, transform 0.15s ease;"
+       data-pct="{now_line_pct:.2f}"
+       title="Drag to move Now line">
+    <span style="color:white;font-size:10px;font-weight:600;">NOW</span>
   </div>'''
 
     def _build_rows_html(
@@ -455,6 +594,7 @@ class ChevronAtomicGenerator:
         """
         Build chevrons HTML for a row.
 
+        v1.2.0: Dynamic text color based on chevron opacity for better contrast.
         v1.1.0: Uses absolute positioning with percentages for variable widths.
         Each chevron can have custom left_pct and width_pct for Gantt-style sizing.
         """
@@ -467,10 +607,14 @@ class ChevronAtomicGenerator:
         default_width_pct = (100 + total_overlap) / num_stages
 
         for stage_idx, chevron in enumerate(chevrons):
-            opacity = opacity_levels[stage_idx] if stage_idx < len(opacity_levels) else 0.9
+            opacity = opacity_levels[stage_idx] if stage_idx < len(opacity_levels) else 0.65
 
-            # Build content HTML (v1.1.0: bullets only)
-            content_html = self._build_bullets_content(chevron.bullets or [])
+            # v1.2.0: Determine text color based on opacity threshold
+            # Use dark text for lighter chevrons, white text for darker chevrons
+            use_dark_text = opacity < CHEVRON_TEXT_OPACITY_THRESHOLD
+
+            # Build content HTML (v1.1.0: bullets only, v1.2.0: with dynamic text color)
+            content_html = self._build_bullets_content(chevron.bullets or [], use_dark_text)
 
             # Calculate position and width
             # Use stored values if available, otherwise calculate defaults
@@ -494,8 +638,9 @@ class ChevronAtomicGenerator:
 
             # v1.1.0: Absolute positioning with percentage widths
             # v1.1.0: Fixed text positioning - increased padding to stay within clip-path
+            # v1.2.0: Added data-use-dark-text attribute for dynamic text color
             chevrons_html += f'''
-        <div class="chevron" style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-left-pct="{left_pct:.1f}" data-width-pct="{width_pct:.1f}" onclick="editChevron(this)">
+        <div class="chevron" style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-left-pct="{left_pct:.1f}" data-width-pct="{width_pct:.1f}" data-opacity="{opacity:.2f}" data-use-dark-text="{str(use_dark_text).lower()}" onclick="editChevron(this)">
           <div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">
             {content_html}
           </div>
@@ -505,35 +650,58 @@ class ChevronAtomicGenerator:
 
         return chevrons_html
 
-    def _build_bullets_content(self, bullets: List[str]) -> str:
-        """Build bullets content HTML."""
+    def _build_bullets_content(self, bullets: List[str], use_dark_text: bool = False) -> str:
+        """
+        Build bullets content HTML.
+
+        v1.2.0: Added use_dark_text parameter for dynamic text color based on chevron opacity.
+
+        Args:
+            bullets: List of bullet point strings
+            use_dark_text: If True, use --chevron-text-dark, otherwise use --chevron-text
+
+        Returns:
+            HTML string for bullet content
+        """
+        text_color_var = "var(--chevron-text-dark)" if use_dark_text else "var(--chevron-text)"
+
         if not bullets:
-            return '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>'
+            return f'<span style="color:{text_color_var};font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>'
 
         items = ""
         for bullet in bullets[:3]:
             items += f'<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{bullet}</li>'
 
-        return f'''<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">{items}</ul>'''
+        return f'''<ul style="margin:0;padding:0 0 0 14px;color:{text_color_var};font-size:11px;line-height:1.4;list-style-type:disc;">{items}</ul>'''
 
 
-    def _generate_interactive_scripts(self, num_stages: int, row_terminology: str) -> str:
+    def _generate_interactive_scripts(
+        self,
+        num_stages: int,
+        row_terminology: str,
+        time_unit: str = "stages",
+        now_line_pct: Optional[float] = None
+    ) -> str:
         """
-        Generate JavaScript for modal, edit, resize, delete, and state persistence.
+        Generate JavaScript for modal, edit, resize, delete, now line, and state persistence.
 
+        v1.2.0: Added push-resize, now line dragging, dynamic text color, time_unit support.
         v1.1.0: Added resize handles, delete chevron, simplified to bullets only.
 
         Args:
             num_stages: Number of stages
             row_terminology: Term for rows
+            time_unit: Type of time labels (quarters, months, years, stages)
+            now_line_pct: Initial position of now line (None = no line)
 
         Returns:
             Script block with interactive functionality
         """
         singular_term = row_terminology.rstrip('s') if row_terminology.endswith('s') else row_terminology
+        now_line_init = now_line_pct if now_line_pct is not None else "null"
 
         return f'''<style>
-/* v1.1.0: Enhanced hover effects with resize handles */
+/* v1.2.0: Enhanced hover effects with resize handles and now line */
 .maturity-row {{
   transition: background 0.15s ease;
 }}
@@ -571,6 +739,14 @@ class ChevronAtomicGenerator:
 #modal-delete:hover, #row-modal-delete:hover {{
   background: rgba(239, 68, 68, 0.1);
 }}
+/* v1.2.0: Now line styling */
+.chevron-now-line:hover {{
+  border-left-width: 3px !important;
+}}
+.chevron-now-handle:hover {{
+  filter: brightness(0.85);
+  transform: scale(1.05);
+}}
 </style>
 <script>
 (function() {{
@@ -578,6 +754,8 @@ class ChevronAtomicGenerator:
   var numStages = {num_stages};
   var rowTerminology = '{row_terminology}';
   var singularTerm = '{singular_term}';
+  var timeUnit = '{time_unit}';
+  var nowLinePct = {now_line_init};
 
   // IDs received from parent via postMessage
   var presentationId = '';
@@ -585,20 +763,99 @@ class ChevronAtomicGenerator:
 
   // v1.1.0: Resize state
   var resizeState = null;
+  // v1.2.0: Now line drag state
+  var nowLineDragState = null;
+
+  // v1.2.0: Opacity threshold for text color (matches CHEVRON_TEXT_OPACITY_THRESHOLD)
+  var textOpacityThreshold = 0.50;
+
+  // v1.2.0: Updated opacity levels (subtler gradient: 0.25 → 0.65)
+  var opacityLevels = {{
+    3: [0.25, 0.45, 0.65],
+    4: [0.25, 0.40, 0.55, 0.65],
+    5: [0.25, 0.35, 0.45, 0.55, 0.65],
+    6: [0.20, 0.30, 0.40, 0.50, 0.60, 0.65]
+  }};
 
   // Listen for init message from parent
   window.addEventListener('message', function(e) {{
     if (!e.data || e.data.type !== 'chevron-init') return;
     presentationId = e.data.presentation_id || '';
     chevronId = e.data.element_id || '';
-    console.log('[Chevron v1.1.0] Received IDs - presentation:', presentationId, 'element:', chevronId);
+    console.log('[Chevron v1.2.0] Received IDs - presentation:', presentationId, 'element:', chevronId);
 
     if (e.data.saved_state && e.data.saved_state.rows) {{
       restoreChevronState(e.data.saved_state);
     }}
   }});
 
-  // v1.1.0: Extract current state for persistence (includes left_pct/width_pct)
+  // v1.2.0: Initialize now line drag handlers
+  function initNowLineDrag() {{
+    var nowLine = container.querySelector('.chevron-now-line');
+    var nowHandle = container.querySelector('.chevron-now-handle');
+    if (!nowLine && !nowHandle) return;
+
+    function startDrag(e) {{
+      e.preventDefault();
+      e.stopPropagation();
+
+      var rowLabelWidth = parseInt(nowLine.dataset.rowLabelWidth) || 180;
+      var timelinePadding = parseInt(nowLine.dataset.timelinePadding) || 12;
+      var timelineWidth = parseInt(nowLine.dataset.timelineWidth) || 500;
+      var startPct = parseFloat(nowLine.dataset.pct) || 25;
+
+      nowLineDragState = {{
+        startX: e.clientX,
+        startPct: startPct,
+        rowLabelWidth: rowLabelWidth,
+        timelinePadding: timelinePadding,
+        timelineWidth: timelineWidth
+      }};
+
+      document.addEventListener('mousemove', onNowLineDrag);
+      document.addEventListener('mouseup', onNowLineDragEnd);
+    }}
+
+    if (nowLine) nowLine.addEventListener('mousedown', startDrag);
+    if (nowHandle) nowHandle.addEventListener('mousedown', startDrag);
+  }}
+
+  function onNowLineDrag(e) {{
+    if (!nowLineDragState) return;
+
+    var deltaX = e.clientX - nowLineDragState.startX;
+    var deltaPct = (deltaX / nowLineDragState.timelineWidth) * 100;
+    var newPct = Math.max(0, Math.min(100, nowLineDragState.startPct + deltaPct));
+
+    var nowLine = container.querySelector('.chevron-now-line');
+    var nowHandle = container.querySelector('.chevron-now-handle');
+
+    var newLeft = 'calc(' + nowLineDragState.rowLabelWidth + 'px + ' + nowLineDragState.timelinePadding + 'px + (' + nowLineDragState.timelineWidth + 'px * ' + (newPct / 100) + '))';
+
+    if (nowLine) {{
+      nowLine.style.left = newLeft;
+      nowLine.dataset.pct = newPct.toFixed(2);
+    }}
+    if (nowHandle) {{
+      nowHandle.style.left = newLeft;
+      nowHandle.dataset.pct = newPct.toFixed(2);
+    }}
+  }}
+
+  function onNowLineDragEnd() {{
+    if (nowLineDragState) {{
+      var nowLine = container.querySelector('.chevron-now-line');
+      if (nowLine) {{
+        nowLinePct = parseFloat(nowLine.dataset.pct);
+      }}
+      notifyStateChange('nowLineMove');
+      nowLineDragState = null;
+    }}
+    document.removeEventListener('mousemove', onNowLineDrag);
+    document.removeEventListener('mouseup', onNowLineDragEnd);
+  }}
+
+  // v1.2.0: Extract current state for persistence (includes time_unit, now_line_pct)
   function extractChevronState() {{
     var rows = [];
     container.querySelectorAll('.maturity-row').forEach(function(rowEl) {{
@@ -628,10 +885,26 @@ class ChevronAtomicGenerator:
       rows.push(row);
     }});
 
+    // v1.2.0: Extract time labels from header
+    var timeLabels = [];
+    container.querySelectorAll('.timeline-column').forEach(function(col) {{
+      timeLabels.push(col.textContent);
+    }});
+
+    // v1.2.0: Get current now line position
+    var currentNowLinePct = null;
+    var nowLine = container.querySelector('.chevron-now-line');
+    if (nowLine) {{
+      currentNowLinePct = parseFloat(nowLine.dataset.pct);
+    }}
+
     return {{
       rows: rows,
       num_stages: numStages,
-      row_terminology: rowTerminology
+      row_terminology: rowTerminology,
+      time_unit: timeUnit,
+      time_labels: timeLabels,
+      now_line_pct: currentNowLinePct
     }};
   }}
 
@@ -649,20 +922,20 @@ class ChevronAtomicGenerator:
       chevronData: state,
       timestamp: Date.now()
     }}, '*');
-    console.log('[Chevron v1.1.0] State change sent to parent:', action);
+    console.log('[Chevron v1.2.0] State change sent to parent:', action);
   }}
 
-  // v1.1.0: Restore state from saved data (with variable widths)
+  // v1.2.0: Restore state from saved data (with variable widths and dynamic text color)
   function restoreChevronState(state) {{
     if (!state || !state.rows) return;
-    console.log('[Chevron v1.1.0] Restoring state with', state.rows.length, 'rows');
+    console.log('[Chevron v1.2.0] Restoring state with', state.rows.length, 'rows');
 
     var body = container.querySelector('.chevron-body');
     if (!body) return;
 
     body.innerHTML = '';
 
-    var opacityLevels = {{3: [0.35, 0.60, 0.90], 4: [0.30, 0.50, 0.70, 0.90], 5: [0.30, 0.45, 0.60, 0.75, 0.90], 6: [0.25, 0.40, 0.55, 0.70, 0.85, 0.95]}};
+    // v1.2.0: Use new opacity levels (subtler gradient)
     var opacities = opacityLevels[numStages] || opacityLevels[5];
 
     state.rows.forEach(function(row, rowIndex) {{
@@ -670,9 +943,13 @@ class ChevronAtomicGenerator:
       var chevronsHtml = '';
 
       row.chevrons.forEach(function(chevron, stageIdx) {{
-        var opacity = opacities[stageIdx] || 0.9;
+        var opacity = opacities[stageIdx] || 0.65;
         var clipPath = stageIdx === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
         var contentHtml = '';
+
+        // v1.2.0: Determine text color based on opacity threshold
+        var useDarkText = opacity < textOpacityThreshold;
+        var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
 
         // v1.1.0: Use saved position or calculate defaults
         var leftPct = chevron.left_pct !== undefined ? chevron.left_pct : (stageIdx * 18);
@@ -683,12 +960,12 @@ class ChevronAtomicGenerator:
           chevron.bullets.forEach(function(b) {{
             bulletItems += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
           }});
-          contentHtml = '<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">' + bulletItems + '</ul>';
+          contentHtml = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:11px;line-height:1.4;list-style-type:disc;">' + bulletItems + '</ul>';
         }} else {{
-          contentHtml = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
+          contentHtml = '<span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
         }}
 
-        chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" onclick="editChevron(this)">' +
+        chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" data-use-dark-text="' + useDarkText + '" onclick="editChevron(this)">' +
           '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">' + contentHtml + '</div>' +
           '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
           '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
@@ -702,16 +979,47 @@ class ChevronAtomicGenerator:
       body.insertAdjacentHTML('beforeend', rowHtml);
     }});
 
-    console.log('[Chevron v1.1.0] State restored successfully');
+    // v1.2.0: Restore now line position if saved
+    if (state.now_line_pct !== undefined && state.now_line_pct !== null) {{
+      nowLinePct = state.now_line_pct;
+      var nowLine = container.querySelector('.chevron-now-line');
+      var nowHandle = container.querySelector('.chevron-now-handle');
+      if (nowLine) {{
+        var rowLabelWidth = parseInt(nowLine.dataset.rowLabelWidth) || 180;
+        var timelinePadding = parseInt(nowLine.dataset.timelinePadding) || 12;
+        var timelineWidth = parseInt(nowLine.dataset.timelineWidth) || 500;
+        var newLeft = 'calc(' + rowLabelWidth + 'px + ' + timelinePadding + 'px + (' + timelineWidth + 'px * ' + (nowLinePct / 100) + '))';
+        nowLine.style.left = newLeft;
+        nowLine.dataset.pct = nowLinePct.toFixed(2);
+        if (nowHandle) {{
+          nowHandle.style.left = newLeft;
+          nowHandle.dataset.pct = nowLinePct.toFixed(2);
+        }}
+      }}
+    }}
+
+    console.log('[Chevron v1.2.0] State restored successfully');
   }}
 
-  // v1.1.0: Start resize operation
+  // v1.2.0: Start resize operation (with push-resize support for right edge)
   window.startResize = function(e, chevronEl, edge) {{
     e.stopPropagation();
     e.preventDefault();
 
     var containerEl = chevronEl.closest('.chevrons-container');
     var containerWidth = containerEl.offsetWidth;
+    var allChevrons = Array.from(containerEl.querySelectorAll('.chevron'));
+    var chevronIndex = allChevrons.indexOf(chevronEl);
+
+    // v1.2.0: Store original positions of all subsequent chevrons for push-resize
+    var subsequentChevrons = allChevrons.slice(chevronIndex + 1);
+    var origPositions = subsequentChevrons.map(function(c) {{
+      return {{
+        el: c,
+        left: parseFloat(c.dataset.leftPct) || 0,
+        width: parseFloat(c.dataset.widthPct) || 20
+      }};
+    }});
 
     resizeState = {{
       chevron: chevronEl,
@@ -719,7 +1027,10 @@ class ChevronAtomicGenerator:
       startX: e.clientX,
       startLeft: parseFloat(chevronEl.dataset.leftPct) || 0,
       startWidth: parseFloat(chevronEl.dataset.widthPct) || 20,
-      containerWidth: containerWidth
+      containerWidth: containerWidth,
+      subsequentChevrons: subsequentChevrons,
+      origPositions: origPositions,
+      origWidth: parseFloat(chevronEl.dataset.widthPct) || 20
     }};
 
     document.addEventListener('mousemove', onResizeMove);
@@ -743,10 +1054,18 @@ class ChevronAtomicGenerator:
         resizeState.chevron.dataset.widthPct = newWidth.toFixed(1);
       }}
     }} else {{
-      // Moving right edge: adjust width only
-      var newWidth = Math.max(5, Math.min(100 - resizeState.startLeft, resizeState.startWidth + deltaPct));
+      // v1.2.0: Moving right edge: expand/shrink and push subsequent chevrons
+      var newWidth = Math.max(5, resizeState.startWidth + deltaPct);
       resizeState.chevron.style.width = newWidth + '%';
       resizeState.chevron.dataset.widthPct = newWidth.toFixed(1);
+
+      // v1.2.0: Push-resize - shift subsequent chevrons by the delta
+      var delta = newWidth - resizeState.origWidth;
+      resizeState.origPositions.forEach(function(orig, i) {{
+        var newLeft = orig.left + delta;
+        resizeState.subsequentChevrons[i].style.left = newLeft + '%';
+        resizeState.subsequentChevrons[i].dataset.leftPct = newLeft.toFixed(1);
+      }});
     }}
   }}
 
@@ -774,7 +1093,7 @@ class ChevronAtomicGenerator:
     notifyStateChange('deleteChevron');
   }};
 
-  // v1.1.0: Redistribute chevron widths after deletion
+  // v1.2.0: Redistribute chevron widths after deletion (with dynamic text color)
   function redistributeChevronWidths(rowEl) {{
     var chevrons = rowEl.querySelectorAll('.chevron');
     var count = chevrons.length;
@@ -784,13 +1103,29 @@ class ChevronAtomicGenerator:
     var totalOverlap = overlap * (count - 1);
     var defaultWidth = (100 + totalOverlap) / count;
 
+    // v1.2.0: Get opacity levels for current count
+    var opacities = opacityLevels[count] || opacityLevels[5];
+
     chevrons.forEach(function(chev, idx) {{
       var leftPct = Math.max(0, idx * (defaultWidth - overlap));
+      var opacity = opacities[idx] || 0.65;
+      var useDarkText = opacity < textOpacityThreshold;
+
       chev.style.left = leftPct + '%';
       chev.style.width = defaultWidth + '%';
+      chev.style.background = 'color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent)';
       chev.dataset.leftPct = leftPct.toFixed(1);
       chev.dataset.widthPct = defaultWidth.toFixed(1);
       chev.dataset.stage = idx;
+      chev.dataset.opacity = opacity.toFixed(2);
+      chev.dataset.useDarkText = useDarkText;
+
+      // Update text color in content
+      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
+      var contentUl = chev.querySelector('ul');
+      var contentSpan = chev.querySelector('span');
+      if (contentUl) contentUl.style.color = textColorVar;
+      if (contentSpan) contentSpan.style.color = textColorVar;
     }});
   }}
 
@@ -839,7 +1174,7 @@ class ChevronAtomicGenerator:
     document.getElementById('row-modal-label').focus();
   }};
 
-  // Add new row (v1.1.0: with variable width chevrons)
+  // v1.2.0: Add new row (with variable width chevrons and dynamic text color)
   window.addRow = function() {{
     var body = container.querySelector('.chevron-body');
     var rows = body.querySelectorAll('.maturity-row');
@@ -847,7 +1182,7 @@ class ChevronAtomicGenerator:
     var rowIndex = rows.length;
     var rowBg = rowIndex % 2 === 0 ? 'var(--chevron-row-odd)' : 'var(--chevron-row-even)';
 
-    var opacityLevels = {{3: [0.35, 0.60, 0.90], 4: [0.30, 0.50, 0.70, 0.90], 5: [0.30, 0.45, 0.60, 0.75, 0.90], 6: [0.25, 0.40, 0.55, 0.70, 0.85, 0.95]}};
+    // v1.2.0: Use new opacity levels (subtler gradient)
     var opacities = opacityLevels[numStages] || opacityLevels[5];
 
     // v1.1.0: Calculate default widths
@@ -857,12 +1192,16 @@ class ChevronAtomicGenerator:
 
     var chevronsHtml = '';
     for (var i = 0; i < numStages; i++) {{
-      var opacity = opacities[i] || 0.9;
+      var opacity = opacities[i] || 0.65;
       var clipPath = i === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
       var leftPct = Math.max(0, i * (defaultWidth - overlap));
 
-      chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" onclick="editChevron(this)">' +
-        '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
+      // v1.2.0: Dynamic text color based on opacity
+      var useDarkText = opacity < textOpacityThreshold;
+      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
+
+      chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" data-use-dark-text="' + useDarkText + '" onclick="editChevron(this)">' +
+        '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
         '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
         '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
         '</div>';
@@ -895,12 +1234,16 @@ class ChevronAtomicGenerator:
       }}
     }});
 
-    // Chevron modal - Save (v1.1.0: bullets only)
+    // v1.2.0: Chevron modal - Save (with dynamic text color)
     document.getElementById('modal-save').addEventListener('click', function() {{
       var chevron = chevronModal._targetChevron;
       if (!chevron) return;
 
       var contentDiv = chevron.querySelector('.chevron-content');
+
+      // v1.2.0: Get text color from chevron's opacity
+      var useDarkText = chevron.dataset.useDarkText === 'true';
+      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
 
       var bullets = [];
       for (var i = 1; i <= 3; i++) {{
@@ -909,13 +1252,13 @@ class ChevronAtomicGenerator:
       }}
 
       if (bullets.length === 0) {{
-        contentDiv.innerHTML = '<span style="color:var(--chevron-text);font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
+        contentDiv.innerHTML = '<span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
       }} else {{
         var items = '';
         bullets.forEach(function(b) {{
           items += '<li style="margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + b + '</li>';
         }});
-        contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:var(--chevron-text);font-size:11px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
+        contentDiv.innerHTML = '<ul style="margin:0;padding:0 0 0 14px;color:' + textColorVar + ';font-size:11px;line-height:1.4;list-style-type:disc;">' + items + '</ul>';
       }}
 
       chevronModal.style.display = 'none';
@@ -981,9 +1324,11 @@ class ChevronAtomicGenerator:
   if (document.readyState === 'loading') {{
     document.addEventListener('DOMContentLoaded', function() {{
       initModals();
+      initNowLineDrag();
     }});
   }} else {{
     initModals();
+    initNowLineDrag();
   }}
 }})();
 </script>'''

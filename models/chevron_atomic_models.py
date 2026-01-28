@@ -5,6 +5,14 @@ Chevron Maturity Atomic Models for Diagram Generator v3
 Pydantic models for the /v1.2/atomic/CHEVRON_MATURITY endpoint that provides
 interactive chevron maturity progression visualization.
 
+v1.2.0: Font contrast fix + Timeline header with Gantt-style features
+- Dynamic font color: dark text on lighter chevrons, white on darker
+- Subtler color progression: 0.25 → 0.65 opacity (reduced from 0.30 → 0.90)
+- Timeline header: user choice of Quarters, Months, Years, or Stages
+- Movable "Now" reference line (Gantt-style)
+- Push-resize: expanding chevron pushes subsequent chevrons right
+- New fields: time_unit, time_labels, now_line_pct
+
 v1.1.0: Major UX improvements
 - Variable width chevrons (Gantt-style resizable)
 - Increased row height: 100px default (+25% from v1.0.0)
@@ -53,6 +61,7 @@ CHEVRON_POSITION_PRESETS = {
 ChevronPositionPresetType = Literal["full_content", "left_four_fifths"]
 ChevronThemeType = Literal["default", "emerald", "purple"]
 ChevronThemeModeType = Literal["light", "dark"]
+ChevronTimeUnitType = Literal["quarters", "months", "years", "stages"]  # v1.2.0
 
 
 # =============================================================================
@@ -60,6 +69,7 @@ ChevronThemeModeType = Literal["light", "dark"]
 # =============================================================================
 
 # Theme 1: Default (Blue)
+# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
 CHEVRON_THEME_DEFAULT = {
     "light": {
         "header_bg": "rgba(59, 130, 246, 0.15)",
@@ -70,7 +80,8 @@ CHEVRON_THEME_DEFAULT = {
         "grid_line": "#E5E7EB",
         "text_primary": "#111827",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#1F2937"  # v1.2.0: Dark text for light chevrons
     },
     "dark": {
         "header_bg": "rgba(59, 130, 246, 0.25)",
@@ -81,11 +92,13 @@ CHEVRON_THEME_DEFAULT = {
         "grid_line": "#374151",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
     }
 }
 
 # Theme 2: Emerald (Green)
+# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
 CHEVRON_THEME_EMERALD = {
     "light": {
         "header_bg": "rgba(16, 185, 129, 0.15)",
@@ -96,7 +109,8 @@ CHEVRON_THEME_EMERALD = {
         "grid_line": "#D1FAE5",
         "text_primary": "#064E3B",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#064E3B"  # v1.2.0: Dark green text for light chevrons
     },
     "dark": {
         "header_bg": "rgba(16, 185, 129, 0.25)",
@@ -107,11 +121,13 @@ CHEVRON_THEME_EMERALD = {
         "grid_line": "#065F46",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
     }
 }
 
 # Theme 3: Purple
+# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
 CHEVRON_THEME_PURPLE = {
     "light": {
         "header_bg": "rgba(139, 92, 246, 0.15)",
@@ -122,7 +138,8 @@ CHEVRON_THEME_PURPLE = {
         "grid_line": "#E5E7EB",
         "text_primary": "#111827",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#4C1D95"  # v1.2.0: Dark purple text for light chevrons
     },
     "dark": {
         "header_bg": "rgba(139, 92, 246, 0.25)",
@@ -133,7 +150,8 @@ CHEVRON_THEME_PURPLE = {
         "grid_line": "#374151",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF"
+        "chevron_text": "#FFFFFF",
+        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
     }
 }
 
@@ -146,12 +164,17 @@ CHEVRON_THEMES = {
 
 # Opacity levels for maturity progression (light → dark)
 # Stage 0 is lightest, higher stages are darker
+# v1.2.0: Subtler gradient (0.25 → 0.65) for better contrast with dark text on light chevrons
 CHEVRON_OPACITY_LEVELS = {
-    3: [0.35, 0.60, 0.90],
-    4: [0.30, 0.50, 0.70, 0.90],
-    5: [0.30, 0.45, 0.60, 0.75, 0.90],
-    6: [0.25, 0.40, 0.55, 0.70, 0.85, 0.95]
+    3: [0.25, 0.45, 0.65],
+    4: [0.25, 0.40, 0.55, 0.65],
+    5: [0.25, 0.35, 0.45, 0.55, 0.65],
+    6: [0.20, 0.30, 0.40, 0.50, 0.60, 0.65]
 }
+
+# v1.2.0: Opacity threshold for text color switching
+# Chevrons with opacity below this use dark text, above use white text
+CHEVRON_TEXT_OPACITY_THRESHOLD = 0.50
 
 
 # =============================================================================
@@ -247,6 +270,7 @@ class ChevronAtomicRequest(BaseModel):
     Generates an interactive chevron maturity progression chart with
     configurable stages, bullet content, and state persistence.
 
+    v1.2.0: Font contrast fix + Timeline header with Gantt-style features
     v1.1.0: Major UX improvements - variable widths, taller rows, delete functionality
     v1.0.0: Initial CHEVRON_MATURITY atomic endpoint
     """
@@ -260,6 +284,22 @@ class ChevronAtomicRequest(BaseModel):
     stage_labels: Optional[List[str]] = Field(
         None,
         description="Custom stage labels (e.g., ['Initial', 'Developing', 'Defined', 'Managed', 'Optimized'])"
+    )
+
+    # v1.2.0: Timeline header configuration
+    time_unit: str = Field(
+        default="stages",
+        description="Header time unit: quarters (Q1-Q4), months, years, or stages"
+    )
+    time_labels: Optional[List[str]] = Field(
+        None,
+        description="Custom time labels (overrides auto-generated labels based on time_unit)"
+    )
+    now_line_pct: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=100.0,
+        description="Position of 'Now' reference line as percentage (0-100). None = no now line."
     )
 
     # Row configuration
