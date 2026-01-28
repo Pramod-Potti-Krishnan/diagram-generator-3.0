@@ -10,6 +10,7 @@ Endpoints:
 - POST /v1.2/atomic/KANBAN_BOARD - Generate interactive Kanban board HTML
 - POST /v1.2/atomic/GANTT_CHART - Generate interactive Gantt chart HTML
 - POST /v1.2/atomic/CHEVRON_MATURITY - Generate interactive chevron maturity chart HTML
+- POST /v1.2/atomic/IDEA_BOARD - Generate interactive 2D matrix idea board HTML
 - GET /v1.2/atomic/health - Health check for atomic endpoints
 - GET /v1.2/atomic/components - List available atomic components
 
@@ -54,12 +55,24 @@ CHEVRON_MATURITY (v1.0.0):
 - State persistence via postMessage + auto-save
 - Light/dark mode theming with CSS variables
 
+IDEA_BOARD (v1.0.0):
+- Interactive 2D matrix for idea prioritization
+- 2 position presets: full_content, left_four_fifths
+- 5 axis presets: impact_urgency, effort_value, risk_reward, cost_benefit, feasibility_desirability
+- Draggable idea cards with max 20 characters
+- Click-to-expand popup with Why/How/What details
+- 6 color options for idea categories
+- 4 theme presets: default, emerald, purple, ocean
+- Light/dark mode theming with CSS variables
+- State persistence via postMessage + auto-save
+
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
 v1.3.0: Added KANBAN_BOARD atomic endpoint
 v1.4.0: Added GANTT_CHART atomic endpoint
 v1.5.0: Added CHEVRON_MATURITY atomic endpoint
+v1.6.0: Added IDEA_BOARD atomic endpoint
 """
 
 import asyncio
@@ -84,10 +97,16 @@ from models.chevron_atomic_models import (
     ChevronAtomicResponse,
     CHEVRON_POSITION_PRESETS
 )
+from models.idea_board_atomic_models import (
+    IdeaBoardAtomicRequest,
+    IdeaBoardAtomicResponse,
+    IDEABOARD_POSITION_PRESETS
+)
 from services.code_display_service import CodeDisplayGenerator
 from services.kanban_atomic_service import KanbanAtomicGenerator
 from services.gantt_atomic_service import GanttAtomicGenerator
 from services.chevron_atomic_service import ChevronAtomicGenerator
+from services.idea_board_atomic_service import IdeaBoardGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +118,7 @@ _code_generator: CodeDisplayGenerator = None
 _kanban_generator: KanbanAtomicGenerator = None
 _gantt_generator: GanttAtomicGenerator = None
 _chevron_generator: ChevronAtomicGenerator = None
+_ideaboard_generator: IdeaBoardGenerator = None
 
 
 def get_code_generator() -> CodeDisplayGenerator:
@@ -131,6 +151,14 @@ def get_chevron_generator() -> ChevronAtomicGenerator:
     if _chevron_generator is None:
         _chevron_generator = ChevronAtomicGenerator()
     return _chevron_generator
+
+
+def get_ideaboard_generator() -> IdeaBoardGenerator:
+    """Get or create the IdeaBoardGenerator singleton."""
+    global _ideaboard_generator
+    if _ideaboard_generator is None:
+        _ideaboard_generator = IdeaBoardGenerator()
+    return _ideaboard_generator
 
 
 # =============================================================================
@@ -577,6 +605,115 @@ async def generate_chevron_maturity(
 
 
 # =============================================================================
+# POST /v1.2/atomic/IDEA_BOARD
+# =============================================================================
+
+@router.post("/IDEA_BOARD", response_model=IdeaBoardAtomicResponse)
+async def generate_idea_board(
+    request: IdeaBoardAtomicRequest
+) -> IdeaBoardAtomicResponse:
+    """
+    Generate IDEA_BOARD atomic component (interactive 2D matrix idea board).
+
+    The idea board includes:
+    - 2D matrix with configurable X-Y axes
+    - Draggable idea cards with color coding
+    - Click-to-expand detail panel with Why/How/What
+    - Add/edit/delete ideas via modal dialog
+    - 5 axis presets for common prioritization frameworks
+    - 4 color themes with light/dark mode support
+    - State persistence via postMessage
+
+    **Request Body**:
+    - axis_preset: Preset axis config (impact_urgency, effort_value, risk_reward, cost_benefit, feasibility_desirability)
+    - x_axis_label, y_axis_label: Custom axis labels (override preset)
+    - x_axis_low, x_axis_high, y_axis_low, y_axis_high: Custom axis range labels
+    - ideas: Explicit idea data (optional)
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme: Color theme (default, emerald, purple, ocean)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth: Available width in grid units (10-32)
+    - gridHeight: Available height in grid units (6-18)
+    - external_margin: Margin in pixels (0-50, default: 10)
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Example Request (Placeholder Mode)**:
+    ```json
+    {
+        "position_preset": "full_content",
+        "axis_preset": "impact_urgency",
+        "theme": "default",
+        "theme_mode": "light",
+        "placeholder_mode": true
+    }
+    ```
+
+    **Example Request (Explicit Ideas)**:
+    ```json
+    {
+        "axis_preset": "effort_value",
+        "ideas": [
+            {
+                "name": "Launch MVP",
+                "x_position": 75,
+                "y_position": 80,
+                "color": "blue",
+                "why": "First-mover advantage",
+                "how": "Agile sprints",
+                "what": "Market share",
+                "benefit_score": 4
+            }
+        ],
+        "theme": "ocean"
+    }
+    ```
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Axis Presets**:
+    - impact_urgency: Urgency (X) vs Impact (Y) - Eisenhower matrix
+    - effort_value: Effort (X) vs Value (Y) - Effort/Value matrix
+    - risk_reward: Risk (X) vs Reward (Y)
+    - cost_benefit: Cost (X) vs Benefit (Y)
+    - feasibility_desirability: Feasibility (X) vs Desirability (Y)
+
+    **Color Themes**:
+    - default: Clean neutral theme
+    - emerald: Green accent
+    - purple: Purple accent
+    - ocean: Blue accent
+
+    **View Mode Interactivity**:
+    - Drag idea cards to reposition on the matrix
+    - Click card to view detail panel (Why/How/What/Score)
+    - Click "+ Add Idea" to add new ideas via modal
+    - Edit idea from detail panel
+    - Delete idea from edit modal
+    """
+    try:
+        generator = get_ideaboard_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-IDEA_BOARD-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-IDEA_BOARD-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # GET /v1.2/atomic/health
 # =============================================================================
 
@@ -590,7 +727,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -727,6 +864,42 @@ async def atomic_health():
                     "row_terminology": "Work Streams",
                     "external_margin": 10,
                     "row_height": 80
+                }
+            },
+            "IDEA_BOARD": {
+                "path": "/v1.2/atomic/IDEA_BOARD",
+                "component_id": "idea_board",
+                "count_range": "1 (single board)",
+                "flexible_items": True,
+                "axis_presets": [
+                    "impact_urgency", "effort_value", "risk_reward",
+                    "cost_benefit", "feasibility_desirability"
+                ],
+                "color_themes": ["default", "emerald", "purple", "ocean"],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "drag_and_drop": True,
+                    "add_idea": True,
+                    "edit_idea": True,
+                    "delete_idea": True,
+                    "detail_panel": True,
+                    "color_coding": True,
+                    "benefit_scoring": True,
+                    "why_how_what": True,
+                    "placeholder_mode": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "axis_preset": "impact_urgency",
+                    "external_margin": 10
                 }
             }
         },
@@ -1023,6 +1196,84 @@ async def list_atomic_components():
                     "state_persistence": "postMessage-based state sync for auto-save integration",
                     "mixed_content": "Each chevron can have bullets OR metrics (user chooses per chevron)",
                     "configurable_stages": "Support for 3-6 maturity stages with custom labels"
+                }
+            },
+            {
+                "type": "IDEA_BOARD",
+                "component_id": "idea_board",
+                "version": "1.0.0",
+                "description": "Interactive 2D matrix idea board with draggable cards, 5 axis presets, Why/How/What detail panels, 4 color themes, light/dark mode, and state persistence",
+                "use_cases": [
+                    "idea prioritization",
+                    "strategic planning",
+                    "effort/value analysis",
+                    "risk assessment",
+                    "brainstorming sessions",
+                    "decision matrices"
+                ],
+                "instance_range": {"min": 1, "max": 1},
+                "axis_presets": {
+                    "impact_urgency": "Urgency (X) vs Impact (Y) - Eisenhower matrix",
+                    "effort_value": "Effort (X) vs Value (Y) - Effort/Value matrix",
+                    "risk_reward": "Risk (X) vs Reward (Y)",
+                    "cost_benefit": "Cost (X) vs Benefit (Y)",
+                    "feasibility_desirability": "Feasibility (X) vs Desirability (Y)"
+                },
+                "color_themes": ["default", "emerald", "purple", "ocean"],
+                "idea_colors": ["blue", "green", "orange", "purple", "red", "gray"],
+                "position_presets": {
+                    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+                    "left_four_fifths": {"start_col": 2, "start_row": 4, "gridWidth": 24, "gridHeight": 14}
+                },
+                "flexible_items": True,
+                "supports_placeholder_mode": True,
+                "supports_prompt_generation": False,
+                "default_options": {
+                    "theme": "default",
+                    "theme_mode": "light",
+                    "axis_preset": "impact_urgency",
+                    "external_margin": 10
+                },
+                "interactive_features": {
+                    "drag_and_drop": {
+                        "description": "Drag idea cards to reposition on the matrix",
+                        "mode": "view"
+                    },
+                    "add_idea": {
+                        "description": "Click '+ Add Idea' button to add new ideas via modal",
+                        "mode": "view"
+                    },
+                    "edit_idea": {
+                        "description": "Click 'Edit Idea' button in detail panel to edit via modal",
+                        "mode": "view"
+                    },
+                    "delete_idea": {
+                        "description": "Delete button in edit modal",
+                        "mode": "view"
+                    },
+                    "detail_panel": {
+                        "description": "Click idea card to view slide-in detail panel with Why/How/What/Score",
+                        "mode": "view"
+                    }
+                },
+                "idea_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "name": {"type": "string", "max_length": 20, "required": True},
+                    "x_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "y_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "color": {"type": "enum", "values": ["blue", "green", "orange", "purple", "red", "gray"], "default": "blue"},
+                    "why": {"type": "string", "max_length": 500, "optional": True},
+                    "how": {"type": "string", "max_length": 500, "optional": True},
+                    "what": {"type": "string", "max_length": 500, "optional": True},
+                    "benefit_score": {"type": "integer", "min": 1, "max": 5, "optional": True}
+                },
+                "v1.0.0_features": {
+                    "inline_styles": "All critical styles are inline for Layout Service compatibility",
+                    "view_mode_interactivity": "Add, edit, delete, drag ideas without entering edit mode",
+                    "theme_support": "4 color themes with light/dark mode via CSS variables",
+                    "state_persistence": "postMessage-based state sync for auto-save integration",
+                    "detail_panel": "Slide-in panel with Why/How/What fields and benefit score stars",
+                    "axis_presets": "5 built-in axis configurations with custom override support"
                 }
             }
         ]
