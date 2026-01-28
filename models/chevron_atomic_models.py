@@ -5,6 +5,12 @@ Chevron Maturity Atomic Models for Diagram Generator v3
 Pydantic models for the /v1.2/atomic/CHEVRON_MATURITY endpoint that provides
 interactive chevron maturity progression visualization.
 
+v1.2.1: Bug fixes for v1.2.0
+- Now line always visible with 25% default position
+- Generic "Add Row" button text
+- Constant chevron angle (130°) using fixed 22px notch
+- Simplified font color: dark text in light mode, white in dark mode
+
 v1.2.0: Font contrast fix + Timeline header with Gantt-style features
 - Dynamic font color: dark text on lighter chevrons, white on darker
 - Subtler color progression: 0.25 → 0.65 opacity (reduced from 0.30 → 0.90)
@@ -69,7 +75,7 @@ ChevronTimeUnitType = Literal["quarters", "months", "years", "stages"]  # v1.2.0
 # =============================================================================
 
 # Theme 1: Default (Blue)
-# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
+# v1.2.1: Simplified text colors - dark in light mode, white in dark mode
 CHEVRON_THEME_DEFAULT = {
     "light": {
         "header_bg": "rgba(59, 130, 246, 0.15)",
@@ -80,8 +86,8 @@ CHEVRON_THEME_DEFAULT = {
         "grid_line": "#E5E7EB",
         "text_primary": "#111827",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#1F2937"  # v1.2.0: Dark text for light chevrons
+        "chevron_text": "#1F2937",       # v1.2.1: Dark text for ALL chevrons in light mode
+        "chevron_text_dark": "#1F2937"   # v1.2.1: Kept for compatibility, same value
     },
     "dark": {
         "header_bg": "rgba(59, 130, 246, 0.25)",
@@ -92,13 +98,13 @@ CHEVRON_THEME_DEFAULT = {
         "grid_line": "#374151",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
+        "chevron_text": "#FFFFFF",       # v1.2.1: White text for ALL chevrons in dark mode
+        "chevron_text_dark": "#FFFFFF"   # v1.2.1: Same in dark mode
     }
 }
 
 # Theme 2: Emerald (Green)
-# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
+# v1.2.1: Simplified text colors - dark in light mode, white in dark mode
 CHEVRON_THEME_EMERALD = {
     "light": {
         "header_bg": "rgba(16, 185, 129, 0.15)",
@@ -109,8 +115,8 @@ CHEVRON_THEME_EMERALD = {
         "grid_line": "#D1FAE5",
         "text_primary": "#064E3B",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#064E3B"  # v1.2.0: Dark green text for light chevrons
+        "chevron_text": "#064E3B",       # v1.2.1: Dark green text for ALL chevrons in light mode
+        "chevron_text_dark": "#064E3B"   # v1.2.1: Kept for compatibility, same value
     },
     "dark": {
         "header_bg": "rgba(16, 185, 129, 0.25)",
@@ -121,13 +127,13 @@ CHEVRON_THEME_EMERALD = {
         "grid_line": "#065F46",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
+        "chevron_text": "#FFFFFF",       # v1.2.1: White text for ALL chevrons in dark mode
+        "chevron_text_dark": "#FFFFFF"   # v1.2.1: Same in dark mode
     }
 }
 
 # Theme 3: Purple
-# v1.2.0: Added chevron_text_dark for contrast on lighter chevrons
+# v1.2.1: Simplified text colors - dark in light mode, white in dark mode
 CHEVRON_THEME_PURPLE = {
     "light": {
         "header_bg": "rgba(139, 92, 246, 0.15)",
@@ -138,8 +144,8 @@ CHEVRON_THEME_PURPLE = {
         "grid_line": "#E5E7EB",
         "text_primary": "#111827",
         "text_secondary": "#6B7280",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#4C1D95"  # v1.2.0: Dark purple text for light chevrons
+        "chevron_text": "#4C1D95",       # v1.2.1: Dark purple text for ALL chevrons in light mode
+        "chevron_text_dark": "#4C1D95"   # v1.2.1: Kept for compatibility, same value
     },
     "dark": {
         "header_bg": "rgba(139, 92, 246, 0.25)",
@@ -150,8 +156,8 @@ CHEVRON_THEME_PURPLE = {
         "grid_line": "#374151",
         "text_primary": "#FFFFFF",
         "text_secondary": "#9CA3AF",
-        "chevron_text": "#FFFFFF",
-        "chevron_text_dark": "#FFFFFF"  # v1.2.0: Same as chevron_text in dark mode
+        "chevron_text": "#FFFFFF",       # v1.2.1: White text for ALL chevrons in dark mode
+        "chevron_text_dark": "#FFFFFF"   # v1.2.1: Same in dark mode
     }
 }
 
@@ -172,9 +178,9 @@ CHEVRON_OPACITY_LEVELS = {
     6: [0.20, 0.30, 0.40, 0.50, 0.60, 0.65]
 }
 
-# v1.2.0: Opacity threshold for text color switching
-# Chevrons with opacity below this use dark text, above use white text
-CHEVRON_TEXT_OPACITY_THRESHOLD = 0.50
+# v1.2.1: REMOVED CHEVRON_TEXT_OPACITY_THRESHOLD
+# Text color is now simplified: dark text in light mode, white in dark mode (for all chevrons)
+# The chevron_text CSS variable handles this based on theme mode
 
 
 # =============================================================================

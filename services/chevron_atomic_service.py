@@ -14,6 +14,13 @@ Service layer for generating interactive chevron maturity progression HTML with:
 - 3 color themes: default (blue), emerald (green), purple
 - State persistence via postMessage + auto-save
 
+v1.2.1: Bug fixes for v1.2.0
+- Now line always visible with 25% default position (Fix #1)
+- Generic "Add Row" button text (Fix #2)
+- Enhanced persistence debug logging (Fix #3)
+- Constant chevron angle (130°) using fixed 22px notch (Fix #4)
+- Simplified font color: dark text in light mode, white in dark mode (Fix #5)
+
 v1.2.0: Font contrast fix + Timeline header with Gantt-style features
 - Dynamic font color: dark text on lighter chevrons (opacity < 0.50)
 - Subtler color progression: 0.25 → 0.65 opacity
@@ -47,7 +54,6 @@ from models.chevron_atomic_models import (
     CHEVRON_POSITION_PRESETS,
     CHEVRON_THEMES,
     CHEVRON_OPACITY_LEVELS,
-    CHEVRON_TEXT_OPACITY_THRESHOLD,
     calculate_row_height
 )
 
@@ -61,6 +67,7 @@ class ChevronAtomicGenerator:
     Generates interactive chevron maturity progression HTML with inline styles
     for Layout Service compatibility.
 
+    v1.2.1: Bug fixes - now line default, generic Add button, constant angle, simple font color
     v1.2.0: Font contrast, timeline header, now line, push-resize
     v1.1.0: Variable width chevrons, taller rows, delete functionality, bullets only
     v1.0.0: Initial implementation with edit modal, state persistence
@@ -327,8 +334,8 @@ class ChevronAtomicGenerator:
                     "row_height_used": effective_row_height,
                     "time_unit": request.time_unit,
                     "time_labels": time_labels,
-                    "now_line_pct": request.now_line_pct,
-                    "version": "1.2.0"
+                    "now_line_pct": request.now_line_pct if request.now_line_pct is not None else 25.0,
+                    "version": "1.2.1"
                 },
                 grid_position=position_data
             )
@@ -403,12 +410,11 @@ class ChevronAtomicGenerator:
             stage_labels, row_label_width, chevron_area_width, row_terminology, time_unit
         )
 
-        # v1.2.0: Build now line HTML if position is set
-        now_line_html = ""
-        if now_line_pct is not None:
-            now_line_html = self._build_now_line_html(
-                now_line_pct, row_label_width, chevron_area_width, header_height, add_btn_height
-            )
+        # v1.2.1: Now line always appears, default to 25% when not specified
+        effective_now_line_pct = now_line_pct if now_line_pct is not None else 25.0
+        now_line_html = self._build_now_line_html(
+            effective_now_line_pct, row_label_width, chevron_area_width, header_height, add_btn_height
+        )
 
         # Build maturity rows HTML
         rows_html = self._build_rows_html(
@@ -460,7 +466,7 @@ class ChevronAtomicGenerator:
     <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
     </svg>
-    Add {row_terminology.rstrip('s') if row_terminology.endswith('s') else row_terminology}
+    Add Row
   </button>
   {interactive_js}
   {theme_sync_script}
@@ -585,6 +591,9 @@ class ChevronAtomicGenerator:
 
         return rows_html
 
+    # v1.2.1: Fixed notch depth for constant ~130° angle regardless of chevron width
+    CHEVRON_NOTCH_DEPTH = 22  # pixels
+
     def _build_chevrons_html(
         self,
         chevrons: List[ChevronContent],
@@ -594,6 +603,7 @@ class ChevronAtomicGenerator:
         """
         Build chevrons HTML for a row.
 
+        v1.2.1: Fixed 22px notch for constant angle, simplified text color (always use --chevron-text).
         v1.2.0: Dynamic text color based on chevron opacity for better contrast.
         v1.1.0: Uses absolute positioning with percentages for variable widths.
         Each chevron can have custom left_pct and width_pct for Gantt-style sizing.
@@ -609,12 +619,10 @@ class ChevronAtomicGenerator:
         for stage_idx, chevron in enumerate(chevrons):
             opacity = opacity_levels[stage_idx] if stage_idx < len(opacity_levels) else 0.65
 
-            # v1.2.0: Determine text color based on opacity threshold
-            # Use dark text for lighter chevrons, white text for darker chevrons
-            use_dark_text = opacity < CHEVRON_TEXT_OPACITY_THRESHOLD
-
-            # Build content HTML (v1.1.0: bullets only, v1.2.0: with dynamic text color)
-            content_html = self._build_bullets_content(chevron.bullets or [], use_dark_text)
+            # v1.2.1: Simplified - always use theme-appropriate color (no opacity threshold)
+            # Light mode: --chevron-text is set to dark text
+            # Dark mode: --chevron-text is set to white text
+            content_html = self._build_bullets_content(chevron.bullets or [])
 
             # Calculate position and width
             # Use stored values if available, otherwise calculate defaults
@@ -629,18 +637,20 @@ class ChevronAtomicGenerator:
             else:
                 width_pct = default_width_pct
 
-            # Chevron shape using clip-path with overlapping effect
+            # v1.2.1: Chevron shape using clip-path with FIXED pixel notch for constant angle
+            # Using calc() to maintain ~130° angle regardless of chevron width
             # First chevron has flat left edge, others have arrow indentation
+            notch = self.CHEVRON_NOTCH_DEPTH
             if stage_idx == 0:
-                clip_path = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)"
+                clip_path = f"polygon(0 0, calc(100% - {notch}px) 0, 100% 50%, calc(100% - {notch}px) 100%, 0 100%)"
             else:
-                clip_path = "polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)"
+                clip_path = f"polygon(0 0, calc(100% - {notch}px) 0, 100% 50%, calc(100% - {notch}px) 100%, 0 100%, {notch}px 50%)"
 
             # v1.1.0: Absolute positioning with percentage widths
             # v1.1.0: Fixed text positioning - increased padding to stay within clip-path
-            # v1.2.0: Added data-use-dark-text attribute for dynamic text color
+            # v1.2.1: Removed data-use-dark-text (no longer needed with simplified font color)
             chevrons_html += f'''
-        <div class="chevron" style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-left-pct="{left_pct:.1f}" data-width-pct="{width_pct:.1f}" data-opacity="{opacity:.2f}" data-use-dark-text="{str(use_dark_text).lower()}" onclick="editChevron(this)">
+        <div class="chevron" style="position:absolute;left:{left_pct:.1f}%;width:{width_pct:.1f}%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) {int(opacity * 100)}%, transparent);clip-path:{clip_path};display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:{num_stages - stage_idx};" data-stage="{stage_idx}" data-left-pct="{left_pct:.1f}" data-width-pct="{width_pct:.1f}" data-opacity="{opacity:.2f}" onclick="editChevron(this)">
           <div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">
             {content_html}
           </div>
@@ -650,20 +660,21 @@ class ChevronAtomicGenerator:
 
         return chevrons_html
 
-    def _build_bullets_content(self, bullets: List[str], use_dark_text: bool = False) -> str:
+    def _build_bullets_content(self, bullets: List[str]) -> str:
         """
         Build bullets content HTML.
 
-        v1.2.0: Added use_dark_text parameter for dynamic text color based on chevron opacity.
+        v1.2.1: Simplified - always use --chevron-text which is theme-aware.
+                Light mode: dark text, Dark mode: white text (for all chevrons).
 
         Args:
             bullets: List of bullet point strings
-            use_dark_text: If True, use --chevron-text-dark, otherwise use --chevron-text
 
         Returns:
             HTML string for bullet content
         """
-        text_color_var = "var(--chevron-text-dark)" if use_dark_text else "var(--chevron-text)"
+        # v1.2.1: Always use --chevron-text (theme CSS handles light/dark appropriately)
+        text_color_var = "var(--chevron-text)"
 
         if not bullets:
             return f'<span style="color:{text_color_var};font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>'
@@ -685,6 +696,7 @@ class ChevronAtomicGenerator:
         """
         Generate JavaScript for modal, edit, resize, delete, now line, and state persistence.
 
+        v1.2.1: Fixed notch (22px), simplified text color, enhanced debug logging, generic Add Row.
         v1.2.0: Added push-resize, now line dragging, dynamic text color, time_unit support.
         v1.1.0: Added resize handles, delete chevron, simplified to bullets only.
 
@@ -692,16 +704,17 @@ class ChevronAtomicGenerator:
             num_stages: Number of stages
             row_terminology: Term for rows
             time_unit: Type of time labels (quarters, months, years, stages)
-            now_line_pct: Initial position of now line (None = no line)
+            now_line_pct: Initial position of now line (None = default 25%)
 
         Returns:
             Script block with interactive functionality
         """
         singular_term = row_terminology.rstrip('s') if row_terminology.endswith('s') else row_terminology
-        now_line_init = now_line_pct if now_line_pct is not None else "null"
+        # v1.2.1: Default to 25% if now_line_pct is None
+        now_line_init = now_line_pct if now_line_pct is not None else 25.0
 
         return f'''<style>
-/* v1.2.0: Enhanced hover effects with resize handles and now line */
+/* v1.2.1: Enhanced hover effects with resize handles and now line */
 .maturity-row {{
   transition: background 0.15s ease;
 }}
@@ -766,8 +779,8 @@ class ChevronAtomicGenerator:
   // v1.2.0: Now line drag state
   var nowLineDragState = null;
 
-  // v1.2.0: Opacity threshold for text color (matches CHEVRON_TEXT_OPACITY_THRESHOLD)
-  var textOpacityThreshold = 0.50;
+  // v1.2.1: Fixed notch depth for constant angle (matches Python CHEVRON_NOTCH_DEPTH)
+  var notchDepth = 22;
 
   // v1.2.0: Updated opacity levels (subtler gradient: 0.25 → 0.65)
   var opacityLevels = {{
@@ -782,10 +795,18 @@ class ChevronAtomicGenerator:
     if (!e.data || e.data.type !== 'chevron-init') return;
     presentationId = e.data.presentation_id || '';
     chevronId = e.data.element_id || '';
-    console.log('[Chevron v1.2.0] Received IDs - presentation:', presentationId, 'element:', chevronId);
+    console.log('[Chevron v1.2.1] Received IDs - presentation:', presentationId, 'element:', chevronId);
+
+    // v1.2.1: Enhanced debug logging for persistence troubleshooting
+    if (!chevronId) {{
+      console.warn('[Chevron v1.2.1] WARNING: No element_id received. State persistence will not work.');
+    }}
 
     if (e.data.saved_state && e.data.saved_state.rows) {{
+      console.log('[Chevron v1.2.1] Restoring saved state with', e.data.saved_state.rows.length, 'rows');
       restoreChevronState(e.data.saved_state);
+    }} else {{
+      console.log('[Chevron v1.2.1] No saved state to restore');
     }}
   }});
 
@@ -911,10 +932,11 @@ class ChevronAtomicGenerator:
   // Notify parent of state change
   function notifyStateChange(action) {{
     if (!chevronId) {{
-      console.warn('[Chevron] Cannot save - no element ID received');
+      console.error('[Chevron v1.2.1] Cannot save - no element ID. Was chevron-init received?');
       return;
     }}
     var state = extractChevronState();
+    console.log('[Chevron v1.2.1] Sending state:', action, 'rows:', state.rows.length, 'now_line_pct:', state.now_line_pct);
     window.parent.postMessage({{
       type: 'updateChevronState',
       elementId: chevronId,
@@ -922,13 +944,12 @@ class ChevronAtomicGenerator:
       chevronData: state,
       timestamp: Date.now()
     }}, '*');
-    console.log('[Chevron v1.2.0] State change sent to parent:', action);
   }}
 
-  // v1.2.0: Restore state from saved data (with variable widths and dynamic text color)
+  // v1.2.1: Restore state from saved data (fixed notch, simplified text color)
   function restoreChevronState(state) {{
     if (!state || !state.rows) return;
-    console.log('[Chevron v1.2.0] Restoring state with', state.rows.length, 'rows');
+    console.log('[Chevron v1.2.1] Restoring state with', state.rows.length, 'rows');
 
     var body = container.querySelector('.chevron-body');
     if (!body) return;
@@ -944,12 +965,14 @@ class ChevronAtomicGenerator:
 
       row.chevrons.forEach(function(chevron, stageIdx) {{
         var opacity = opacities[stageIdx] || 0.65;
-        var clipPath = stageIdx === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
+        // v1.2.1: Fixed 22px notch for constant ~130° angle
+        var clipPath = stageIdx === 0
+          ? 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%)'
+          : 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%, ' + notchDepth + 'px 50%)';
         var contentHtml = '';
 
-        // v1.2.0: Determine text color based on opacity threshold
-        var useDarkText = opacity < textOpacityThreshold;
-        var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
+        // v1.2.1: Simplified - always use --chevron-text (theme handles light/dark)
+        var textColorVar = 'var(--chevron-text)';
 
         // v1.1.0: Use saved position or calculate defaults
         var leftPct = chevron.left_pct !== undefined ? chevron.left_pct : (stageIdx * 18);
@@ -965,7 +988,7 @@ class ChevronAtomicGenerator:
           contentHtml = '<span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span>';
         }}
 
-        chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" data-use-dark-text="' + useDarkText + '" onclick="editChevron(this)">' +
+        chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + widthPct.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - stageIdx) + ';" data-stage="' + stageIdx + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + widthPct.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" onclick="editChevron(this)">' +
           '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;">' + contentHtml + '</div>' +
           '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
           '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
@@ -998,7 +1021,7 @@ class ChevronAtomicGenerator:
       }}
     }}
 
-    console.log('[Chevron v1.2.0] State restored successfully');
+    console.log('[Chevron v1.2.1] State restored successfully');
   }}
 
   // v1.2.0: Start resize operation (with push-resize support for right edge)
@@ -1093,7 +1116,7 @@ class ChevronAtomicGenerator:
     notifyStateChange('deleteChevron');
   }};
 
-  // v1.2.0: Redistribute chevron widths after deletion (with dynamic text color)
+  // v1.2.1: Redistribute chevron widths after deletion (fixed notch, simplified text color)
   function redistributeChevronWidths(rowEl) {{
     var chevrons = rowEl.querySelectorAll('.chevron');
     var count = chevrons.length;
@@ -1109,19 +1132,23 @@ class ChevronAtomicGenerator:
     chevrons.forEach(function(chev, idx) {{
       var leftPct = Math.max(0, idx * (defaultWidth - overlap));
       var opacity = opacities[idx] || 0.65;
-      var useDarkText = opacity < textOpacityThreshold;
+
+      // v1.2.1: Fixed 22px notch for constant angle
+      var clipPath = idx === 0
+        ? 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%)'
+        : 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%, ' + notchDepth + 'px 50%)';
 
       chev.style.left = leftPct + '%';
       chev.style.width = defaultWidth + '%';
       chev.style.background = 'color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent)';
+      chev.style.clipPath = clipPath;
       chev.dataset.leftPct = leftPct.toFixed(1);
       chev.dataset.widthPct = defaultWidth.toFixed(1);
       chev.dataset.stage = idx;
       chev.dataset.opacity = opacity.toFixed(2);
-      chev.dataset.useDarkText = useDarkText;
 
-      // Update text color in content
-      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
+      // v1.2.1: Simplified - always use --chevron-text (theme handles light/dark)
+      var textColorVar = 'var(--chevron-text)';
       var contentUl = chev.querySelector('ul');
       var contentSpan = chev.querySelector('span');
       if (contentUl) contentUl.style.color = textColorVar;
@@ -1174,7 +1201,7 @@ class ChevronAtomicGenerator:
     document.getElementById('row-modal-label').focus();
   }};
 
-  // v1.2.0: Add new row (with variable width chevrons and dynamic text color)
+  // v1.2.1: Add new row (fixed notch, simplified text color, generic "New Row")
   window.addRow = function() {{
     var body = container.querySelector('.chevron-body');
     var rows = body.querySelectorAll('.maturity-row');
@@ -1190,25 +1217,28 @@ class ChevronAtomicGenerator:
     var totalOverlap = overlap * (numStages - 1);
     var defaultWidth = (100 + totalOverlap) / numStages;
 
+    // v1.2.1: Simplified text color (theme handles light/dark)
+    var textColorVar = 'var(--chevron-text)';
+
     var chevronsHtml = '';
     for (var i = 0; i < numStages; i++) {{
       var opacity = opacities[i] || 0.65;
-      var clipPath = i === 0 ? 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%)' : 'polygon(0 0, 85% 0, 100% 50%, 85% 100%, 0 100%, 15% 50%)';
+      // v1.2.1: Fixed 22px notch for constant angle
+      var clipPath = i === 0
+        ? 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%)'
+        : 'polygon(0 0, calc(100% - ' + notchDepth + 'px) 0, 100% 50%, calc(100% - ' + notchDepth + 'px) 100%, 0 100%, ' + notchDepth + 'px 50%)';
       var leftPct = Math.max(0, i * (defaultWidth - overlap));
 
-      // v1.2.0: Dynamic text color based on opacity
-      var useDarkText = opacity < textOpacityThreshold;
-      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
-
-      chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" data-use-dark-text="' + useDarkText + '" onclick="editChevron(this)">' +
+      chevronsHtml += '<div class="chevron" style="position:absolute;left:' + leftPct.toFixed(1) + '%;width:' + defaultWidth.toFixed(1) + '%;height:calc(100% - 8px);top:4px;background:color-mix(in srgb, var(--chevron-base-color) ' + Math.round(opacity * 100) + '%, transparent);clip-path:' + clipPath + ';display:flex;flex-direction:column;justify-content:center;cursor:pointer;transition:transform 0.15s ease, filter 0.15s ease, left 0.1s ease, width 0.1s ease;z-index:' + (numStages - i) + ';" data-stage="' + i + '" data-left-pct="' + leftPct.toFixed(1) + '" data-width-pct="' + defaultWidth.toFixed(1) + '" data-opacity="' + opacity.toFixed(2) + '" onclick="editChevron(this)">' +
         '<div class="chevron-content" style="overflow:hidden;padding:8px 25px 8px 35px;margin-left:5%;width:85%;"><span style="color:' + textColorVar + ';font-size:11px;opacity:0.7;font-style:italic;">Click to edit</span></div>' +
         '<div class="resize-handle resize-left" style="position:absolute;left:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'left\\')"></div>' +
         '<div class="resize-handle resize-right" style="position:absolute;right:0;top:0;bottom:0;width:8px;cursor:ew-resize;z-index:10;opacity:0;transition:opacity 0.15s;" onmousedown="startResize(event,this.parentElement,\\'right\\')"></div>' +
         '</div>';
     }}
 
+    // v1.2.1: Generic "New Row" label instead of singularTerm
     var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + newId + '">' +
-      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New ' + singularTerm + '</div>' +
+      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New Row</div>' +
       '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
     body.insertAdjacentHTML('beforeend', rowHtml);
@@ -1234,16 +1264,15 @@ class ChevronAtomicGenerator:
       }}
     }});
 
-    // v1.2.0: Chevron modal - Save (with dynamic text color)
+    // v1.2.1: Chevron modal - Save (simplified text color)
     document.getElementById('modal-save').addEventListener('click', function() {{
       var chevron = chevronModal._targetChevron;
       if (!chevron) return;
 
       var contentDiv = chevron.querySelector('.chevron-content');
 
-      // v1.2.0: Get text color from chevron's opacity
-      var useDarkText = chevron.dataset.useDarkText === 'true';
-      var textColorVar = useDarkText ? 'var(--chevron-text-dark)' : 'var(--chevron-text)';
+      // v1.2.1: Simplified - always use --chevron-text (theme handles light/dark)
+      var textColorVar = 'var(--chevron-text)';
 
       var bullets = [];
       for (var i = 1; i <= 3; i++) {{
