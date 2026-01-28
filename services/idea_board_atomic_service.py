@@ -203,6 +203,10 @@ class IdeaBoardGenerator:
         # Generate color CSS for cards
         color_css = self._generate_color_css()
 
+        # Calculate pixel dimensions for explicit sizing
+        pixel_width = request.gridWidth * 60 - 20
+        pixel_height = request.gridHeight * 60 - 20
+
         html = f'''<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -219,6 +223,14 @@ class IdeaBoardGenerator:
     padding: 0;
 }}
 
+html, body {{
+    width: {pixel_width}px;
+    height: {pixel_height}px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}}
+
 :root {{
     --board-bg: {theme_colors["board_bg"]};
     --grid-line: {theme_colors["grid_line"]};
@@ -233,8 +245,8 @@ class IdeaBoardGenerator:
 }}
 
 .idea-board-container {{
-    width: 100%;
-    height: 100%;
+    width: {pixel_width}px;
+    height: {pixel_height}px;
     position: relative;
     background: var(--board-bg);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
