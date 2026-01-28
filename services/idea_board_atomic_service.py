@@ -207,28 +207,15 @@ class IdeaBoardGenerator:
         pixel_width = request.gridWidth * 60 - 20
         pixel_height = request.gridHeight * 60 - 20
 
-        html = f'''<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
+        html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v1.0.0
+   IDEA_BOARD CSS v1.0.1 - Responsive Layout Fix
    ============================================ */
 
 * {{
     box-sizing: border-box;
     margin: 0;
     padding: 0;
-}}
-
-html, body {{
-    width: {pixel_width}px;
-    height: {pixel_height}px;
-    margin: 0;
-    padding: 0;
-    overflow: hidden;
 }}
 
 :root {{
@@ -245,8 +232,10 @@ html, body {{
 }}
 
 .idea-board-container {{
-    width: {pixel_width}px;
-    height: {pixel_height}px;
+    width: 100%;
+    height: 100%;
+    min-width: {pixel_width}px;
+    min-height: {pixel_height}px;
     position: relative;
     background: var(--board-bg);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -719,8 +708,6 @@ html, body {{
     opacity: 0.9;
 }}
 </style>
-</head>
-<body>
 <div class="idea-board-container" id="{element_id}" data-ideaboard-container="true">
     <div class="idea-board">
         <!-- Axis Labels -->
@@ -1273,9 +1260,7 @@ html, body {{
     init();
 
 }})();
-</script>
-</body>
-</html>'''
+</script>'''
 
         return html
 
