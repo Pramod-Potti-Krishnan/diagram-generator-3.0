@@ -131,35 +131,54 @@ AXIS_PRESETS = {
 # Color Palette
 # =============================================================================
 
+# v2.0: Saturated post-it style colors for better visibility
 IDEA_COLORS = {
-    "blue": {"bg": "#DBEAFE", "border": "#3B82F6", "text": "#1E40AF"},
-    "green": {"bg": "#D1FAE5", "border": "#10B981", "text": "#065F46"},
-    "orange": {"bg": "#FED7AA", "border": "#F97316", "text": "#9A3412"},
-    "purple": {"bg": "#E9D5FF", "border": "#8B5CF6", "text": "#5B21B6"},
-    "red": {"bg": "#FEE2E2", "border": "#EF4444", "text": "#991B1B"},
-    "gray": {"bg": "#F3F4F6", "border": "#6B7280", "text": "#374151"}
+    "blue": {"bg": "#3B82F6", "border": "#1D4ED8", "text": "#FFFFFF"},
+    "green": {"bg": "#10B981", "border": "#059669", "text": "#FFFFFF"},
+    "orange": {"bg": "#F97316", "border": "#EA580C", "text": "#FFFFFF"},
+    "purple": {"bg": "#8B5CF6", "border": "#7C3AED", "text": "#FFFFFF"},
+    "red": {"bg": "#EF4444", "border": "#DC2626", "text": "#FFFFFF"},
+    "yellow": {"bg": "#FBBF24", "border": "#F59E0B", "text": "#1F2937"},
+    "pink": {"bg": "#EC4899", "border": "#DB2777", "text": "#FFFFFF"},
+    "gray": {"bg": "#6B7280", "border": "#4B5563", "text": "#FFFFFF"}
 }
 
 VALID_COLORS = list(IDEA_COLORS.keys())
+
+# Axis customization options for dynamic dropdowns
+AXIS_OPTIONS = [
+    {"value": "urgency", "label": "Urgency"},
+    {"value": "impact", "label": "Impact"},
+    {"value": "effort", "label": "Effort"},
+    {"value": "value", "label": "Value"},
+    {"value": "risk", "label": "Risk"},
+    {"value": "cost", "label": "Cost"},
+    {"value": "feasibility", "label": "Feasibility"},
+    {"value": "reward", "label": "Reward"},
+    {"value": "benefit", "label": "Benefit"},
+    {"value": "desirability", "label": "Desirability"},
+    {"value": "custom", "label": "Custom..."}
+]
 
 
 # =============================================================================
 # Theme Presets
 # =============================================================================
 
+# v2.0: Updated themes with warm cork board background for light mode
 THEME_PRESETS = {
     "default": {
         "light": {
-            "board_bg": "#FFFFFF",
-            "grid_line": "#E5E7EB",
-            "axis_label": "#1F2937",
-            "axis_secondary": "#6B7280",
-            "quadrant_label": "rgba(0,0,0,0.05)",
-            "card_shadow": "0 2px 4px rgba(0,0,0,0.1)",
-            "text_primary": "#111827",
-            "text_secondary": "#6B7280",
-            "panel_bg": "#FFFFFF",
-            "panel_border": "#E5E7EB"
+            "board_bg": "#FEF9E7",  # Warm cream/cork board
+            "grid_line": "#E8DCC8",
+            "axis_label": "#5D4E37",  # Warm brown
+            "axis_secondary": "#8B7355",
+            "quadrant_label": "rgba(139, 119, 101, 0.12)",
+            "card_shadow": "3px 3px 10px rgba(0,0,0,0.15)",
+            "text_primary": "#3D3226",
+            "text_secondary": "#6B5B4D",
+            "panel_bg": "#FFFDF7",
+            "panel_border": "#E8DCC8"
         },
         "dark": {
             "board_bg": "#1F2937",
@@ -167,7 +186,7 @@ THEME_PRESETS = {
             "axis_label": "#F9FAFB",
             "axis_secondary": "#9CA3AF",
             "quadrant_label": "rgba(255,255,255,0.05)",
-            "card_shadow": "0 2px 4px rgba(0,0,0,0.3)",
+            "card_shadow": "3px 3px 10px rgba(0,0,0,0.4)",
             "text_primary": "#F9FAFB",
             "text_secondary": "#D1D5DB",
             "panel_bg": "#111827",

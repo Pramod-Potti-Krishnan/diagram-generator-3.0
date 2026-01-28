@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v1.0.0
+IDEA_BOARD HTML Generation Service v2.0.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,14 @@ Includes embedded CSS and JavaScript for:
 - Click-to-expand detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.0.0 Visual Redesign:
+- Post-it style cards with push-pins
+- Larger, more visible cards with saturated colors
+- Warm cork board background (light mode)
+- Dynamic axis customization UI with dropdowns
+- Fixed postMessage protocol with presentation_id
+- Improved drag & drop responsiveness
 
 v1.0.0 Initial Release:
 - Complete HTML generation with embedded styles
@@ -119,7 +127,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "1.0.0"
+                    "version": "2.0.0"
                 },
                 grid_position=grid_position
             )
@@ -209,7 +217,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v1.0.1 - Responsive Layout Fix
+   IDEA_BOARD CSS v2.0.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -251,31 +259,69 @@ class IdeaBoardGenerator:
     border-radius: 8px;
 }}
 
-/* Axis Labels */
-.y-axis-label {{
+/* Axis Labels with Dropdowns */
+.y-axis-container {{
     position: absolute;
-    left: -40px;
+    left: -60px;
     top: 50%;
     transform: rotate(-90deg) translateX(-50%);
     transform-origin: left center;
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--axis-label);
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     white-space: nowrap;
 }}
 
-.x-axis-label {{
+.x-axis-container {{
     position: absolute;
-    bottom: -30px;
+    bottom: -40px;
     left: 50%;
     transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}}
+
+.axis-label {{
     font-weight: 700;
     font-size: 14px;
     color: var(--axis-label);
     text-transform: uppercase;
     letter-spacing: 1px;
+}}
+
+.axis-selector {{
+    padding: 4px 8px;
+    border: 1px solid var(--grid-line);
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase;
+}}
+
+.axis-selector:hover {{
+    border-color: var(--axis-label);
+}}
+
+.axis-selector:focus {{
+    outline: none;
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 2px rgba(59,130,246,0.2);
+}}
+
+.axis-custom-input {{
+    padding: 4px 8px;
+    border: 1px solid #3B82F6;
+    border-radius: 4px;
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    width: 100px;
+    text-transform: uppercase;
 }}
 
 .y-axis-high {{
@@ -336,7 +382,7 @@ class IdeaBoardGenerator:
 /* Quadrant Labels */
 .quadrant-label {{
     position: absolute;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
     color: var(--quadrant-label);
     text-transform: uppercase;
@@ -345,10 +391,10 @@ class IdeaBoardGenerator:
     user-select: none;
 }}
 
-.quadrant-label.q1 {{ top: 15%; right: 15%; }}
-.quadrant-label.q2 {{ top: 15%; left: 15%; }}
-.quadrant-label.q3 {{ bottom: 15%; right: 15%; }}
-.quadrant-label.q4 {{ bottom: 15%; left: 15%; }}
+.quadrant-label.q1 {{ top: 12%; right: 12%; }}
+.quadrant-label.q2 {{ top: 12%; left: 12%; }}
+.quadrant-label.q3 {{ bottom: 12%; right: 12%; }}
+.quadrant-label.q4 {{ bottom: 12%; left: 12%; }}
 
 /* Ideas Container */
 .ideas-container {{
@@ -360,36 +406,53 @@ class IdeaBoardGenerator:
     overflow: visible;
 }}
 
-/* Idea Cards */
+/* Post-It Style Idea Cards */
 .idea-card {{
     position: absolute;
-    padding: 8px 12px;
-    border-radius: 6px;
+    min-width: 120px;
+    min-height: 70px;
+    padding: 20px 16px 14px 16px;
+    border-radius: 3px 3px 3px 18px; /* Curled bottom-left corner */
     cursor: grab;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
-    max-width: 150px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
-    box-shadow: var(--card-shadow);
-    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    box-shadow: var(--card-shadow), inset 0 -2px 3px rgba(0,0,0,0.05);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
     z-index: 10;
     user-select: none;
+    text-align: center;
+}}
+
+/* Push-pin effect */
+.idea-card::before {{
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 12px;
+    height: 12px;
+    background: radial-gradient(circle at 30% 30%, #ff6b6b, #c0392b);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }}
 
 .idea-card:hover {{
-    transform: scale(1.05);
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    transform: scale(1.08) rotate(1deg);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.2);
     z-index: 20;
 }}
 
 .idea-card.dragging {{
     cursor: grabbing;
-    transform: scale(1.1);
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    transform: scale(1.12) rotate(-2deg);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.25);
     z-index: 100;
-    opacity: 0.9;
+    opacity: 0.95;
 }}
 
 /* Card Colors */
@@ -710,11 +773,41 @@ class IdeaBoardGenerator:
 </style>
 <div class="idea-board-container" id="{element_id}" data-ideaboard-container="true">
     <div class="idea-board">
-        <!-- Axis Labels -->
-        <div class="y-axis-label">{axis_config["y_label"]}</div>
+        <!-- Y-Axis with Selector -->
+        <div class="y-axis-container">
+            <span class="axis-label y-axis-label-text">{axis_config["y_label"]}</span>
+            <select class="axis-selector" id="y-axis-select" onchange="handleAxisChange('y', this.value)">
+                <option value="impact" {self._get_selected(axis_config["y_label"], "IMPACT")}>Impact</option>
+                <option value="urgency" {self._get_selected(axis_config["y_label"], "URGENCY")}>Urgency</option>
+                <option value="value" {self._get_selected(axis_config["y_label"], "VALUE")}>Value</option>
+                <option value="reward" {self._get_selected(axis_config["y_label"], "REWARD")}>Reward</option>
+                <option value="benefit" {self._get_selected(axis_config["y_label"], "BENEFIT")}>Benefit</option>
+                <option value="desirability" {self._get_selected(axis_config["y_label"], "DESIRABILITY")}>Desirability</option>
+                <option value="custom">Custom...</option>
+            </select>
+            <input type="text" class="axis-custom-input" id="y-axis-custom"
+                   placeholder="Custom label" style="display:none;"
+                   onchange="applyCustomAxis('y', this.value)" onblur="applyCustomAxis('y', this.value)">
+        </div>
         <div class="y-axis-high">{axis_config["y_high"]}</div>
         <div class="y-axis-low">{axis_config["y_low"]}</div>
-        <div class="x-axis-label">{axis_config["x_label"]}</div>
+
+        <!-- X-Axis with Selector -->
+        <div class="x-axis-container">
+            <span class="axis-label x-axis-label-text">{axis_config["x_label"]}</span>
+            <select class="axis-selector" id="x-axis-select" onchange="handleAxisChange('x', this.value)">
+                <option value="urgency" {self._get_selected(axis_config["x_label"], "URGENCY")}>Urgency</option>
+                <option value="impact" {self._get_selected(axis_config["x_label"], "IMPACT")}>Impact</option>
+                <option value="effort" {self._get_selected(axis_config["x_label"], "EFFORT")}>Effort</option>
+                <option value="risk" {self._get_selected(axis_config["x_label"], "RISK")}>Risk</option>
+                <option value="cost" {self._get_selected(axis_config["x_label"], "COST")}>Cost</option>
+                <option value="feasibility" {self._get_selected(axis_config["x_label"], "FEASIBILITY")}>Feasibility</option>
+                <option value="custom">Custom...</option>
+            </select>
+            <input type="text" class="axis-custom-input" id="x-axis-custom"
+                   placeholder="Custom label" style="display:none;"
+                   onchange="applyCustomAxis('x', this.value)" onblur="applyCustomAxis('x', this.value)">
+        </div>
         <div class="x-axis-low">{axis_config["x_low"]}</div>
         <div class="x-axis-high">{axis_config["x_high"]}</div>
 
@@ -814,7 +907,7 @@ class IdeaBoardGenerator:
 
 <script>
 /* ============================================
-   IDEA_BOARD JavaScript v1.0.0
+   IDEA_BOARD JavaScript v2.0.0 - Enhanced
    ============================================ */
 
 (function() {{
@@ -823,8 +916,19 @@ class IdeaBoardGenerator:
     // Configuration
     var containerId = '{element_id}';
     var ideaBoardId = containerId;
+    var presentationId = '';  // v2.0: Added for postMessage protocol
     var currentEditingIdea = null;
     var selectedScore = 0;
+
+    // Axis configuration state
+    var axisConfig = {{
+        x_label: '{axis_config["x_label"]}',
+        y_label: '{axis_config["y_label"]}',
+        x_low: '{axis_config["x_low"]}',
+        x_high: '{axis_config["x_high"]}',
+        y_low: '{axis_config["y_low"]}',
+        y_high: '{axis_config["y_high"]}'
+    }};
 
     // Get container and elements
     var container = document.getElementById(containerId);
@@ -844,7 +948,86 @@ class IdeaBoardGenerator:
         initDragDrop();
         initScoreSelector();
         listenForParentMessages();
-        console.log('[IdeaBoard] Initialized:', containerId);
+        console.log('[IdeaBoard v2.0] Initialized:', containerId);
+    }}
+
+    // ============================================
+    // AXIS CUSTOMIZATION
+    // ============================================
+
+    window.handleAxisChange = function(axis, value) {{
+        var customInput = document.getElementById(axis + '-axis-custom');
+        var labelElement = container.querySelector('.' + axis + '-axis-label-text');
+
+        if (value === 'custom') {{
+            customInput.style.display = 'inline-block';
+            customInput.focus();
+        }} else {{
+            customInput.style.display = 'none';
+            var newLabel = value.charAt(0).toUpperCase() + value.slice(1);
+            if (labelElement) labelElement.textContent = newLabel.toUpperCase();
+
+            // Update axis config
+            if (axis === 'x') {{
+                axisConfig.x_label = newLabel.toUpperCase();
+                updateAxisEndpoints('x', value);
+            }} else {{
+                axisConfig.y_label = newLabel.toUpperCase();
+                updateAxisEndpoints('y', value);
+            }}
+
+            notifyStateChange('axis_change');
+        }}
+    }};
+
+    window.applyCustomAxis = function(axis, value) {{
+        if (!value || !value.trim()) return;
+
+        var labelElement = container.querySelector('.' + axis + '-axis-label-text');
+        var customInput = document.getElementById(axis + '-axis-custom');
+        var selectElement = document.getElementById(axis + '-axis-select');
+
+        if (labelElement) labelElement.textContent = value.toUpperCase();
+        customInput.style.display = 'none';
+        selectElement.value = 'custom';
+
+        if (axis === 'x') {{
+            axisConfig.x_label = value.toUpperCase();
+        }} else {{
+            axisConfig.y_label = value.toUpperCase();
+        }}
+
+        notifyStateChange('axis_change');
+    }};
+
+    function updateAxisEndpoints(axis, value) {{
+        var presets = {{
+            'urgency': {{ low: 'Low Urgency', high: 'High Urgency' }},
+            'impact': {{ low: 'Low Impact', high: 'High Impact' }},
+            'effort': {{ low: 'Low Effort', high: 'High Effort' }},
+            'value': {{ low: 'Low Value', high: 'High Value' }},
+            'risk': {{ low: 'Low Risk', high: 'High Risk' }},
+            'cost': {{ low: 'Low Cost', high: 'High Cost' }},
+            'feasibility': {{ low: 'Hard to Implement', high: 'Easy to Implement' }},
+            'reward': {{ low: 'Low Reward', high: 'High Reward' }},
+            'benefit': {{ low: 'Low Benefit', high: 'High Benefit' }},
+            'desirability': {{ low: 'Low Demand', high: 'High Demand' }}
+        }};
+
+        var endpoints = presets[value] || {{ low: 'Low', high: 'High' }};
+        var lowEl = container.querySelector('.' + axis + '-axis-low');
+        var highEl = container.querySelector('.' + axis + '-axis-high');
+
+        if (lowEl) lowEl.textContent = endpoints.low;
+        if (highEl) highEl.textContent = endpoints.high;
+
+        if (axis === 'x') {{
+            axisConfig.x_low = endpoints.low;
+            axisConfig.x_high = endpoints.high;
+        }} else {{
+            axisConfig.y_low = endpoints.low;
+            axisConfig.y_high = endpoints.high;
+        }}
     }}
 
     // ============================================
@@ -1176,19 +1359,22 @@ class IdeaBoardGenerator:
     }}
 
     function getColorBorder(colorName) {{
+        // v2.0: Updated with saturated colors + yellow/pink
         var colors = {{
             blue: '#3B82F6',
             green: '#10B981',
             orange: '#F97316',
             purple: '#8B5CF6',
             red: '#EF4444',
+            yellow: '#FBBF24',
+            pink: '#EC4899',
             gray: '#6B7280'
         }};
         return colors[colorName] || colors.blue;
     }}
 
     // ============================================
-    // PERSISTENCE (postMessage)
+    // PERSISTENCE (postMessage) - v2.0 Enhanced
     // ============================================
 
     function extractIdeaBoardState() {{
@@ -1205,7 +1391,16 @@ class IdeaBoardGenerator:
                     what: idea.what || '',
                     benefit_score: idea.benefit_score || 0
                 }};
-            }})
+            }}),
+            // v2.0: Include axis configuration in state
+            axis_config: {{
+                x_label: axisConfig.x_label,
+                y_label: axisConfig.y_label,
+                x_low: axisConfig.x_low,
+                x_high: axisConfig.x_high,
+                y_low: axisConfig.y_low,
+                y_high: axisConfig.y_high
+            }}
         }};
     }}
 
@@ -1216,11 +1411,12 @@ class IdeaBoardGenerator:
             window.parent.postMessage({{
                 type: 'updateIdeaBoardState',
                 elementId: ideaBoardId,
+                presentationId: presentationId,  // v2.0: Added presentation_id
                 action: action,
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard] State change notified:', action);
+            console.log('[IdeaBoard v2.0] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1230,27 +1426,83 @@ class IdeaBoardGenerator:
         window.addEventListener('message', function(e) {{
             if (!e.data || e.data.type !== 'ideaboard-init') return;
 
+            // v2.0: Extract presentation_id for proper parent communication
+            presentationId = e.data.presentation_id || '';
             ideaBoardId = e.data.element_id || containerId;
 
             if (e.data.saved_state) {{
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard] Received init from parent:', ideaBoardId);
+            console.log('[IdeaBoard v2.0] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
     function restoreIdeaBoardState(state) {{
-        if (!state || !state.ideas) return;
+        if (!state) return;
 
-        ideasContainer.innerHTML = '';
-        ideasState = state.ideas;
+        // Restore ideas
+        if (state.ideas && state.ideas.length > 0) {{
+            ideasContainer.innerHTML = '';
+            ideasState = state.ideas;
 
-        ideasState.forEach(function(idea) {{
-            addCardToDOM(idea);
-        }});
+            ideasState.forEach(function(idea) {{
+                addCardToDOM(idea);
+            }});
 
-        console.log('[IdeaBoard] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.0] Restored', ideasState.length, 'ideas');
+        }}
+
+        // v2.0: Restore axis configuration
+        if (state.axis_config) {{
+            axisConfig = state.axis_config;
+            restoreAxisUI(state.axis_config);
+        }}
+    }}
+
+    function restoreAxisUI(config) {{
+        // Update axis labels
+        var xLabelEl = container.querySelector('.x-axis-label-text');
+        var yLabelEl = container.querySelector('.y-axis-label-text');
+        if (xLabelEl && config.x_label) xLabelEl.textContent = config.x_label;
+        if (yLabelEl && config.y_label) yLabelEl.textContent = config.y_label;
+
+        // Update endpoints
+        var xLowEl = container.querySelector('.x-axis-low');
+        var xHighEl = container.querySelector('.x-axis-high');
+        var yLowEl = container.querySelector('.y-axis-low');
+        var yHighEl = container.querySelector('.y-axis-high');
+        if (xLowEl && config.x_low) xLowEl.textContent = config.x_low;
+        if (xHighEl && config.x_high) xHighEl.textContent = config.x_high;
+        if (yLowEl && config.y_low) yLowEl.textContent = config.y_low;
+        if (yHighEl && config.y_high) yHighEl.textContent = config.y_high;
+
+        // Update select dropdowns to match restored config
+        var xSelect = document.getElementById('x-axis-select');
+        var ySelect = document.getElementById('y-axis-select');
+        if (xSelect) updateSelectToMatch(xSelect, config.x_label);
+        if (ySelect) updateSelectToMatch(ySelect, config.y_label);
+    }}
+
+    function updateSelectToMatch(selectEl, label) {{
+        var options = selectEl.options;
+        var found = false;
+        for (var i = 0; i < options.length; i++) {{
+            if (options[i].text.toUpperCase() === label.toUpperCase()) {{
+                selectEl.selectedIndex = i;
+                found = true;
+                break;
+            }}
+        }}
+        if (!found) {{
+            // Custom value, select "Custom..."
+            for (var j = 0; j < options.length; j++) {{
+                if (options[j].value === 'custom') {{
+                    selectEl.selectedIndex = j;
+                    break;
+                }}
+            }}
+        }}
     }}
 
     // ============================================
@@ -1298,3 +1550,9 @@ class IdeaBoardGenerator:
                 .replace(">", "&gt;")
                 .replace('"', "&quot;")
                 .replace("'", "&#39;"))
+
+    def _get_selected(self, current_label: str, option_label: str) -> str:
+        """Return 'selected' attribute if current label matches option."""
+        if current_label.upper() == option_label.upper():
+            return 'selected'
+        return ''
