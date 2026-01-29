@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.1.0
+IDEA_BOARD HTML Generation Service v2.2.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,13 @@ Includes embedded CSS and JavaScript for:
 - Click-to-expand detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.2.0 Click vs Drag UX Fix:
+- Added drag threshold (5px) to distinguish click from drag intent
+- Click on card opens detail panel (no drag movement needed)
+- Added expand button (↗) on cards for explicit panel access
+- Added hover preview tooltip (500ms delay)
+- hasMoved flag prevents detail panel opening after drag
 
 v2.1.0 Multi-Instance Fix:
 - Fixed modal opening on wrong slide (global function collision)
@@ -133,7 +140,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.1.0"
+                    "version": "2.2.0"
                 },
                 grid_position=grid_position
             )
@@ -193,7 +200,7 @@ class IdeaBoardGenerator:
         """Generate the complete HTML with embedded CSS and JavaScript."""
 
         # Generate idea cards HTML
-        ideas_html = self._generate_ideas_html(ideas)
+        ideas_html = self._generate_ideas_html(ideas, element_id)
 
         # Generate ideas JSON for JavaScript
         ideas_json = json.dumps([{
@@ -223,7 +230,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.1.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.2.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -459,6 +466,62 @@ class IdeaBoardGenerator:
     box-shadow: 0 10px 20px rgba(0,0,0,0.25);
     z-index: 100;
     opacity: 0.95;
+}}
+
+/* v2.2: Expand button on cards */
+.idea-card .expand-btn {{
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    width: 20px;
+    height: 20px;
+    background: rgba(255,255,255,0.8);
+    border: 1px solid rgba(0,0,0,0.2);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 5;
+}}
+
+.idea-card:hover .expand-btn {{
+    opacity: 1;
+}}
+
+.idea-card .expand-btn:hover {{
+    background: white;
+    transform: scale(1.1);
+}}
+
+/* v2.2: Hover tooltip preview */
+.idea-card .hover-preview {{
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 11px;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    pointer-events: none;
+    z-index: 50;
+    margin-bottom: 8px;
+}}
+
+.idea-card:hover .hover-preview {{
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0.5s;  /* Show after 500ms hover */
 }}
 
 /* Card Colors */
@@ -913,7 +976,7 @@ class IdeaBoardGenerator:
 
 <script>
 /* ============================================
-   IDEA_BOARD JavaScript v2.1.0 - Multi-Instance
+   IDEA_BOARD JavaScript v2.2.0 - Multi-Instance + Click/Drag UX
    ============================================ */
 
 // v2.1: Create global registry for multi-instance support
@@ -972,7 +1035,7 @@ window.ideaboards = window.ideaboards || {{}};
         initDragDrop();
         initScoreSelector();
         listenForParentMessages();
-        console.log('[IdeaBoard v2.1] Initialized:', containerId);
+        console.log('[IdeaBoard v2.2] Initialized:', containerId);
     }}
 
     // ============================================
@@ -1062,6 +1125,11 @@ window.ideaboards = window.ideaboards || {{}};
     var draggedCard = null;
     var dragOffset = {{ x: 0, y: 0 }};
 
+    // v2.2: Click vs drag detection
+    var dragStartPos = {{ x: 0, y: 0 }};
+    var DRAG_THRESHOLD = 5;  // Pixels - must move this far to start actual drag
+    var hasMoved = false;
+
     function initDragDrop() {{
         if (!ideasContainer) {{
             console.warn('[IdeaBoard] ideasContainer not found, skipping drag init');
@@ -1079,21 +1147,43 @@ window.ideaboards = window.ideaboards || {{}};
     function startDrag(e) {{
         if (e.button !== 0) return;
 
+        // v2.2: Don't start drag if clicking on expand button
+        if (e.target.closest('.expand-btn')) return;
+
         var card = e.target.closest('.idea-card');
         if (!card) return;
 
-        e.preventDefault();
-        isDragging = true;
+        // v2.2: Record start position but don't start drag yet
         draggedCard = card;
-        card.classList.add('dragging');
-
         var rect = card.getBoundingClientRect();
         dragOffset.x = e.clientX - rect.left;
         dragOffset.y = e.clientY - rect.top;
+
+        // v2.2: Store initial mouse position for threshold check
+        dragStartPos.x = e.clientX;
+        dragStartPos.y = e.clientY;
+        hasMoved = false;
+        isDragging = false;  // Don't set true until mouse moves past threshold
+
+        // Don't call e.preventDefault() here - allow click events to fire
     }}
 
     function onDrag(e) {{
-        if (!isDragging || !draggedCard) return;
+        if (!draggedCard) return;
+
+        // v2.2: Calculate distance from start
+        var dx = e.clientX - dragStartPos.x;
+        var dy = e.clientY - dragStartPos.y;
+        var distance = Math.sqrt(dx * dx + dy * dy);
+
+        // v2.2: Only start actual drag if moved past threshold
+        if (!isDragging && distance >= DRAG_THRESHOLD) {{
+            isDragging = true;
+            hasMoved = true;
+            draggedCard.classList.add('dragging');
+        }}
+
+        if (!isDragging) return;  // Not yet dragging
 
         var boardRect = board.getBoundingClientRect();
 
@@ -1116,28 +1206,40 @@ window.ideaboards = window.ideaboards || {{}};
     }}
 
     function endDrag(e) {{
-        if (!isDragging || !draggedCard) return;
+        // v2.2: Check if we actually dragged (moved past threshold)
+        if (!draggedCard) return;
 
-        isDragging = false;
-        draggedCard.classList.remove('dragging');
+        if (isDragging) {{
+            // We were dragging, so save the position
+            isDragging = false;
+            draggedCard.classList.remove('dragging');
 
-        var boardRect = board.getBoundingClientRect();
-        var cardRect = draggedCard.getBoundingClientRect();
-        var centerX = cardRect.left + cardRect.width / 2 - boardRect.left;
-        var centerY = cardRect.top + cardRect.height / 2 - boardRect.top;
+            var boardRect = board.getBoundingClientRect();
+            var cardRect = draggedCard.getBoundingClientRect();
+            var centerX = cardRect.left + cardRect.width / 2 - boardRect.left;
+            var centerY = cardRect.top + cardRect.height / 2 - boardRect.top;
 
-        var xPercent = (centerX / boardRect.width) * 100;
-        var yPercent = 100 - (centerY / boardRect.height) * 100;
+            var xPercent = (centerX / boardRect.width) * 100;
+            var yPercent = 100 - (centerY / boardRect.height) * 100;
 
-        var ideaId = draggedCard.dataset.ideaId;
-        updateIdeaPosition(ideaId, xPercent, yPercent);
+            var ideaId = draggedCard.dataset.ideaId;
+            updateIdeaPosition(ideaId, xPercent, yPercent);
+            notifyStateChange('move');
+        }}
 
         draggedCard = null;
-        notifyStateChange('move');
+        // Note: hasMoved stays true until handleCardClick checks it
     }}
 
     function handleCardClick(e) {{
-        if (isDragging) return;
+        // v2.2: Don't open panel if clicking expand button (it has its own handler)
+        if (e.target.closest('.expand-btn')) return;
+
+        // v2.2: Only open panel if we didn't just drag
+        if (hasMoved) {{
+            hasMoved = false;  // Reset for next interaction
+            return;
+        }}
 
         var card = e.target.closest('.idea-card');
         if (!card) return;
@@ -1307,7 +1409,12 @@ window.ideaboards = window.ideaboards || {{}};
         var card = document.createElement('div');
         card.className = 'idea-card color-' + idea.color;
         card.dataset.ideaId = idea.id;
-        card.innerHTML = '<span class="idea-name">' + escapeHtml(idea.name) + '</span>';
+
+        // v2.2: Include expand button and hover preview
+        var previewText = idea.why ? (idea.why.length > 30 ? idea.why.substring(0, 30) + '...' : idea.why) : 'Click to view details';
+        card.innerHTML = '<span class="idea-name">' + escapeHtml(idea.name) + '</span>' +
+            '<button class="expand-btn" onclick="event.stopPropagation(); ideaboards[\'' + containerId + '\'].showDetail(\'' + idea.id + '\')">↗</button>' +
+            '<div class="hover-preview">' + escapeHtml(previewText) + '</div>';
 
         var boardRect = board.getBoundingClientRect();
         var x = (idea.x_position / 100) * boardRect.width;
@@ -1454,7 +1561,7 @@ window.ideaboards = window.ideaboards || {{}};
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.1] State change notified:', action);
+            console.log('[IdeaBoard v2.2] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1472,7 +1579,7 @@ window.ideaboards = window.ideaboards || {{}};
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.1] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.2] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -1488,7 +1595,7 @@ window.ideaboards = window.ideaboards || {{}};
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.1] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.2] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -1558,7 +1665,8 @@ window.ideaboards = window.ideaboards || {{}};
         editFromPanel: editFromPanel,
         handleAxisChange: handleAxisChange,
         applyCustomAxis: applyCustomAxis,
-        openEditModal: openEditModal
+        openEditModal: openEditModal,
+        showDetail: showDetailPanel  // v2.2: For expand button onclick
     }};
 
     // ============================================
@@ -1570,23 +1678,27 @@ window.ideaboards = window.ideaboards || {{}};
 
     init();
 
-    console.log('[IdeaBoard v2.1] Registered namespace:', containerId);
+    console.log('[IdeaBoard v2.2] Registered namespace:', containerId);
 
 }})();
 </script>'''
 
         return html
 
-    def _generate_ideas_html(self, ideas: List[Idea]) -> str:
+    def _generate_ideas_html(self, ideas: List[Idea], element_id: str = "") -> str:
         """Generate HTML for idea cards."""
         cards = []
         for idea in ideas:
             top_percent = 100 - idea.y_position
+            # v2.2: Generate hover preview text
+            preview_text = idea.why[:30] + "..." if idea.why and len(idea.why) > 30 else (idea.why or "Click to view details")
 
             card = f'''<div class="idea-card color-{idea.color}"
      data-idea-id="{idea.id}"
      style="left: {idea.x_position}%; top: {top_percent}%; transform: translate(-50%, -50%);">
     <span class="idea-name">{self._escape_html(idea.name)}</span>
+    <button class="expand-btn" onclick="event.stopPropagation(); ideaboards['{element_id}'].showDetail('{idea.id}')">↗</button>
+    <div class="hover-preview">{self._escape_html(preview_text)}</div>
 </div>'''
             cards.append(card)
 
