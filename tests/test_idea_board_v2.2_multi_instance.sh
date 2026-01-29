@@ -4,6 +4,9 @@
 # Creates presentation with 4 IDEA_BOARD slides to test multi-instance support
 # Target: Diagram Generator v3.0 + Layout Service
 #
+# CRITICAL: Uses Diagram Element API (/api/presentations/{id}/slides/{idx}/diagrams)
+# to add IDEA_BOARD elements in iframes for proper isolation.
+#
 # v2.2 Features Tested:
 # 1. Click vs drag threshold (5px) - click opens panel, drag moves card
 # 2. Expand button (↗) on cards - explicit panel access
@@ -16,15 +19,6 @@
 # 2. Tech Decisions - Effort/Value (purple/red/yellow cards)
 # 3. Sprint Planning - Risk/Reward (pink/gray/blue cards)
 # 4. Innovation Lab - Cost/Benefit (all colors showcase)
-#
-# Manual Test Checklist:
-# - [ ] Click card (no movement) → Detail panel opens
-# - [ ] Click expand button (↗) → Detail panel opens
-# - [ ] Hover 500ms → Preview tooltip appears
-# - [ ] Click and drag > 5px → Card moves
-# - [ ] Slide 1 "Add Idea" → Modal on slide 1
-# - [ ] Slide 3 "Add Idea" → Modal on slide 3 (not slide 1)
-# - [ ] Console: Object.keys(window.ideaboards).length === 4
 #
 
 set -e
@@ -79,6 +73,57 @@ fi
 echo ""
 
 # ============================================
+# Arrays to track slides for Diagram Element API insertion
+# ============================================
+declare -a ALL_POSITIONED_SLIDES
+declare -a ALL_POSITIONED_HTML
+
+# ============================================
+# Function: Add positioned element via Layout Service Diagram API
+# This renders HTML inside an iframe for proper isolation
+# ============================================
+add_positioned_element() {
+    local pres_id=$1
+    local slide_idx=$2
+    local html=$3
+    local start_col=$4
+    local width=$5
+    local height=${6:-14}
+    local start_row=${7:-4}
+
+    # Calculate end positions for grid CSS
+    local end_row=$((start_row + height))
+    local end_col=$((start_col + width))
+
+    # Escape HTML for JSON using jq
+    local escaped_html=$(echo "$html" | jq -Rs .)
+
+    # Use Diagram Element API with html_content field (rendered in iframe)
+    local element_payload="{
+        \"position\": {
+            \"grid_row\": \"$start_row/$end_row\",
+            \"grid_column\": \"$start_col/$end_col\"
+        },
+        \"html_content\": $escaped_html,
+        \"diagram_type\": \"idea_board\",
+        \"z_index\": 100
+    }"
+
+    local response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/diagrams" \
+        -H "Content-Type: application/json" \
+        -d "$element_payload")
+
+    local success=$(echo "$response" | jq -r '.success // .id // "null"')
+    if [ "$success" != "null" ] && [ -n "$success" ]; then
+        echo -e "    ${GREEN}Diagram element added at grid position ($start_col/$end_col, $start_row/$end_row)${NC}"
+        return 0
+    else
+        echo -e "    ${RED}Failed to add element: $(echo "$response" | jq -r '.detail // .error // "Unknown error"')${NC}"
+        return 1
+    fi
+}
+
+# ============================================
 # Ideas Configurations - Each Slide Distinct
 # ============================================
 
@@ -126,15 +171,14 @@ declare -a SLIDES=(
 )
 
 # ============================================
-# Generate Slides
+# Generate IDEA_BOARD HTML and build empty slides
 # ============================================
 echo "=============================================="
 echo -e "  ${MAGENTA}Generating IDEA_BOARD v2.2 Components${NC}"
 echo "=============================================="
 echo ""
 
-SLIDES_JSON="["
-FIRST_SLIDE=true
+C1_SLIDES=""
 SLIDE_NUM=0
 SUCCESS_COUNT=0
 FAIL_COUNT=0
@@ -159,6 +203,9 @@ for item in "${SLIDES[@]}"; do
             theme: $theme,
             theme_mode: $mode,
             position_preset: "full_content",
+            gridWidth: 30,
+            gridHeight: 14,
+            external_margin: 10,
             ideas: $ideas
         }')
 
@@ -212,39 +259,34 @@ for item in "${SLIDES[@]}"; do
     # Save HTML for debugging
     echo "$HTML_CONTENT" > "$OUTPUT_DIR/slide_${SLIDE_NUM}_${axis_preset}.html"
 
-    # Escape HTML for JSON
-    HTML_ESCAPED=$(echo "$HTML_CONTENT" | jq -Rs .)
+    # Track slide for Diagram Element API insertion (slide_idx is 0-based)
+    local_slide_idx=$((SLIDE_NUM - 1))
+    ALL_POSITIONED_SLIDES+=("$local_slide_idx:2:30:14")
+    ALL_POSITIONED_HTML+=("$HTML_CONTENT")
 
-    # Build slide JSON for C5-diagram layout
-    SLIDE_JSON=$(jq -n \
-        --arg title "$title" \
-        --arg subtitle "v2.2 | $axis_preset | $theme ($theme_mode)" \
-        --argjson diagram_html "$HTML_ESCAPED" \
-        '{
-            layout: "C5-diagram",
-            content: {
-                slide_title: $title,
-                subtitle: $subtitle,
-                diagram_html: $diagram_html,
-                presentation_name: "IDEA_BOARD v2.2 Multi-Instance Test",
-                logo: " "
-            }
-        }')
+    # Build C1-text slide with EMPTY body (diagram added via /diagrams API later)
+    TITLE_ESCAPED=$(echo "$title" | jq -Rs . | sed 's/^"//;s/"$//')
+    C1_SLIDE="{
+        \"layout\": \"C1-text\",
+        \"content\": {
+            \"slide_title\": \"$TITLE_ESCAPED\",
+            \"subtitle\": \"v2.2 | $axis_preset | $theme ($theme_mode)\",
+            \"body\": \"\",
+            \"footer_text\": \"IDEA_BOARD v2.2.0 Multi-Instance Test\",
+            \"logo\": \" \"
+        }
+    }"
 
-    # Add to slides array
-    if [ "$FIRST_SLIDE" = true ]; then
-        SLIDES_JSON="$SLIDES_JSON$SLIDE_JSON"
-        FIRST_SLIDE=false
+    # Append to slides array
+    if [ -z "$C1_SLIDES" ]; then
+        C1_SLIDES="$C1_SLIDE"
     else
-        SLIDES_JSON="$SLIDES_JSON,$SLIDE_JSON"
+        C1_SLIDES="$C1_SLIDES,$C1_SLIDE"
     fi
 
     ((SUCCESS_COUNT++))
     echo ""
 done
-
-# Close slides array
-SLIDES_JSON="$SLIDES_JSON]"
 
 echo "=============================================="
 echo "  Generation Summary: $SUCCESS_COUNT / ${#SLIDES[@]} slides"
@@ -262,23 +304,21 @@ if [ $SUCCESS_COUNT -eq 0 ]; then
 fi
 
 # Save slides JSON
-echo "$SLIDES_JSON" > "$OUTPUT_DIR/slides.json"
+echo "[$C1_SLIDES]" > "$OUTPUT_DIR/slides.json"
 
 # ============================================
-# Create Presentation via Layout Service
+# Create Presentation via Layout Service (empty slides first)
 # ============================================
 echo "--- Creating Presentation via Layout Service ---"
 echo ""
 
-LAYOUT_REQUEST=$(jq -n \
-    --arg title "IDEA_BOARD v2.2 Multi-Instance Test ($SUCCESS_COUNT slides)" \
-    --argjson slides "$SLIDES_JSON" \
-    '{
-        title: $title,
-        slides: $slides
-    }')
+LAYOUT_REQUEST="{
+    \"title\": \"IDEA_BOARD v2.2 Multi-Instance Test ($SUCCESS_COUNT slides) - $TIMESTAMP\",
+    \"template_id\": \"L25\",
+    \"slides\": [$C1_SLIDES]
+}"
 
-echo "$LAYOUT_REQUEST" > "$OUTPUT_DIR/layout_request.json"
+echo "$LAYOUT_REQUEST" | jq . > "$OUTPUT_DIR/layout_request.json"
 
 LAYOUT_RESPONSE=$(curl -s -X POST "$LAYOUT_URL/api/presentations" \
     -H "Content-Type: application/json" \
@@ -286,15 +326,48 @@ LAYOUT_RESPONSE=$(curl -s -X POST "$LAYOUT_URL/api/presentations" \
 
 echo "$LAYOUT_RESPONSE" > "$OUTPUT_DIR/layout_response.json"
 
-PRES_ID=$(echo "$LAYOUT_RESPONSE" | jq -r '.id')
+PRES_ID=$(echo "$LAYOUT_RESPONSE" | jq -r '.id // .presentation_id // ""')
 
-if [ "$PRES_ID" = "null" ] || [ -z "$PRES_ID" ]; then
+if [ -z "$PRES_ID" ] || [ "$PRES_ID" = "null" ]; then
     echo -e "${RED}Layout Service failed to create presentation${NC}"
     echo "$LAYOUT_RESPONSE" | jq . 2>/dev/null || echo "$LAYOUT_RESPONSE"
     exit 1
 fi
 
 URL="$LAYOUT_URL/p/$PRES_ID"
+echo -e "${GREEN}Presentation Created: SUCCESS${NC}"
+echo "  ID: $PRES_ID"
+echo "  URL: $URL"
+echo ""
+
+# ============================================
+# Add ALL IDEA_BOARD Elements via Diagram API (in iframes)
+# ============================================
+if [ ${#ALL_POSITIONED_SLIDES[@]} -gt 0 ]; then
+    echo "--- Adding IDEA_BOARD Elements via Diagram API (iframe isolation) ---"
+    echo "  ${#ALL_POSITIONED_SLIDES[@]} elements to add..."
+    echo ""
+
+    ELEMENT_SUCCESS=0
+    ELEMENT_FAIL=0
+
+    for i in "${!ALL_POSITIONED_SLIDES[@]}"; do
+        # Parse slide info: "slide_idx:start_col:width:height"
+        IFS=':' read -r slide_idx start_col width height <<< "${ALL_POSITIONED_SLIDES[$i]}"
+        html="${ALL_POSITIONED_HTML[$i]}"
+
+        echo -e "  ${BLUE}Adding element to slide $((slide_idx + 1))${NC} (grid-column: $start_col/$(($start_col + $width)))"
+
+        if add_positioned_element "$PRES_ID" "$slide_idx" "$html" "$start_col" "$width" "$height" 4; then
+            ELEMENT_SUCCESS=$((ELEMENT_SUCCESS + 1))
+        else
+            ELEMENT_FAIL=$((ELEMENT_FAIL + 1))
+        fi
+    done
+
+    echo ""
+    echo -e "  Element insertion: ${GREEN}$ELEMENT_SUCCESS${NC} success, ${RED}$ELEMENT_FAIL${NC} failed"
+fi
 
 echo ""
 echo "=============================================="
@@ -318,17 +391,15 @@ echo "  [ ] Click expand button (↗) → Detail panel opens"
 echo "  [ ] Hover over card 500ms → Preview tooltip appears"
 echo "  [ ] Click + drag >5px → Card moves, panel does NOT open"
 echo ""
-echo "Multi-Instance Isolation:"
+echo "Multi-Instance Isolation (CRITICAL - each slide has its own iframe):"
 echo "  [ ] Go to Slide 1, click 'Add Idea' → Modal opens ON SLIDE 1"
 echo "  [ ] Go to Slide 3, click 'Add Idea' → Modal opens ON SLIDE 3"
 echo "  [ ] Drag card on Slide 2 → Only Slide 2 card moves"
 echo "  [ ] Click card on Slide 4 → Detail panel for Slide 4"
 echo ""
-echo "Browser Console Verification:"
-echo "  [ ] Run: Object.keys(window.ideaboards).length"
-echo "  [ ] Expected: 4 (one per slide)"
-echo "  [ ] Run: Object.keys(window.ideaboards)"
-echo "  [ ] Expected: Array of 4 unique ideaboard-* IDs"
+echo "Browser Console Verification (inside each slide's iframe):"
+echo "  [ ] Each iframe has its own window.ideaboards namespace"
+echo "  [ ] No cross-slide interference"
 echo ""
 echo "Output: $OUTPUT_DIR"
 echo ""
@@ -342,10 +413,11 @@ echo "=============================================="
 echo "  Test Complete"
 echo "=============================================="
 echo ""
-echo -e "Passed: ${GREEN}$SUCCESS_COUNT${NC} | Failed: ${RED}$FAIL_COUNT${NC}"
+echo -e "Generated: ${GREEN}$SUCCESS_COUNT${NC} | Failed: ${RED}$FAIL_COUNT${NC}"
+echo -e "Elements Added: ${GREEN}$ELEMENT_SUCCESS${NC} | Failed: ${RED}$ELEMENT_FAIL${NC}"
 echo ""
 
-if [ $FAIL_COUNT -eq 0 ]; then
+if [ $FAIL_COUNT -eq 0 ] && [ $ELEMENT_FAIL -eq 0 ]; then
     exit 0
 else
     exit 1
