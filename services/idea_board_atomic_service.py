@@ -245,7 +245,7 @@ class IdeaBoardGenerator:
     min-width: {pixel_width}px;
     min-height: {pixel_height}px;
     position: relative;
-    background: var(--board-bg);
+    background: {theme_colors["board_bg"]};
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     padding: {request.external_margin}px;
@@ -930,12 +930,8 @@ class IdeaBoardGenerator:
         y_high: '{axis_config["y_high"]}'
     }};
 
-    // Get container and elements
-    var container = document.getElementById(containerId);
-    var board = container.querySelector('.idea-board');
-    var ideasContainer = container.querySelector('.ideas-container');
-    var modal = document.getElementById('idea-modal');
-    var detailPanel = document.getElementById('detail-panel');
+    // DOM elements (initialized in init())
+    var container, board, ideasContainer, modal, detailPanel;
 
     // Ideas state
     var ideasState = {ideas_json};
@@ -945,6 +941,22 @@ class IdeaBoardGenerator:
     // ============================================
 
     function init() {{
+        // Get DOM elements inside init() to ensure DOM is ready
+        container = document.getElementById(containerId);
+        if (!container) {{
+            console.error('[IdeaBoard] Container not found:', containerId);
+            return;
+        }}
+        board = container.querySelector('.idea-board');
+        ideasContainer = container.querySelector('.ideas-container');
+        modal = document.getElementById('idea-modal');
+        detailPanel = document.getElementById('detail-panel');
+
+        if (!board || !ideasContainer) {{
+            console.error('[IdeaBoard] Required elements not found');
+            return;
+        }}
+
         initDragDrop();
         initScoreSelector();
         listenForParentMessages();
@@ -1039,6 +1051,10 @@ class IdeaBoardGenerator:
     var dragOffset = {{ x: 0, y: 0 }};
 
     function initDragDrop() {{
+        if (!ideasContainer) {{
+            console.warn('[IdeaBoard] ideasContainer not found, skipping drag init');
+            return;
+        }}
         ideasContainer.querySelectorAll('.idea-card').forEach(function(card) {{
             card.addEventListener('mousedown', startDrag);
             card.addEventListener('click', handleCardClick);
@@ -1506,10 +1522,14 @@ class IdeaBoardGenerator:
     }}
 
     // ============================================
-    // INITIALIZE
+    // INITIALIZE - Wait for DOM ready
     // ============================================
 
-    init();
+    if (document.readyState === 'loading') {{
+        document.addEventListener('DOMContentLoaded', init);
+    }} else {{
+        init();
+    }}
 
 }})();
 </script>'''
