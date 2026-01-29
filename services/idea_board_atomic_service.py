@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.3.0
+IDEA_BOARD HTML Generation Service v2.3.1
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,11 @@ Includes embedded CSS and JavaScript for:
 - Click-to-expand detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.3.1 Escape Sequence Fix:
+- Fixed Python f-string escape bug in expand button onclick handler
+- Changed \' to \\' to produce literal backslash in JavaScript output
+- ideaboards['id'] onclick handlers now correctly escaped for JS parsing
 
 v2.3.0 Iframe Script Execution Fix:
 - Restructured HTML to match Gantt pattern (script inside container)
@@ -147,7 +152,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.3.0"
+                    "version": "2.3.1"
                 },
                 grid_position=grid_position
             )
@@ -237,7 +242,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.3.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.3.1 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -983,7 +988,7 @@ class IdeaBoardGenerator:
 
     <script>
     /* ============================================
-       IDEA_BOARD JavaScript v2.3.0 - Iframe Script Execution Fix
+       IDEA_BOARD JavaScript v2.3.1 - Escape Sequence Fix
        ============================================ */
 
     // v2.1: Create global registry for multi-instance support
@@ -1423,7 +1428,7 @@ class IdeaBoardGenerator:
         // v2.2: Include expand button and hover preview
         var previewText = idea.why ? (idea.why.length > 30 ? idea.why.substring(0, 30) + '...' : idea.why) : 'Click to view details';
         card.innerHTML = '<span class="idea-name">' + escapeHtml(idea.name) + '</span>' +
-            '<button class="expand-btn" onclick="event.stopPropagation(); ideaboards[\'' + containerId + '\'].showDetail(\'' + idea.id + '\')">↗</button>' +
+            '<button class="expand-btn" onclick="event.stopPropagation(); ideaboards[\\'' + containerId + '\\'].showDetail(\\'' + idea.id + '\\')">↗</button>' +
             '<div class="hover-preview">' + escapeHtml(previewText) + '</div>';
 
         var boardRect = board.getBoundingClientRect();
