@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.2.0
+IDEA_BOARD HTML Generation Service v2.3.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,13 @@ Includes embedded CSS and JavaScript for:
 - Click-to-expand detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.3.0 Iframe Script Execution Fix:
+- Restructured HTML to match Gantt pattern (script inside container)
+- Modal and script moved inside .idea-board-container div
+- Changed wrapper reference to direct container parent reference
+- document.currentScript.parentElement now returns actual container
+- Fixed script not executing when rendered via Diagram Element API (iframe)
 
 v2.2.0 Click vs Drag UX Fix:
 - Added drag threshold (5px) to distinguish click from drag intent
@@ -140,7 +147,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.2.0"
+                    "version": "2.3.0"
                 },
                 grid_position=grid_position
             )
@@ -230,7 +237,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.2.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.3.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -924,11 +931,11 @@ class IdeaBoardGenerator:
         </div>
         <button class="panel-edit-btn" onclick="ideaboards['{element_id}'].editFromPanel()">Edit Idea</button>
     </div>
-</div>
 
-<!-- Modal (outside container for proper z-index) -->
-<div class="modal-overlay" id="idea-modal-{element_id}">
-    <div class="modal-dialog">
+    <!-- v2.3: Modal moved inside container for iframe script execution -->
+    <!-- z-index: 1000 ensures it overlays everything within container -->
+    <div class="modal-overlay" id="idea-modal-{element_id}">
+        <div class="modal-dialog">
         <div class="modal-header">
             <h3 id="modal-title-{element_id}">Add Idea</h3>
             <button class="modal-close" onclick="ideaboards['{element_id}'].closeModal()">&times;</button>
@@ -970,43 +977,50 @@ class IdeaBoardGenerator:
             <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="ideaboards['{element_id}'].deleteIdea()" style="display:none;">Delete</button>
             <button class="btn btn-secondary" onclick="ideaboards['{element_id}'].closeModal()">Cancel</button>
             <button class="btn btn-primary" onclick="ideaboards['{element_id}'].saveIdea()">Save</button>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-/* ============================================
-   IDEA_BOARD JavaScript v2.2.0 - Multi-Instance + Click/Drag UX
-   ============================================ */
+    <script>
+    /* ============================================
+       IDEA_BOARD JavaScript v2.3.0 - Iframe Script Execution Fix
+       ============================================ */
 
-// v2.1: Create global registry for multi-instance support
-window.ideaboards = window.ideaboards || {{}};
+    // v2.1: Create global registry for multi-instance support
+    window.ideaboards = window.ideaboards || {{}};
 
-(function() {{
-    'use strict';
+    (function() {{
+        'use strict';
 
-    // Capture wrapper BEFORE anything else (document.currentScript only works during initial script execution)
-    var wrapper = document.currentScript.parentElement;
+        // v2.3: Script is now INSIDE the container (like Gantt pattern)
+        // document.currentScript.parentElement returns the actual container,
+        // not the body - fixing iframe script execution issues
+        var container = document.currentScript.parentElement;
+        var containerId = container.id;
 
-    // Configuration
-    var containerId = '{element_id}';
-    var ideaBoardId = containerId;
-    var presentationId = '';  // v2.0: Added for postMessage protocol
-    var currentEditingIdea = null;
-    var selectedScore = 0;
+        // Verify we got the right container
+        if (!container || !container.classList.contains('idea-board-container')) {{
+            console.error('[IdeaBoard v2.3] Script parent is not idea-board-container:', container);
+            return;
+        }}
 
-    // Axis configuration state
-    var axisConfig = {{
-        x_label: '{axis_config["x_label"]}',
-        y_label: '{axis_config["y_label"]}',
-        x_low: '{axis_config["x_low"]}',
-        x_high: '{axis_config["x_high"]}',
-        y_low: '{axis_config["y_low"]}',
-        y_high: '{axis_config["y_high"]}'
-    }};
+        var ideaBoardId = containerId;
+        var presentationId = '';  // v2.0: Added for postMessage protocol
+        var currentEditingIdea = null;
+        var selectedScore = 0;
 
-    // DOM elements (initialized in init())
-    var container, board, ideasContainer, modal, detailPanel;
+        // Axis configuration state
+        var axisConfig = {{
+            x_label: '{axis_config["x_label"]}',
+            y_label: '{axis_config["y_label"]}',
+            x_low: '{axis_config["x_low"]}',
+            x_high: '{axis_config["x_high"]}',
+            y_low: '{axis_config["y_low"]}',
+            y_high: '{axis_config["y_high"]}'
+        }};
+
+        // DOM elements (initialized in init())
+        var board, ideasContainer, modal, detailPanel;
 
     // Ideas state
     var ideasState = {ideas_json};
@@ -1015,35 +1029,31 @@ window.ideaboards = window.ideaboards || {{}};
     // INITIALIZATION
     // ============================================
 
-    function init() {{
-        // Get DOM elements using wrapper-relative queries to avoid duplicate ID issues
-        container = wrapper.querySelector('#' + containerId);
-        if (!container) {{
-            console.error('[IdeaBoard] Container not found:', containerId);
-            return;
-        }}
-        board = container.querySelector('.idea-board');
-        ideasContainer = container.querySelector('.ideas-container');
-        modal = wrapper.querySelector('#idea-modal-' + containerId);
-        detailPanel = container.querySelector('#detail-panel-' + containerId);
+        function init() {{
+            // v2.3: Container already set from document.currentScript.parentElement
+            board = container.querySelector('.idea-board');
+            ideasContainer = container.querySelector('.ideas-container');
+            // v2.3: Modal is now inside container, use container.querySelector
+            modal = container.querySelector('.modal-overlay');
+            detailPanel = container.querySelector('.detail-panel');
 
-        if (!board || !ideasContainer) {{
-            console.error('[IdeaBoard] Required elements not found');
-            return;
-        }}
+            if (!board || !ideasContainer) {{
+                console.error('[IdeaBoard v2.3] Required elements not found in container');
+                return;
+            }}
 
-        initDragDrop();
-        initScoreSelector();
-        listenForParentMessages();
-        console.log('[IdeaBoard v2.2] Initialized:', containerId);
-    }}
+            initDragDrop();
+            initScoreSelector();
+            listenForParentMessages();
+            console.log('[IdeaBoard v2.3] Initialized:', containerId);
+        }}
 
     // ============================================
     // AXIS CUSTOMIZATION
     // ============================================
 
     function handleAxisChange(axis, value) {{
-        var customInput = wrapper.querySelector('#' + axis + '-axis-custom-' + containerId);
+        var customInput = container.querySelector('#' + axis + '-axis-custom-' + containerId);
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
 
         if (value === 'custom') {{
@@ -1071,8 +1081,8 @@ window.ideaboards = window.ideaboards || {{}};
         if (!value || !value.trim()) return;
 
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
-        var customInput = wrapper.querySelector('#' + axis + '-axis-custom-' + containerId);
-        var selectElement = wrapper.querySelector('#' + axis + '-axis-select-' + containerId);
+        var customInput = container.querySelector('#' + axis + '-axis-custom-' + containerId);
+        var selectElement = container.querySelector('#' + axis + '-axis-select-' + containerId);
 
         if (labelElement) labelElement.textContent = value.toUpperCase();
         customInput.style.display = 'none';
@@ -1276,8 +1286,8 @@ window.ideaboards = window.ideaboards || {{}};
 
     function openAddModal() {{
         currentEditingIdea = null;
-        wrapper.querySelector('#modal-title-' + containerId).textContent = 'Add Idea';
-        wrapper.querySelector('#modal-delete-' + containerId).style.display = 'none';
+        container.querySelector('#modal-title-' + containerId).textContent = 'Add Idea';
+        container.querySelector('#modal-delete-' + containerId).style.display = 'none';
         clearModalFields();
         modal.classList.add('open');
     }}
@@ -1287,8 +1297,8 @@ window.ideaboards = window.ideaboards || {{}};
         if (!idea) return;
 
         currentEditingIdea = idea;
-        wrapper.querySelector('#modal-title-' + containerId).textContent = 'Edit Idea';
-        wrapper.querySelector('#modal-delete-' + containerId).style.display = 'block';
+        container.querySelector('#modal-title-' + containerId).textContent = 'Edit Idea';
+        container.querySelector('#modal-delete-' + containerId).style.display = 'block';
         populateModalFields(idea);
         modal.classList.add('open');
     }}
@@ -1299,20 +1309,20 @@ window.ideaboards = window.ideaboards || {{}};
     }}
 
     function clearModalFields() {{
-        wrapper.querySelector('#modal-name-' + containerId).value = '';
-        wrapper.querySelector('#modal-color-' + containerId).value = 'blue';
-        wrapper.querySelector('#modal-why-' + containerId).value = '';
-        wrapper.querySelector('#modal-how-' + containerId).value = '';
-        wrapper.querySelector('#modal-what-' + containerId).value = '';
+        container.querySelector('#modal-name-' + containerId).value = '';
+        container.querySelector('#modal-color-' + containerId).value = 'blue';
+        container.querySelector('#modal-why-' + containerId).value = '';
+        container.querySelector('#modal-how-' + containerId).value = '';
+        container.querySelector('#modal-what-' + containerId).value = '';
         setSelectedScore(0);
     }}
 
     function populateModalFields(idea) {{
-        wrapper.querySelector('#modal-name-' + containerId).value = idea.name;
-        wrapper.querySelector('#modal-color-' + containerId).value = idea.color;
-        wrapper.querySelector('#modal-why-' + containerId).value = idea.why || '';
-        wrapper.querySelector('#modal-how-' + containerId).value = idea.how || '';
-        wrapper.querySelector('#modal-what-' + containerId).value = idea.what || '';
+        container.querySelector('#modal-name-' + containerId).value = idea.name;
+        container.querySelector('#modal-color-' + containerId).value = idea.color;
+        container.querySelector('#modal-why-' + containerId).value = idea.why || '';
+        container.querySelector('#modal-how-' + containerId).value = idea.how || '';
+        container.querySelector('#modal-what-' + containerId).value = idea.what || '';
         setSelectedScore(idea.benefit_score || 0);
     }}
 
@@ -1321,7 +1331,7 @@ window.ideaboards = window.ideaboards || {{}};
     // ============================================
 
     function initScoreSelector() {{
-        var selector = wrapper.querySelector('#score-selector-' + containerId);
+        var selector = container.querySelector('#score-selector-' + containerId);
         if (!selector) return;
         selector.querySelectorAll('.score-btn').forEach(function(btn) {{
             btn.addEventListener('click', function() {{
@@ -1333,7 +1343,7 @@ window.ideaboards = window.ideaboards || {{}};
 
     function setSelectedScore(score) {{
         selectedScore = score;
-        var selector = wrapper.querySelector('#score-selector-' + containerId);
+        var selector = container.querySelector('#score-selector-' + containerId);
         if (!selector) return;
         selector.querySelectorAll('.score-btn').forEach(function(btn) {{
             var btnScore = parseInt(btn.dataset.score);
@@ -1350,7 +1360,7 @@ window.ideaboards = window.ideaboards || {{}};
     // ============================================
 
     function saveIdea() {{
-        var name = wrapper.querySelector('#modal-name-' + containerId).value.trim();
+        var name = container.querySelector('#modal-name-' + containerId).value.trim();
         if (!name) {{
             alert('Please enter an idea name');
             return;
@@ -1358,10 +1368,10 @@ window.ideaboards = window.ideaboards || {{}};
 
         var ideaData = {{
             name: name,
-            color: wrapper.querySelector('#modal-color-' + containerId).value,
-            why: wrapper.querySelector('#modal-why-' + containerId).value.trim(),
-            how: wrapper.querySelector('#modal-how-' + containerId).value.trim(),
-            what: wrapper.querySelector('#modal-what-' + containerId).value.trim(),
+            color: container.querySelector('#modal-color-' + containerId).value,
+            why: container.querySelector('#modal-why-' + containerId).value.trim(),
+            how: container.querySelector('#modal-how-' + containerId).value.trim(),
+            what: container.querySelector('#modal-what-' + containerId).value.trim(),
             benefit_score: selectedScore
         }};
 
@@ -1454,8 +1464,8 @@ window.ideaboards = window.ideaboards || {{}};
 
         currentEditingIdea = idea;
 
-        wrapper.querySelector('#panel-name-' + containerId).textContent = idea.name;
-        wrapper.querySelector('#panel-color-' + containerId).style.background = getColorBorder(idea.color);
+        container.querySelector('#panel-name-' + containerId).textContent = idea.name;
+        container.querySelector('#panel-color-' + containerId).style.background = getColorBorder(idea.color);
 
         setDetailContent('panel-why-' + containerId, idea.why);
         setDetailContent('panel-how-' + containerId, idea.how);
@@ -1478,7 +1488,7 @@ window.ideaboards = window.ideaboards || {{}};
     }}
 
     function setDetailContent(elementId, content) {{
-        var el = wrapper.querySelector('#' + elementId);
+        var el = container.querySelector('#' + elementId);
         if (!el) return;
         if (content && content.trim()) {{
             el.textContent = content;
@@ -1490,7 +1500,7 @@ window.ideaboards = window.ideaboards || {{}};
     }}
 
     function renderStars(elementId, score) {{
-        var el = wrapper.querySelector('#' + elementId);
+        var el = container.querySelector('#' + elementId);
         if (!el) return;
         var html = '';
         for (var i = 1; i <= 5; i++) {{
@@ -1561,7 +1571,7 @@ window.ideaboards = window.ideaboards || {{}};
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.2] State change notified:', action);
+            console.log('[IdeaBoard v2.3] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1579,7 +1589,7 @@ window.ideaboards = window.ideaboards || {{}};
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.2] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.3] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -1595,7 +1605,7 @@ window.ideaboards = window.ideaboards || {{}};
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.2] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.3] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -1623,8 +1633,8 @@ window.ideaboards = window.ideaboards || {{}};
         if (yHighEl && config.y_high) yHighEl.textContent = config.y_high;
 
         // Update select dropdowns to match restored config
-        var xSelect = wrapper.querySelector('#x-axis-select-' + containerId);
-        var ySelect = wrapper.querySelector('#y-axis-select-' + containerId);
+        var xSelect = container.querySelector('#x-axis-select-' + containerId);
+        var ySelect = container.querySelector('#y-axis-select-' + containerId);
         if (xSelect) updateSelectToMatch(xSelect, config.x_label);
         if (ySelect) updateSelectToMatch(ySelect, config.y_label);
     }}
@@ -1678,10 +1688,11 @@ window.ideaboards = window.ideaboards || {{}};
 
     init();
 
-    console.log('[IdeaBoard v2.2] Registered namespace:', containerId);
+        console.log('[IdeaBoard v2.3] Registered namespace:', containerId);
 
-}})();
-</script>'''
+    }})();
+    </script>
+</div>'''
 
         return html
 
