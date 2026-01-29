@@ -776,7 +776,7 @@ class IdeaBoardGenerator:
         <!-- Y-Axis with Selector -->
         <div class="y-axis-container">
             <span class="axis-label y-axis-label-text">{axis_config["y_label"]}</span>
-            <select class="axis-selector" id="y-axis-select" onchange="handleAxisChange('y', this.value)">
+            <select class="axis-selector" id="y-axis-select-{element_id}" onchange="handleAxisChange('y', this.value)">
                 <option value="impact" {self._get_selected(axis_config["y_label"], "IMPACT")}>Impact</option>
                 <option value="urgency" {self._get_selected(axis_config["y_label"], "URGENCY")}>Urgency</option>
                 <option value="value" {self._get_selected(axis_config["y_label"], "VALUE")}>Value</option>
@@ -785,7 +785,7 @@ class IdeaBoardGenerator:
                 <option value="desirability" {self._get_selected(axis_config["y_label"], "DESIRABILITY")}>Desirability</option>
                 <option value="custom">Custom...</option>
             </select>
-            <input type="text" class="axis-custom-input" id="y-axis-custom"
+            <input type="text" class="axis-custom-input" id="y-axis-custom-{element_id}"
                    placeholder="Custom label" style="display:none;"
                    onchange="applyCustomAxis('y', this.value)" onblur="applyCustomAxis('y', this.value)">
         </div>
@@ -795,7 +795,7 @@ class IdeaBoardGenerator:
         <!-- X-Axis with Selector -->
         <div class="x-axis-container">
             <span class="axis-label x-axis-label-text">{axis_config["x_label"]}</span>
-            <select class="axis-selector" id="x-axis-select" onchange="handleAxisChange('x', this.value)">
+            <select class="axis-selector" id="x-axis-select-{element_id}" onchange="handleAxisChange('x', this.value)">
                 <option value="urgency" {self._get_selected(axis_config["x_label"], "URGENCY")}>Urgency</option>
                 <option value="impact" {self._get_selected(axis_config["x_label"], "IMPACT")}>Impact</option>
                 <option value="effort" {self._get_selected(axis_config["x_label"], "EFFORT")}>Effort</option>
@@ -804,7 +804,7 @@ class IdeaBoardGenerator:
                 <option value="feasibility" {self._get_selected(axis_config["x_label"], "FEASIBILITY")}>Feasibility</option>
                 <option value="custom">Custom...</option>
             </select>
-            <input type="text" class="axis-custom-input" id="x-axis-custom"
+            <input type="text" class="axis-custom-input" id="x-axis-custom-{element_id}"
                    placeholder="Custom label" style="display:none;"
                    onchange="applyCustomAxis('x', this.value)" onblur="applyCustomAxis('x', this.value)">
         </div>
@@ -831,65 +831,65 @@ class IdeaBoardGenerator:
     </div>
 
     <!-- Detail Panel (slides in from right) -->
-    <div class="detail-panel" id="detail-panel">
+    <div class="detail-panel" id="detail-panel-{element_id}">
         <button class="panel-close" onclick="closeDetailPanel()">&times;</button>
         <div class="panel-header">
-            <h4 class="panel-name" id="panel-name"></h4>
-            <div class="panel-color-indicator" id="panel-color"></div>
+            <h4 class="panel-name" id="panel-name-{element_id}"></h4>
+            <div class="panel-color-indicator" id="panel-color-{element_id}"></div>
         </div>
         <div class="panel-section">
             <span class="panel-label">WHY</span>
-            <p class="panel-content" id="panel-why"></p>
+            <p class="panel-content" id="panel-why-{element_id}"></p>
         </div>
         <div class="panel-section">
             <span class="panel-label">HOW</span>
-            <p class="panel-content" id="panel-how"></p>
+            <p class="panel-content" id="panel-how-{element_id}"></p>
         </div>
         <div class="panel-section">
             <span class="panel-label">WHAT</span>
-            <p class="panel-content" id="panel-what"></p>
+            <p class="panel-content" id="panel-what-{element_id}"></p>
         </div>
         <div class="panel-section">
             <span class="panel-label">BENEFIT SCORE</span>
-            <div class="star-rating" id="panel-stars"></div>
+            <div class="star-rating" id="panel-stars-{element_id}"></div>
         </div>
         <button class="panel-edit-btn" onclick="editFromPanel()">Edit Idea</button>
     </div>
 </div>
 
 <!-- Modal (outside container for proper z-index) -->
-<div class="modal-overlay" id="idea-modal">
+<div class="modal-overlay" id="idea-modal-{element_id}">
     <div class="modal-dialog">
         <div class="modal-header">
-            <h3 id="modal-title">Add Idea</h3>
+            <h3 id="modal-title-{element_id}">Add Idea</h3>
             <button class="modal-close" onclick="closeModal()">&times;</button>
         </div>
         <div class="form-group">
-            <label for="modal-name">Idea Name (max 20 chars)</label>
-            <input type="text" id="modal-name" maxlength="20" placeholder="Enter idea name...">
+            <label for="modal-name-{element_id}">Idea Name (max 20 chars)</label>
+            <input type="text" id="modal-name-{element_id}" maxlength="20" placeholder="Enter idea name...">
         </div>
         <div class="form-group">
-            <label for="modal-color">Color</label>
-            <select id="modal-color">
+            <label for="modal-color-{element_id}">Color</label>
+            <select id="modal-color-{element_id}">
                 {color_options_html}
             </select>
         </div>
         <div class="form-divider"></div>
         <div class="form-group">
-            <label for="modal-why">Why is this useful?</label>
-            <textarea id="modal-why" rows="2" placeholder="Explain the rationale..."></textarea>
+            <label for="modal-why-{element_id}">Why is this useful?</label>
+            <textarea id="modal-why-{element_id}" rows="2" placeholder="Explain the rationale..."></textarea>
         </div>
         <div class="form-group">
-            <label for="modal-how">How will we do it?</label>
-            <textarea id="modal-how" rows="2" placeholder="Describe the approach..."></textarea>
+            <label for="modal-how-{element_id}">How will we do it?</label>
+            <textarea id="modal-how-{element_id}" rows="2" placeholder="Describe the approach..."></textarea>
         </div>
         <div class="form-group">
-            <label for="modal-what">What are the benefits?</label>
-            <textarea id="modal-what" rows="2" placeholder="List expected outcomes..."></textarea>
+            <label for="modal-what-{element_id}">What are the benefits?</label>
+            <textarea id="modal-what-{element_id}" rows="2" placeholder="List expected outcomes..."></textarea>
         </div>
         <div class="form-group">
             <label>Benefit Score</label>
-            <div class="score-selector" id="score-selector">
+            <div class="score-selector" id="score-selector-{element_id}">
                 <button type="button" class="score-btn" data-score="1">1</button>
                 <button type="button" class="score-btn" data-score="2">2</button>
                 <button type="button" class="score-btn" data-score="3">3</button>
@@ -898,7 +898,7 @@ class IdeaBoardGenerator:
             </div>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-danger" id="modal-delete" onclick="deleteIdea()" style="display:none;">Delete</button>
+            <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="deleteIdea()" style="display:none;">Delete</button>
             <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
             <button class="btn btn-primary" onclick="saveIdea()">Save</button>
         </div>
@@ -912,6 +912,9 @@ class IdeaBoardGenerator:
 
 (function() {{
     'use strict';
+
+    // Capture wrapper BEFORE anything else (document.currentScript only works during initial script execution)
+    var wrapper = document.currentScript.parentElement;
 
     // Configuration
     var containerId = '{element_id}';
@@ -941,16 +944,16 @@ class IdeaBoardGenerator:
     // ============================================
 
     function init() {{
-        // Get DOM elements inside init() to ensure DOM is ready
-        container = document.getElementById(containerId);
+        // Get DOM elements using wrapper-relative queries to avoid duplicate ID issues
+        container = wrapper.querySelector('#' + containerId);
         if (!container) {{
             console.error('[IdeaBoard] Container not found:', containerId);
             return;
         }}
         board = container.querySelector('.idea-board');
         ideasContainer = container.querySelector('.ideas-container');
-        modal = document.getElementById('idea-modal');
-        detailPanel = document.getElementById('detail-panel');
+        modal = wrapper.querySelector('#idea-modal-' + containerId);
+        detailPanel = container.querySelector('#detail-panel-' + containerId);
 
         if (!board || !ideasContainer) {{
             console.error('[IdeaBoard] Required elements not found');
@@ -968,7 +971,7 @@ class IdeaBoardGenerator:
     // ============================================
 
     window.handleAxisChange = function(axis, value) {{
-        var customInput = document.getElementById(axis + '-axis-custom');
+        var customInput = wrapper.querySelector('#' + axis + '-axis-custom-' + containerId);
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
 
         if (value === 'custom') {{
@@ -996,8 +999,8 @@ class IdeaBoardGenerator:
         if (!value || !value.trim()) return;
 
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
-        var customInput = document.getElementById(axis + '-axis-custom');
-        var selectElement = document.getElementById(axis + '-axis-select');
+        var customInput = wrapper.querySelector('#' + axis + '-axis-custom-' + containerId);
+        var selectElement = wrapper.querySelector('#' + axis + '-axis-select-' + containerId);
 
         if (labelElement) labelElement.textContent = value.toUpperCase();
         customInput.style.display = 'none';
@@ -1156,8 +1159,8 @@ class IdeaBoardGenerator:
 
     window.openAddModal = function() {{
         currentEditingIdea = null;
-        document.getElementById('modal-title').textContent = 'Add Idea';
-        document.getElementById('modal-delete').style.display = 'none';
+        wrapper.querySelector('#modal-title-' + containerId).textContent = 'Add Idea';
+        wrapper.querySelector('#modal-delete-' + containerId).style.display = 'none';
         clearModalFields();
         modal.classList.add('open');
     }};
@@ -1167,8 +1170,8 @@ class IdeaBoardGenerator:
         if (!idea) return;
 
         currentEditingIdea = idea;
-        document.getElementById('modal-title').textContent = 'Edit Idea';
-        document.getElementById('modal-delete').style.display = 'block';
+        wrapper.querySelector('#modal-title-' + containerId).textContent = 'Edit Idea';
+        wrapper.querySelector('#modal-delete-' + containerId).style.display = 'block';
         populateModalFields(idea);
         modal.classList.add('open');
     }};
@@ -1179,20 +1182,20 @@ class IdeaBoardGenerator:
     }};
 
     function clearModalFields() {{
-        document.getElementById('modal-name').value = '';
-        document.getElementById('modal-color').value = 'blue';
-        document.getElementById('modal-why').value = '';
-        document.getElementById('modal-how').value = '';
-        document.getElementById('modal-what').value = '';
+        wrapper.querySelector('#modal-name-' + containerId).value = '';
+        wrapper.querySelector('#modal-color-' + containerId).value = 'blue';
+        wrapper.querySelector('#modal-why-' + containerId).value = '';
+        wrapper.querySelector('#modal-how-' + containerId).value = '';
+        wrapper.querySelector('#modal-what-' + containerId).value = '';
         setSelectedScore(0);
     }}
 
     function populateModalFields(idea) {{
-        document.getElementById('modal-name').value = idea.name;
-        document.getElementById('modal-color').value = idea.color;
-        document.getElementById('modal-why').value = idea.why || '';
-        document.getElementById('modal-how').value = idea.how || '';
-        document.getElementById('modal-what').value = idea.what || '';
+        wrapper.querySelector('#modal-name-' + containerId).value = idea.name;
+        wrapper.querySelector('#modal-color-' + containerId).value = idea.color;
+        wrapper.querySelector('#modal-why-' + containerId).value = idea.why || '';
+        wrapper.querySelector('#modal-how-' + containerId).value = idea.how || '';
+        wrapper.querySelector('#modal-what-' + containerId).value = idea.what || '';
         setSelectedScore(idea.benefit_score || 0);
     }}
 
@@ -1201,7 +1204,8 @@ class IdeaBoardGenerator:
     // ============================================
 
     function initScoreSelector() {{
-        var selector = document.getElementById('score-selector');
+        var selector = wrapper.querySelector('#score-selector-' + containerId);
+        if (!selector) return;
         selector.querySelectorAll('.score-btn').forEach(function(btn) {{
             btn.addEventListener('click', function() {{
                 var score = parseInt(this.dataset.score);
@@ -1212,7 +1216,8 @@ class IdeaBoardGenerator:
 
     function setSelectedScore(score) {{
         selectedScore = score;
-        var selector = document.getElementById('score-selector');
+        var selector = wrapper.querySelector('#score-selector-' + containerId);
+        if (!selector) return;
         selector.querySelectorAll('.score-btn').forEach(function(btn) {{
             var btnScore = parseInt(btn.dataset.score);
             if (btnScore <= score && score > 0) {{
@@ -1228,7 +1233,7 @@ class IdeaBoardGenerator:
     // ============================================
 
     window.saveIdea = function() {{
-        var name = document.getElementById('modal-name').value.trim();
+        var name = wrapper.querySelector('#modal-name-' + containerId).value.trim();
         if (!name) {{
             alert('Please enter an idea name');
             return;
@@ -1236,10 +1241,10 @@ class IdeaBoardGenerator:
 
         var ideaData = {{
             name: name,
-            color: document.getElementById('modal-color').value,
-            why: document.getElementById('modal-why').value.trim(),
-            how: document.getElementById('modal-how').value.trim(),
-            what: document.getElementById('modal-what').value.trim(),
+            color: wrapper.querySelector('#modal-color-' + containerId).value,
+            why: wrapper.querySelector('#modal-why-' + containerId).value.trim(),
+            how: wrapper.querySelector('#modal-how-' + containerId).value.trim(),
+            what: wrapper.querySelector('#modal-what-' + containerId).value.trim(),
             benefit_score: selectedScore
         }};
 
@@ -1327,14 +1332,14 @@ class IdeaBoardGenerator:
 
         currentEditingIdea = idea;
 
-        document.getElementById('panel-name').textContent = idea.name;
-        document.getElementById('panel-color').style.background = getColorBorder(idea.color);
+        wrapper.querySelector('#panel-name-' + containerId).textContent = idea.name;
+        wrapper.querySelector('#panel-color-' + containerId).style.background = getColorBorder(idea.color);
 
-        setDetailContent('panel-why', idea.why);
-        setDetailContent('panel-how', idea.how);
-        setDetailContent('panel-what', idea.what);
+        setDetailContent('panel-why-' + containerId, idea.why);
+        setDetailContent('panel-how-' + containerId, idea.how);
+        setDetailContent('panel-what-' + containerId, idea.what);
 
-        renderStars('panel-stars', idea.benefit_score || 0);
+        renderStars('panel-stars-' + containerId, idea.benefit_score || 0);
 
         detailPanel.classList.add('open');
     }}
@@ -1351,7 +1356,8 @@ class IdeaBoardGenerator:
     }};
 
     function setDetailContent(elementId, content) {{
-        var el = document.getElementById(elementId);
+        var el = wrapper.querySelector('#' + elementId);
+        if (!el) return;
         if (content && content.trim()) {{
             el.textContent = content;
             el.classList.remove('empty');
@@ -1362,7 +1368,8 @@ class IdeaBoardGenerator:
     }}
 
     function renderStars(elementId, score) {{
-        var el = document.getElementById(elementId);
+        var el = wrapper.querySelector('#' + elementId);
+        if (!el) return;
         var html = '';
         for (var i = 1; i <= 5; i++) {{
             if (i <= score) {{
@@ -1494,8 +1501,8 @@ class IdeaBoardGenerator:
         if (yHighEl && config.y_high) yHighEl.textContent = config.y_high;
 
         // Update select dropdowns to match restored config
-        var xSelect = document.getElementById('x-axis-select');
-        var ySelect = document.getElementById('y-axis-select');
+        var xSelect = wrapper.querySelector('#x-axis-select-' + containerId);
+        var ySelect = wrapper.querySelector('#y-axis-select-' + containerId);
         if (xSelect) updateSelectToMatch(xSelect, config.x_label);
         if (ySelect) updateSelectToMatch(ySelect, config.y_label);
     }}
