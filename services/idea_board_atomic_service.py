@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.0.0
+IDEA_BOARD HTML Generation Service v2.1.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,12 @@ Includes embedded CSS and JavaScript for:
 - Click-to-expand detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.1.0 Multi-Instance Fix:
+- Fixed modal opening on wrong slide (global function collision)
+- Fixed card drag offset jump (transform: translate(-50%, -50%) not accounted for)
+- All functions now namespaced under window.ideaboards[containerId]
+- Each IDEA_BOARD instance has its own isolated function scope
 
 v2.0.0 Visual Redesign:
 - Post-it style cards with push-pins
@@ -127,7 +133,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.0.0"
+                    "version": "2.1.0"
                 },
                 grid_position=grid_position
             )
@@ -217,7 +223,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.0.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.1.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -776,7 +782,7 @@ class IdeaBoardGenerator:
         <!-- Y-Axis with Selector -->
         <div class="y-axis-container">
             <span class="axis-label y-axis-label-text">{axis_config["y_label"]}</span>
-            <select class="axis-selector" id="y-axis-select-{element_id}" onchange="handleAxisChange('y', this.value)">
+            <select class="axis-selector" id="y-axis-select-{element_id}" onchange="ideaboards['{element_id}'].handleAxisChange('y', this.value)">
                 <option value="impact" {self._get_selected(axis_config["y_label"], "IMPACT")}>Impact</option>
                 <option value="urgency" {self._get_selected(axis_config["y_label"], "URGENCY")}>Urgency</option>
                 <option value="value" {self._get_selected(axis_config["y_label"], "VALUE")}>Value</option>
@@ -787,7 +793,7 @@ class IdeaBoardGenerator:
             </select>
             <input type="text" class="axis-custom-input" id="y-axis-custom-{element_id}"
                    placeholder="Custom label" style="display:none;"
-                   onchange="applyCustomAxis('y', this.value)" onblur="applyCustomAxis('y', this.value)">
+                   onchange="ideaboards['{element_id}'].applyCustomAxis('y', this.value)" onblur="ideaboards['{element_id}'].applyCustomAxis('y', this.value)">
         </div>
         <div class="y-axis-high">{axis_config["y_high"]}</div>
         <div class="y-axis-low">{axis_config["y_low"]}</div>
@@ -795,7 +801,7 @@ class IdeaBoardGenerator:
         <!-- X-Axis with Selector -->
         <div class="x-axis-container">
             <span class="axis-label x-axis-label-text">{axis_config["x_label"]}</span>
-            <select class="axis-selector" id="x-axis-select-{element_id}" onchange="handleAxisChange('x', this.value)">
+            <select class="axis-selector" id="x-axis-select-{element_id}" onchange="ideaboards['{element_id}'].handleAxisChange('x', this.value)">
                 <option value="urgency" {self._get_selected(axis_config["x_label"], "URGENCY")}>Urgency</option>
                 <option value="impact" {self._get_selected(axis_config["x_label"], "IMPACT")}>Impact</option>
                 <option value="effort" {self._get_selected(axis_config["x_label"], "EFFORT")}>Effort</option>
@@ -806,7 +812,7 @@ class IdeaBoardGenerator:
             </select>
             <input type="text" class="axis-custom-input" id="x-axis-custom-{element_id}"
                    placeholder="Custom label" style="display:none;"
-                   onchange="applyCustomAxis('x', this.value)" onblur="applyCustomAxis('x', this.value)">
+                   onchange="ideaboards['{element_id}'].applyCustomAxis('x', this.value)" onblur="ideaboards['{element_id}'].applyCustomAxis('x', this.value)">
         </div>
         <div class="x-axis-low">{axis_config["x_low"]}</div>
         <div class="x-axis-high">{axis_config["x_high"]}</div>
@@ -827,12 +833,12 @@ class IdeaBoardGenerator:
         </div>
 
         <!-- Add Idea Button -->
-        <button class="add-idea-btn" onclick="openAddModal()">+ Add Idea</button>
+        <button class="add-idea-btn" onclick="ideaboards['{element_id}'].openAddModal()">+ Add Idea</button>
     </div>
 
     <!-- Detail Panel (slides in from right) -->
     <div class="detail-panel" id="detail-panel-{element_id}">
-        <button class="panel-close" onclick="closeDetailPanel()">&times;</button>
+        <button class="panel-close" onclick="ideaboards['{element_id}'].closeDetailPanel()">&times;</button>
         <div class="panel-header">
             <h4 class="panel-name" id="panel-name-{element_id}"></h4>
             <div class="panel-color-indicator" id="panel-color-{element_id}"></div>
@@ -853,7 +859,7 @@ class IdeaBoardGenerator:
             <span class="panel-label">BENEFIT SCORE</span>
             <div class="star-rating" id="panel-stars-{element_id}"></div>
         </div>
-        <button class="panel-edit-btn" onclick="editFromPanel()">Edit Idea</button>
+        <button class="panel-edit-btn" onclick="ideaboards['{element_id}'].editFromPanel()">Edit Idea</button>
     </div>
 </div>
 
@@ -862,7 +868,7 @@ class IdeaBoardGenerator:
     <div class="modal-dialog">
         <div class="modal-header">
             <h3 id="modal-title-{element_id}">Add Idea</h3>
-            <button class="modal-close" onclick="closeModal()">&times;</button>
+            <button class="modal-close" onclick="ideaboards['{element_id}'].closeModal()">&times;</button>
         </div>
         <div class="form-group">
             <label for="modal-name-{element_id}">Idea Name (max 20 chars)</label>
@@ -898,17 +904,20 @@ class IdeaBoardGenerator:
             </div>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="deleteIdea()" style="display:none;">Delete</button>
-            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-            <button class="btn btn-primary" onclick="saveIdea()">Save</button>
+            <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="ideaboards['{element_id}'].deleteIdea()" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" onclick="ideaboards['{element_id}'].closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="ideaboards['{element_id}'].saveIdea()">Save</button>
         </div>
     </div>
 </div>
 
 <script>
 /* ============================================
-   IDEA_BOARD JavaScript v2.0.0 - Enhanced
+   IDEA_BOARD JavaScript v2.1.0 - Multi-Instance
    ============================================ */
+
+// v2.1: Create global registry for multi-instance support
+window.ideaboards = window.ideaboards || {{}};
 
 (function() {{
     'use strict';
@@ -963,14 +972,14 @@ class IdeaBoardGenerator:
         initDragDrop();
         initScoreSelector();
         listenForParentMessages();
-        console.log('[IdeaBoard v2.0] Initialized:', containerId);
+        console.log('[IdeaBoard v2.1] Initialized:', containerId);
     }}
 
     // ============================================
     // AXIS CUSTOMIZATION
     // ============================================
 
-    window.handleAxisChange = function(axis, value) {{
+    function handleAxisChange(axis, value) {{
         var customInput = wrapper.querySelector('#' + axis + '-axis-custom-' + containerId);
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
 
@@ -993,9 +1002,9 @@ class IdeaBoardGenerator:
 
             notifyStateChange('axis_change');
         }}
-    }};
+    }}
 
-    window.applyCustomAxis = function(axis, value) {{
+    function applyCustomAxis(axis, value) {{
         if (!value || !value.trim()) return;
 
         var labelElement = container.querySelector('.' + axis + '-axis-label-text');
@@ -1013,7 +1022,7 @@ class IdeaBoardGenerator:
         }}
 
         notifyStateChange('axis_change');
-    }};
+    }}
 
     function updateAxisEndpoints(axis, value) {{
         var presets = {{
@@ -1087,17 +1096,23 @@ class IdeaBoardGenerator:
         if (!isDragging || !draggedCard) return;
 
         var boardRect = board.getBoundingClientRect();
-        var x = e.clientX - boardRect.left - dragOffset.x;
-        var y = e.clientY - boardRect.top - dragOffset.y;
 
+        // v2.1: Calculate position for card CENTER (not top-left)
+        // since cards use transform: translate(-50%, -50%)
         var cardWidth = draggedCard.offsetWidth;
         var cardHeight = draggedCard.offsetHeight;
 
-        x = Math.max(0, Math.min(x, boardRect.width - cardWidth));
-        y = Math.max(0, Math.min(y, boardRect.height - cardHeight));
+        // Position where the CENTER of the card should be
+        var centerX = e.clientX - boardRect.left - dragOffset.x + cardWidth / 2;
+        var centerY = e.clientY - boardRect.top - dragOffset.y + cardHeight / 2;
 
-        draggedCard.style.left = x + 'px';
-        draggedCard.style.top = y + 'px';
+        // Clamp to board bounds (keeping card fully visible)
+        centerX = Math.max(cardWidth / 2, Math.min(centerX, boardRect.width - cardWidth / 2));
+        centerY = Math.max(cardHeight / 2, Math.min(centerY, boardRect.height - cardHeight / 2));
+
+        // Set position (transform will center the card at this point)
+        draggedCard.style.left = centerX + 'px';
+        draggedCard.style.top = centerY + 'px';
     }}
 
     function endDrag(e) {{
@@ -1157,15 +1172,15 @@ class IdeaBoardGenerator:
     // MODAL FUNCTIONS
     // ============================================
 
-    window.openAddModal = function() {{
+    function openAddModal() {{
         currentEditingIdea = null;
         wrapper.querySelector('#modal-title-' + containerId).textContent = 'Add Idea';
         wrapper.querySelector('#modal-delete-' + containerId).style.display = 'none';
         clearModalFields();
         modal.classList.add('open');
-    }};
+    }}
 
-    window.openEditModal = function(ideaId) {{
+    function openEditModal(ideaId) {{
         var idea = findIdea(ideaId);
         if (!idea) return;
 
@@ -1174,12 +1189,12 @@ class IdeaBoardGenerator:
         wrapper.querySelector('#modal-delete-' + containerId).style.display = 'block';
         populateModalFields(idea);
         modal.classList.add('open');
-    }};
+    }}
 
-    window.closeModal = function() {{
+    function closeModal() {{
         modal.classList.remove('open');
         currentEditingIdea = null;
-    }};
+    }}
 
     function clearModalFields() {{
         wrapper.querySelector('#modal-name-' + containerId).value = '';
@@ -1232,7 +1247,7 @@ class IdeaBoardGenerator:
     // SAVE / DELETE IDEA
     // ============================================
 
-    window.saveIdea = function() {{
+    function saveIdea() {{
         var name = wrapper.querySelector('#modal-name-' + containerId).value.trim();
         if (!name) {{
             alert('Please enter an idea name');
@@ -1262,9 +1277,9 @@ class IdeaBoardGenerator:
         }}
 
         closeModal();
-    }};
+    }}
 
-    window.deleteIdea = function() {{
+    function deleteIdea() {{
         if (!currentEditingIdea) return;
 
         if (!confirm('Delete this idea?')) return;
@@ -1282,7 +1297,7 @@ class IdeaBoardGenerator:
         closeModal();
         closeDetailPanel();
         notifyStateChange('delete');
-    }};
+    }}
 
     // ============================================
     // DOM MANIPULATION
@@ -1344,16 +1359,16 @@ class IdeaBoardGenerator:
         detailPanel.classList.add('open');
     }}
 
-    window.closeDetailPanel = function() {{
+    function closeDetailPanel() {{
         detailPanel.classList.remove('open');
-    }};
+    }}
 
-    window.editFromPanel = function() {{
+    function editFromPanel() {{
         if (currentEditingIdea) {{
             closeDetailPanel();
             openEditModal(currentEditingIdea.id);
         }}
-    }};
+    }}
 
     function setDetailContent(elementId, content) {{
         var el = wrapper.querySelector('#' + elementId);
@@ -1439,7 +1454,7 @@ class IdeaBoardGenerator:
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.0] State change notified:', action);
+            console.log('[IdeaBoard v2.1] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1457,7 +1472,7 @@ class IdeaBoardGenerator:
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.0] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.1] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -1473,7 +1488,7 @@ class IdeaBoardGenerator:
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.0] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.1] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -1529,6 +1544,24 @@ class IdeaBoardGenerator:
     }}
 
     // ============================================
+    // NAMESPACE REGISTRATION - v2.1 Multi-Instance Support
+    // ============================================
+    // Register all public functions under namespaced object to prevent
+    // collisions when multiple IDEA_BOARDs exist on different slides.
+
+    window.ideaboards[containerId] = {{
+        openAddModal: openAddModal,
+        closeModal: closeModal,
+        saveIdea: saveIdea,
+        deleteIdea: deleteIdea,
+        closeDetailPanel: closeDetailPanel,
+        editFromPanel: editFromPanel,
+        handleAxisChange: handleAxisChange,
+        applyCustomAxis: applyCustomAxis,
+        openEditModal: openEditModal
+    }};
+
+    // ============================================
     // INITIALIZE
     // ============================================
     // Call init() directly - all HTML elements are before this script
@@ -1536,6 +1569,8 @@ class IdeaBoardGenerator:
     // Note: DOMContentLoaded may not fire reliably in srcdoc iframes.
 
     init();
+
+    console.log('[IdeaBoard v2.1] Registered namespace:', containerId);
 
 }})();
 </script>'''
