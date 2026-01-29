@@ -1522,14 +1522,13 @@ class IdeaBoardGenerator:
     }}
 
     // ============================================
-    // INITIALIZE - Wait for DOM ready
+    // INITIALIZE
     // ============================================
+    // Call init() directly - all HTML elements are before this script
+    // in the document, so they are guaranteed to exist.
+    // Note: DOMContentLoaded may not fire reliably in srcdoc iframes.
 
-    if (document.readyState === 'loading') {{
-        document.addEventListener('DOMContentLoaded', init);
-    }} else {{
-        init();
-    }}
+    init();
 
 }})();
 </script>'''
