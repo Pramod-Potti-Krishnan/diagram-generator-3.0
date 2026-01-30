@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.5.1
+IDEA_BOARD HTML Generation Service v2.5.2
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,12 @@ Includes embedded CSS and JavaScript for:
 - Inline editing in detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.5.2 Critical Bug Fix:
+- Fixed user-provided ideas having no unique IDs (all had id=None)
+- v2.5.1 only fixed placeholder ideas, but API requests with explicit ideas
+  still passed through with id=None because they bypass _generate_placeholder_ideas()
+- Now ALL ideas get unique UUIDs assigned in generate() regardless of source
 
 v2.5.1 Critical Bug Fixes:
 - Fixed placeholder ideas having no unique IDs (all had id=None)
@@ -129,6 +135,13 @@ class IdeaBoardGenerator:
             if request.placeholder_mode and not ideas:
                 ideas = self._generate_placeholder_ideas(request.axis_preset)
 
+            # v2.5.2: Ensure ALL ideas have unique IDs (including user-provided)
+            # This fixes the bug where user-provided ideas had id=None because
+            # they bypass _generate_placeholder_ideas() which adds UUIDs
+            for idea in ideas:
+                if not idea.id:
+                    idea.id = f"idea-{uuid.uuid4().hex[:8]}"
+
             # v2.5: Generate LLM details for ideas that need them
             ideas = await self._generate_idea_details(ideas, request.axis_preset)
 
@@ -175,7 +188,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.5.1"
+                    "version": "2.5.2"
                 },
                 grid_position=grid_position
             )
