@@ -131,16 +131,42 @@ AXIS_PRESETS = {
 # Color Palette
 # =============================================================================
 
-# v2.0: Saturated post-it style colors for better visibility
+# v2.6: Nested light/dark color structure for theme support
+# Light mode: Pastel backgrounds with dark text
+# Dark mode: Saturated/vibrant backgrounds with white text
 IDEA_COLORS = {
-    "blue": {"bg": "#3B82F6", "border": "#1D4ED8", "text": "#FFFFFF"},
-    "green": {"bg": "#10B981", "border": "#059669", "text": "#FFFFFF"},
-    "orange": {"bg": "#F97316", "border": "#EA580C", "text": "#FFFFFF"},
-    "purple": {"bg": "#8B5CF6", "border": "#7C3AED", "text": "#FFFFFF"},
-    "red": {"bg": "#EF4444", "border": "#DC2626", "text": "#FFFFFF"},
-    "yellow": {"bg": "#FBBF24", "border": "#F59E0B", "text": "#1F2937"},
-    "pink": {"bg": "#EC4899", "border": "#DB2777", "text": "#FFFFFF"},
-    "gray": {"bg": "#6B7280", "border": "#4B5563", "text": "#FFFFFF"}
+    "blue": {
+        "light": {"bg": "#BFDBFE", "border": "#93C5FD", "text": "#1E3A8A"},
+        "dark":  {"bg": "#3B82F6", "border": "#1D4ED8", "text": "#FFFFFF"}
+    },
+    "green": {
+        "light": {"bg": "#BBF7D0", "border": "#86EFAC", "text": "#166534"},
+        "dark":  {"bg": "#10B981", "border": "#059669", "text": "#FFFFFF"}
+    },
+    "orange": {
+        "light": {"bg": "#FED7AA", "border": "#FDBA74", "text": "#9A3412"},
+        "dark":  {"bg": "#F97316", "border": "#EA580C", "text": "#FFFFFF"}
+    },
+    "purple": {
+        "light": {"bg": "#DDD6FE", "border": "#C4B5FD", "text": "#5B21B6"},
+        "dark":  {"bg": "#8B5CF6", "border": "#7C3AED", "text": "#FFFFFF"}
+    },
+    "red": {
+        "light": {"bg": "#FECACA", "border": "#FCA5A5", "text": "#991B1B"},
+        "dark":  {"bg": "#EF4444", "border": "#DC2626", "text": "#FFFFFF"}
+    },
+    "yellow": {
+        "light": {"bg": "#FEF08A", "border": "#FDE047", "text": "#854D0E"},
+        "dark":  {"bg": "#FBBF24", "border": "#F59E0B", "text": "#1F2937"}
+    },
+    "pink": {
+        "light": {"bg": "#FBCFE8", "border": "#F9A8D4", "text": "#9D174D"},
+        "dark":  {"bg": "#EC4899", "border": "#DB2777", "text": "#FFFFFF"}
+    },
+    "gray": {
+        "light": {"bg": "#E5E7EB", "border": "#D1D5DB", "text": "#374151"},
+        "dark":  {"bg": "#6B7280", "border": "#4B5563", "text": "#FFFFFF"}
+    }
 }
 
 VALID_COLORS = list(IDEA_COLORS.keys())
@@ -289,8 +315,8 @@ class Idea(BaseModel):
     name: str = Field(
         ...,
         min_length=1,
-        max_length=20,
-        description="Idea name displayed on card (max 20 characters)"
+        max_length=40,
+        description="Idea name displayed on card (max 40 characters, supports 2 lines)"
     )
     x_position: float = Field(
         ...,

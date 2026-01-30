@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.5.2
+IDEA_BOARD HTML Generation Service v2.6.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -7,7 +7,14 @@ Includes embedded CSS and JavaScript for:
 - Add/Edit modal with Why/How/What fields
 - Inline editing in detail panel
 - postMessage persistence protocol
-- Light/dark theme support
+- Light/dark theme support with live switching
+
+v2.6.0 Light/Dark Mode + Two-Line Cards:
+- Added live light/dark mode switching via postMessage theme sync
+- Card colors now use CSS variables (pastel for light, saturated for dark)
+- Cards support up to 2 lines of text with line-clamp (max 40 characters)
+- Added _generate_theme_css() and _generate_theme_sync_script() methods
+- Increased card min-height to 80px for 2-line support
 
 v2.5.2 Critical Bug Fix:
 - Fixed user-provided ideas having no unique IDs (all had id=None)
@@ -188,7 +195,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.5.2"
+                    "version": "2.6.0"
                 },
                 grid_position=grid_position
             )
@@ -219,6 +226,70 @@ class IdeaBoardGenerator:
         """Get theme colors for the specified theme and mode."""
         theme_preset = THEME_PRESETS.get(theme, THEME_PRESETS["default"])
         return theme_preset.get(mode, theme_preset["light"])
+
+    def _generate_theme_css(self, theme: str, theme_mode: str) -> str:
+        """Generate CSS variables for theme support with light defaults and dark overrides."""
+        theme_config = THEME_PRESETS.get(theme, THEME_PRESETS["default"])
+        light_colors = theme_config["light"]
+        dark_colors = theme_config["dark"]
+
+        light_card_vars = self._generate_card_color_vars("light")
+        dark_card_vars = self._generate_card_color_vars("dark")
+
+        return f'''<style>
+/* Deckster IDEA_BOARD Theme Variables - v2.6.0 */
+:root {{
+    --board-bg: {light_colors["board_bg"]};
+    --grid-line: {light_colors["grid_line"]};
+    --axis-label: {light_colors["axis_label"]};
+    --axis-secondary: {light_colors["axis_secondary"]};
+    --quadrant-label: {light_colors["quadrant_label"]};
+    --card-shadow: {light_colors["card_shadow"]};
+    --text-primary: {light_colors["text_primary"]};
+    --text-secondary: {light_colors["text_secondary"]};
+    --panel-bg: {light_colors["panel_bg"]};
+    --panel-border: {light_colors["panel_border"]};
+{light_card_vars}
+}}
+:root.theme-dark {{
+    --board-bg: {dark_colors["board_bg"]};
+    --grid-line: {dark_colors["grid_line"]};
+    --axis-label: {dark_colors["axis_label"]};
+    --axis-secondary: {dark_colors["axis_secondary"]};
+    --quadrant-label: {dark_colors["quadrant_label"]};
+    --card-shadow: {dark_colors["card_shadow"]};
+    --text-primary: {dark_colors["text_primary"]};
+    --text-secondary: {dark_colors["text_secondary"]};
+    --panel-bg: {dark_colors["panel_bg"]};
+    --panel-border: {dark_colors["panel_border"]};
+{dark_card_vars}
+}}
+</style>'''
+
+    def _generate_card_color_vars(self, mode: str) -> str:
+        """Generate CSS variables for card colors."""
+        lines = []
+        for color_name, color_modes in IDEA_COLORS.items():
+            colors = color_modes.get(mode, color_modes.get("light", {}))
+            lines.append(f"    --card-{color_name}-bg: {colors['bg']};")
+            lines.append(f"    --card-{color_name}-border: {colors['border']};")
+            lines.append(f"    --card-{color_name}-text: {colors['text']};")
+        return "\n".join(lines)
+
+    def _generate_theme_sync_script(self) -> str:
+        """Generate postMessage listener for theme sync from Layout Service."""
+        return '''<script>
+(function(){
+    window.addEventListener('message',function(e){
+        if(!e.data||e.data.type!=='deckster-theme-sync')return;
+        var m=e.data.mode,v=e.data.variables,r=document.documentElement;
+        if(!m||!v)return;
+        for(var k in v)if(v.hasOwnProperty(k))r.style.setProperty(k,v[k]);
+        r.classList.toggle('theme-dark',m==='dark');
+        r.classList.toggle('theme-light',m==='light');
+    });
+})();
+</script>'''
 
     def _generate_placeholder_ideas(self, axis_preset: str) -> List[Idea]:
         """Generate placeholder ideas for testing.
@@ -354,13 +425,24 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
         # Generate color CSS for cards
         color_css = self._generate_color_css()
 
+        # v2.6: Generate theme CSS with light/dark mode support
+        theme_css = self._generate_theme_css(request.theme, theme_mode)
+
+        # v2.6: Generate theme sync script for postMessage-based mode switching
+        theme_sync_script = self._generate_theme_sync_script()
+
         # Calculate pixel dimensions for explicit sizing
         pixel_width = request.gridWidth * 60 - 20
         pixel_height = request.gridHeight * 60 - 20
 
-        html = f'''<style>
+        # v2.6: Determine initial theme class
+        theme_class = "theme-dark" if theme_mode == "dark" else "theme-light"
+
+        html = f'''{theme_css}
+{theme_sync_script}
+<style>
 /* ============================================
-   IDEA_BOARD CSS v2.5.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.6.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -369,26 +451,13 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
     padding: 0;
 }}
 
-:root {{
-    --board-bg: {theme_colors["board_bg"]};
-    --grid-line: {theme_colors["grid_line"]};
-    --axis-label: {theme_colors["axis_label"]};
-    --axis-secondary: {theme_colors["axis_secondary"]};
-    --quadrant-label: {theme_colors["quadrant_label"]};
-    --card-shadow: {theme_colors["card_shadow"]};
-    --text-primary: {theme_colors["text_primary"]};
-    --text-secondary: {theme_colors["text_secondary"]};
-    --panel-bg: {theme_colors["panel_bg"]};
-    --panel-border: {theme_colors["panel_border"]};
-}}
-
 .idea-board-container {{
     width: 100%;
     height: 100%;
     min-width: {pixel_width}px;
     min-height: {pixel_height}px;
     position: relative;
-    background: {theme_colors["board_bg"]};
+    background: var(--board-bg);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     padding: {request.external_margin}px;
@@ -549,25 +618,35 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
     overflow: visible;
 }}
 
-/* Post-It Style Idea Cards */
+/* Post-It Style Idea Cards - v2.6: Two-line support */
 .idea-card {{
     position: absolute;
     min-width: 120px;
-    min-height: 70px;
+    min-height: 80px;
     padding: 20px 16px 14px 16px;
     border-radius: 3px 3px 3px 18px; /* Curled bottom-left corner */
     cursor: grab;
     font-size: 13px;
     font-weight: 600;
-    white-space: nowrap;
     max-width: 160px;
-    overflow: hidden;
-    text-overflow: ellipsis;
     box-shadow: var(--card-shadow), inset 0 -2px 3px rgba(0,0,0,0.05);
     transition: transform 0.15s ease, box-shadow 0.15s ease;
     z-index: 10;
     user-select: none;
     text-align: center;
+}}
+
+/* v2.6: Two-line text support for idea names */
+.idea-card .idea-name {{
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    word-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.3;
+    max-height: 2.6em;
 }}
 
 /* Push-pin effect */
@@ -1121,7 +1200,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
     <div class="detail-panel" id="detail-panel-{element_id}">
         <button class="panel-close" onclick="ideaboards['{element_id}'].closeDetailPanel()">&times;</button>
         <div class="panel-header">
-            <input type="text" class="panel-name-input" id="panel-name-input-{element_id}" placeholder="Idea name" maxlength="20">
+            <input type="text" class="panel-name-input" id="panel-name-input-{element_id}" placeholder="Idea name" maxlength="40">
             <div class="panel-color-picker" id="panel-color-picker-{element_id}">
                 <div class="color-swatch color-blue" data-color="blue" onclick="ideaboards['{element_id}'].setPanelColor('blue')"></div>
                 <div class="color-swatch color-green" data-color="green" onclick="ideaboards['{element_id}'].setPanelColor('green')"></div>
@@ -1170,8 +1249,8 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
             <button class="modal-close" onclick="ideaboards['{element_id}'].closeModal()">&times;</button>
         </div>
         <div class="form-group">
-            <label for="modal-name-{element_id}">Idea Name (max 20 chars)</label>
-            <input type="text" id="modal-name-{element_id}" maxlength="20" placeholder="Enter idea name...">
+            <label for="modal-name-{element_id}">Idea Name (max 40 chars)</label>
+            <input type="text" id="modal-name-{element_id}" maxlength="40" placeholder="Enter idea name...">
         </div>
         <div class="form-group">
             <label for="modal-color-{element_id}">Color</label>
@@ -1212,7 +1291,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
 
     <script>
     /* ============================================
-       IDEA_BOARD JavaScript v2.5.0 - Bug Fixes & UX Improvements
+       IDEA_BOARD JavaScript v2.6.0 - Bug Fixes & UX Improvements
        ============================================ */
 
     // v2.1: Create global registry for multi-instance support
@@ -1229,7 +1308,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
 
         // Verify we got the right container
         if (!container || !container.classList.contains('idea-board-container')) {{
-            console.error('[IdeaBoard v2.5] Script parent is not idea-board-container:', container);
+            console.error('[IdeaBoard v2.6] Script parent is not idea-board-container:', container);
             return;
         }}
 
@@ -1267,7 +1346,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
             detailPanel = container.querySelector('.detail-panel');
 
             if (!board || !ideasContainer) {{
-                console.error('[IdeaBoard v2.5] Required elements not found in container');
+                console.error('[IdeaBoard v2.6] Required elements not found in container');
                 return;
             }}
 
@@ -1293,7 +1372,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
                 }}
             }});
 
-            console.log('[IdeaBoard v2.5] Initialized:', containerId, 'with', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.6] Initialized:', containerId, 'with', ideasState.length, 'ideas');
         }}
 
         // v2.4: Sync ideasState array with initial cards in DOM
@@ -1335,7 +1414,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
                         what: '',
                         benefit_score: 3
                     }});
-                    console.log('[IdeaBoard v2.5] Synced initial card to state:', id);
+                    console.log('[IdeaBoard v2.6] Synced initial card to state:', id);
                 }}
             }});
         }}
@@ -1783,15 +1862,15 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
 
         // v2.5: Defensive fallback - if idea not in state, extract from DOM
         if (!idea) {{
-            console.warn('[IdeaBoard v2.5] Idea not in state, extracting from DOM:', ideaId);
+            console.warn('[IdeaBoard v2.6] Idea not in state, extracting from DOM:', ideaId);
             var card = ideasContainer.querySelector('[data-idea-id="' + ideaId + '"]');
             if (card) {{
                 // Create idea object from DOM and add to state
                 idea = extractIdeaFromCard(card);
                 ideasState.push(idea);
-                console.log('[IdeaBoard v2.5] Added extracted idea to state:', ideaId);
+                console.log('[IdeaBoard v2.6] Added extracted idea to state:', ideaId);
             }} else {{
-                console.error('[IdeaBoard v2.5] Card not found in DOM:', ideaId);
+                console.error('[IdeaBoard v2.6] Card not found in DOM:', ideaId);
                 return;
             }}
         }}
@@ -1889,7 +1968,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
             }}, 1000);
         }}
 
-        console.log('[IdeaBoard v2.5] Saved changes for:', currentEditingIdea.id);
+        console.log('[IdeaBoard v2.6] Saved changes for:', currentEditingIdea.id);
     }}
 
     // v2.4: Delete idea from panel
@@ -1918,7 +1997,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
         // Notify parent
         notifyStateChange('delete');
 
-        console.log('[IdeaBoard v2.5] Deleted idea:', ideaId);
+        console.log('[IdeaBoard v2.6] Deleted idea:', ideaId);
     }}
 
     // Legacy function kept for backward compatibility
@@ -1986,7 +2065,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.5] State change notified:', action);
+            console.log('[IdeaBoard v2.6] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -2004,7 +2083,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.5] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.6] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -2020,7 +2099,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.5] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.6] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -2108,7 +2187,7 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
 
     init();
 
-        console.log('[IdeaBoard v2.5] Registered namespace:', containerId);
+        console.log('[IdeaBoard v2.6] Registered namespace:', containerId);
 
     }})();
     </script>
@@ -2136,13 +2215,13 @@ Keep responses concise (under 100 characters each). Be specific and actionable."
         return "\n            ".join(cards)
 
     def _generate_color_css(self) -> str:
-        """Generate CSS classes for each idea color."""
+        """Generate CSS classes for each idea color using CSS variables."""
         css_parts = []
-        for color_name, colors in IDEA_COLORS.items():
+        for color_name in IDEA_COLORS.keys():
             css_parts.append(f'''.idea-card.color-{color_name} {{
-    background: {colors["bg"]};
-    border: 2px solid {colors["border"]};
-    color: {colors["text"]};
+    background: var(--card-{color_name}-bg);
+    border: 2px solid var(--card-{color_name}-border);
+    color: var(--card-{color_name}-text);
 }}''')
         return "\n\n".join(css_parts)
 
