@@ -1,13 +1,20 @@
 """
-IDEA_BOARD HTML Generation Service v2.3.1
+IDEA_BOARD HTML Generation Service v2.4.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
 - Drag & drop idea cards
 - Add/Edit modal with Why/How/What fields
-- Click-to-expand detail panel
+- Inline editing in detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.4.0 Persistence & UX Improvements:
+- Fixed pre-existing ideas expand button bug (ideasState sync on init)
+- Converted detail panel to inline editable form (no modal for editing)
+- Modal now only used for "Add Idea" - editing is inline in panel
+- Added color picker and star rating to inline edit panel
+- Persistence via Layout Service now fully supported
 
 v2.3.1 Escape Sequence Fix:
 - Fixed Python f-string escape bug in expand button onclick handler
@@ -152,7 +159,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.3.1"
+                    "version": "2.4.0"
                 },
                 grid_position=grid_position
             )
@@ -242,7 +249,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.3.1 - Post-It Style Design
+   IDEA_BOARD CSS v2.4.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -834,22 +841,110 @@ class IdeaBoardGenerator:
     color: var(--panel-border);
 }}
 
-.panel-edit-btn {{
+/* v2.4: Inline Editable Panel Styles */
+.panel-name-input {{
     width: 100%;
-    padding: 12px;
-    margin-top: 20px;
-    background: var(--axis-label);
-    color: var(--board-bg);
-    border: none;
+    padding: 10px 12px;
+    border: 1px solid var(--panel-border);
     border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity 0.2s ease;
+    font-size: 18px;
+    font-weight: 700;
+    background: var(--board-bg);
+    color: var(--text-primary);
+    margin-bottom: 12px;
 }}
 
-.panel-edit-btn:hover {{
-    opacity: 0.9;
+.panel-name-input:focus {{
+    outline: none;
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}}
+
+.panel-color-picker {{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}}
+
+.color-swatch {{
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}}
+
+.color-swatch:hover {{
+    transform: scale(1.15);
+}}
+
+.color-swatch.selected {{
+    border-color: var(--text-primary);
+    transform: scale(1.1);
+}}
+
+.color-swatch.color-blue {{ background: #3B82F6; }}
+.color-swatch.color-green {{ background: #10B981; }}
+.color-swatch.color-orange {{ background: #F97316; }}
+.color-swatch.color-purple {{ background: #8B5CF6; }}
+.color-swatch.color-red {{ background: #EF4444; }}
+.color-swatch.color-yellow {{ background: #FBBF24; }}
+.color-swatch.color-pink {{ background: #EC4899; }}
+.color-swatch.color-gray {{ background: #6B7280; }}
+
+.panel-input {{
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--panel-border);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--board-bg);
+    color: var(--text-primary);
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}}
+
+.panel-input:focus {{
+    outline: none;
+    border-color: #3B82F6;
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}}
+
+.panel-star-selector {{
+    display: flex;
+    gap: 4px;
+}}
+
+.star-btn {{
+    font-size: 28px;
+    color: var(--panel-border);
+    cursor: pointer;
+    transition: color 0.15s ease, transform 0.15s ease;
+}}
+
+.star-btn:hover {{
+    transform: scale(1.15);
+}}
+
+.star-btn.filled {{
+    color: #F59E0B;
+}}
+
+.panel-actions {{
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+}}
+
+.panel-delete-btn {{
+    flex: 0 0 auto;
+}}
+
+.panel-save-btn {{
+    flex: 1;
 }}
 </style>
 <div class="idea-board-container" id="{element_id}" data-ideaboard-container="true">
@@ -911,30 +1006,48 @@ class IdeaBoardGenerator:
         <button class="add-idea-btn" onclick="ideaboards['{element_id}'].openAddModal()">+ Add Idea</button>
     </div>
 
-    <!-- Detail Panel (slides in from right) -->
+    <!-- Detail Panel (slides in from right) - v2.4: Inline Editable -->
     <div class="detail-panel" id="detail-panel-{element_id}">
         <button class="panel-close" onclick="ideaboards['{element_id}'].closeDetailPanel()">&times;</button>
         <div class="panel-header">
-            <h4 class="panel-name" id="panel-name-{element_id}"></h4>
-            <div class="panel-color-indicator" id="panel-color-{element_id}"></div>
+            <input type="text" class="panel-name-input" id="panel-name-input-{element_id}" placeholder="Idea name" maxlength="20">
+            <div class="panel-color-picker" id="panel-color-picker-{element_id}">
+                <div class="color-swatch color-blue" data-color="blue" onclick="ideaboards['{element_id}'].setPanelColor('blue')"></div>
+                <div class="color-swatch color-green" data-color="green" onclick="ideaboards['{element_id}'].setPanelColor('green')"></div>
+                <div class="color-swatch color-orange" data-color="orange" onclick="ideaboards['{element_id}'].setPanelColor('orange')"></div>
+                <div class="color-swatch color-purple" data-color="purple" onclick="ideaboards['{element_id}'].setPanelColor('purple')"></div>
+                <div class="color-swatch color-red" data-color="red" onclick="ideaboards['{element_id}'].setPanelColor('red')"></div>
+                <div class="color-swatch color-yellow" data-color="yellow" onclick="ideaboards['{element_id}'].setPanelColor('yellow')"></div>
+                <div class="color-swatch color-pink" data-color="pink" onclick="ideaboards['{element_id}'].setPanelColor('pink')"></div>
+                <div class="color-swatch color-gray" data-color="gray" onclick="ideaboards['{element_id}'].setPanelColor('gray')"></div>
+            </div>
         </div>
         <div class="panel-section">
             <span class="panel-label">WHY</span>
-            <p class="panel-content" id="panel-why-{element_id}"></p>
+            <textarea class="panel-input" id="panel-why-input-{element_id}" rows="2" placeholder="Why is this important?"></textarea>
         </div>
         <div class="panel-section">
             <span class="panel-label">HOW</span>
-            <p class="panel-content" id="panel-how-{element_id}"></p>
+            <textarea class="panel-input" id="panel-how-input-{element_id}" rows="2" placeholder="How will this be achieved?"></textarea>
         </div>
         <div class="panel-section">
             <span class="panel-label">WHAT</span>
-            <p class="panel-content" id="panel-what-{element_id}"></p>
+            <textarea class="panel-input" id="panel-what-input-{element_id}" rows="2" placeholder="What is the expected outcome?"></textarea>
         </div>
         <div class="panel-section">
             <span class="panel-label">BENEFIT SCORE</span>
-            <div class="star-rating" id="panel-stars-{element_id}"></div>
+            <div class="panel-star-selector" id="panel-stars-{element_id}">
+                <span class="star-btn" data-score="1" onclick="ideaboards['{element_id}'].setPanelScore(1)">&#9733;</span>
+                <span class="star-btn" data-score="2" onclick="ideaboards['{element_id}'].setPanelScore(2)">&#9733;</span>
+                <span class="star-btn" data-score="3" onclick="ideaboards['{element_id}'].setPanelScore(3)">&#9733;</span>
+                <span class="star-btn" data-score="4" onclick="ideaboards['{element_id}'].setPanelScore(4)">&#9733;</span>
+                <span class="star-btn" data-score="5" onclick="ideaboards['{element_id}'].setPanelScore(5)">&#9733;</span>
+            </div>
         </div>
-        <button class="panel-edit-btn" onclick="ideaboards['{element_id}'].editFromPanel()">Edit Idea</button>
+        <div class="panel-actions">
+            <button class="btn btn-danger panel-delete-btn" onclick="ideaboards['{element_id}'].deleteFromPanel()">Delete</button>
+            <button class="btn btn-primary panel-save-btn" onclick="ideaboards['{element_id}'].savePanelChanges()">Save Changes</button>
+        </div>
     </div>
 
     <!-- v2.3: Modal moved inside container for iframe script execution -->
@@ -988,7 +1101,7 @@ class IdeaBoardGenerator:
 
     <script>
     /* ============================================
-       IDEA_BOARD JavaScript v2.3.1 - Escape Sequence Fix
+       IDEA_BOARD JavaScript v2.4.0 - Persistence & Inline Editing
        ============================================ */
 
     // v2.1: Create global registry for multi-instance support
@@ -1005,7 +1118,7 @@ class IdeaBoardGenerator:
 
         // Verify we got the right container
         if (!container || !container.classList.contains('idea-board-container')) {{
-            console.error('[IdeaBoard v2.3] Script parent is not idea-board-container:', container);
+            console.error('[IdeaBoard v2.4] Script parent is not idea-board-container:', container);
             return;
         }}
 
@@ -1043,14 +1156,62 @@ class IdeaBoardGenerator:
             detailPanel = container.querySelector('.detail-panel');
 
             if (!board || !ideasContainer) {{
-                console.error('[IdeaBoard v2.3] Required elements not found in container');
+                console.error('[IdeaBoard v2.4] Required elements not found in container');
                 return;
             }}
+
+            // v2.4: Sync ideasState with initial DOM cards to fix pre-existing ideas bug
+            // This ensures findIdea() works for initial cards rendered by Python
+            syncIdeasStateFromDOM();
 
             initDragDrop();
             initScoreSelector();
             listenForParentMessages();
-            console.log('[IdeaBoard v2.3] Initialized:', containerId);
+            console.log('[IdeaBoard v2.4] Initialized:', containerId, 'with', ideasState.length, 'ideas');
+        }}
+
+        // v2.4: Sync ideasState array with initial cards in DOM
+        function syncIdeasStateFromDOM() {{
+            var initialCards = ideasContainer.querySelectorAll('.idea-card');
+            if (initialCards.length === 0) return;
+
+            // Build a map of existing ideasState by id for quick lookup
+            var stateMap = {{}};
+            ideasState.forEach(function(idea) {{
+                stateMap[idea.id] = idea;
+            }});
+
+            // Check each initial card and ensure it's in ideasState
+            initialCards.forEach(function(card) {{
+                var id = card.dataset.ideaId;
+                if (!stateMap[id]) {{
+                    // Card exists in DOM but not in ideasState - extract and add
+                    var nameEl = card.querySelector('.idea-name');
+                    var name = nameEl ? nameEl.textContent : 'Unnamed';
+
+                    // Get position from style
+                    var left = parseFloat(card.style.left) || 50;
+                    var top = parseFloat(card.style.top) || 50;
+                    var y_position = 100 - top;  // Reverse the transform
+
+                    // Get color from class
+                    var colorMatch = card.className.match(/color-(\\w+)/);
+                    var color = colorMatch ? colorMatch[1] : 'blue';
+
+                    ideasState.push({{
+                        id: id,
+                        name: name,
+                        x_position: left,
+                        y_position: y_position,
+                        color: color,
+                        why: '',
+                        how: '',
+                        what: '',
+                        benefit_score: 3
+                    }});
+                    console.log('[IdeaBoard v2.4] Synced initial card to state:', id);
+                }}
+            }});
         }}
 
     // ============================================
@@ -1460,62 +1621,149 @@ class IdeaBoardGenerator:
     }}
 
     // ============================================
-    // DETAIL PANEL
+    // DETAIL PANEL - v2.4 Inline Editing
     // ============================================
+
+    var panelSelectedColor = 'blue';
+    var panelSelectedScore = 0;
 
     function showDetailPanel(ideaId) {{
         var idea = findIdea(ideaId);
-        if (!idea) return;
+        if (!idea) {{
+            console.warn('[IdeaBoard v2.4] Idea not found:', ideaId);
+            return;
+        }}
 
         currentEditingIdea = idea;
 
-        container.querySelector('#panel-name-' + containerId).textContent = idea.name;
-        container.querySelector('#panel-color-' + containerId).style.background = getColorBorder(idea.color);
+        // v2.4: Populate editable inputs
+        container.querySelector('#panel-name-input-' + containerId).value = idea.name;
+        container.querySelector('#panel-why-input-' + containerId).value = idea.why || '';
+        container.querySelector('#panel-how-input-' + containerId).value = idea.how || '';
+        container.querySelector('#panel-what-input-' + containerId).value = idea.what || '';
 
-        setDetailContent('panel-why-' + containerId, idea.why);
-        setDetailContent('panel-how-' + containerId, idea.how);
-        setDetailContent('panel-what-' + containerId, idea.what);
+        // Set color picker selection
+        setPanelColor(idea.color, true);
 
-        renderStars('panel-stars-' + containerId, idea.benefit_score || 0);
+        // Set star rating
+        setPanelScore(idea.benefit_score || 0, true);
 
         detailPanel.classList.add('open');
     }}
 
     function closeDetailPanel() {{
         detailPanel.classList.remove('open');
+        currentEditingIdea = null;
     }}
 
-    function editFromPanel() {{
-        if (currentEditingIdea) {{
-            closeDetailPanel();
-            openEditModal(currentEditingIdea.id);
+    // v2.4: Set panel color selection
+    function setPanelColor(color, skipNotify) {{
+        panelSelectedColor = color;
+
+        // Update visual selection
+        var picker = container.querySelector('#panel-color-picker-' + containerId);
+        if (picker) {{
+            picker.querySelectorAll('.color-swatch').forEach(function(swatch) {{
+                if (swatch.dataset.color === color) {{
+                    swatch.classList.add('selected');
+                }} else {{
+                    swatch.classList.remove('selected');
+                }}
+            }});
         }}
     }}
 
-    function setDetailContent(elementId, content) {{
-        var el = container.querySelector('#' + elementId);
-        if (!el) return;
-        if (content && content.trim()) {{
-            el.textContent = content;
-            el.classList.remove('empty');
-        }} else {{
-            el.textContent = 'Not specified';
-            el.classList.add('empty');
+    // v2.4: Set panel star score
+    function setPanelScore(score, skipNotify) {{
+        panelSelectedScore = score;
+
+        // Update visual selection
+        var starsEl = container.querySelector('#panel-stars-' + containerId);
+        if (starsEl) {{
+            starsEl.querySelectorAll('.star-btn').forEach(function(star) {{
+                var starScore = parseInt(star.dataset.score);
+                if (starScore <= score && score > 0) {{
+                    star.classList.add('filled');
+                }} else {{
+                    star.classList.remove('filled');
+                }}
+            }});
         }}
     }}
 
-    function renderStars(elementId, score) {{
-        var el = container.querySelector('#' + elementId);
-        if (!el) return;
-        var html = '';
-        for (var i = 1; i <= 5; i++) {{
-            if (i <= score) {{
-                html += '<span class="star filled">&#9733;</span>';
-            }} else {{
-                html += '<span class="star empty">&#9734;</span>';
+    // v2.4: Save changes from inline edit panel
+    function savePanelChanges() {{
+        if (!currentEditingIdea) return;
+
+        var name = container.querySelector('#panel-name-input-' + containerId).value.trim();
+        if (!name) {{
+            alert('Please enter an idea name');
+            return;
+        }}
+
+        // Update idea in state
+        currentEditingIdea.name = name;
+        currentEditingIdea.color = panelSelectedColor;
+        currentEditingIdea.why = container.querySelector('#panel-why-input-' + containerId).value.trim();
+        currentEditingIdea.how = container.querySelector('#panel-how-input-' + containerId).value.trim();
+        currentEditingIdea.what = container.querySelector('#panel-what-input-' + containerId).value.trim();
+        currentEditingIdea.benefit_score = panelSelectedScore;
+
+        // Update card in DOM
+        updateCardInDOM(currentEditingIdea);
+
+        // Notify parent of state change
+        notifyStateChange('edit');
+
+        // Show brief success indication
+        var saveBtn = container.querySelector('.panel-save-btn');
+        if (saveBtn) {{
+            var originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Saved!';
+            saveBtn.style.background = '#10B981';
+            setTimeout(function() {{
+                saveBtn.textContent = originalText;
+                saveBtn.style.background = '';
+            }}, 1000);
+        }}
+
+        console.log('[IdeaBoard v2.4] Saved changes for:', currentEditingIdea.id);
+    }}
+
+    // v2.4: Delete idea from panel
+    function deleteFromPanel() {{
+        if (!currentEditingIdea) return;
+
+        if (!confirm('Delete this idea?')) return;
+
+        var ideaId = currentEditingIdea.id;
+
+        // Remove from state
+        for (var i = 0; i < ideasState.length; i++) {{
+            if (ideasState[i].id === ideaId) {{
+                ideasState.splice(i, 1);
+                break;
             }}
         }}
-        el.innerHTML = html;
+
+        // Remove from DOM
+        var card = ideasContainer.querySelector('[data-idea-id="' + ideaId + '"]');
+        if (card) card.remove();
+
+        // Close panel
+        closeDetailPanel();
+
+        // Notify parent
+        notifyStateChange('delete');
+
+        console.log('[IdeaBoard v2.4] Deleted idea:', ideaId);
+    }}
+
+    // Legacy function kept for backward compatibility
+    function editFromPanel() {{
+        // v2.4: Panel is already in edit mode, so just focus the name input
+        var nameInput = container.querySelector('#panel-name-input-' + containerId);
+        if (nameInput) nameInput.focus();
     }}
 
     function getColorBorder(colorName) {{
@@ -1576,7 +1824,7 @@ class IdeaBoardGenerator:
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.3] State change notified:', action);
+            console.log('[IdeaBoard v2.4] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1594,7 +1842,7 @@ class IdeaBoardGenerator:
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.3] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.4] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -1610,7 +1858,7 @@ class IdeaBoardGenerator:
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.3] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.4] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -1681,7 +1929,12 @@ class IdeaBoardGenerator:
         handleAxisChange: handleAxisChange,
         applyCustomAxis: applyCustomAxis,
         openEditModal: openEditModal,
-        showDetail: showDetailPanel  // v2.2: For expand button onclick
+        showDetail: showDetailPanel,  // v2.2: For expand button onclick
+        // v2.4: Inline edit panel functions
+        setPanelColor: setPanelColor,
+        setPanelScore: setPanelScore,
+        savePanelChanges: savePanelChanges,
+        deleteFromPanel: deleteFromPanel
     }};
 
     // ============================================
@@ -1693,7 +1946,7 @@ class IdeaBoardGenerator:
 
     init();
 
-        console.log('[IdeaBoard v2.3] Registered namespace:', containerId);
+        console.log('[IdeaBoard v2.4] Registered namespace:', containerId);
 
     }})();
     </script>
