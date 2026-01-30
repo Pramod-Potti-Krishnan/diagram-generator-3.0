@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.5.0
+IDEA_BOARD HTML Generation Service v2.5.1
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,12 @@ Includes embedded CSS and JavaScript for:
 - Inline editing in detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.5.1 Critical Bug Fixes:
+- Fixed placeholder ideas having no unique IDs (all had id=None)
+- Placeholder ideas now get unique UUIDs (id=f"idea-{uuid.uuid4().hex[:8]}")
+- Placeholder ideas now have empty why/how/what so LLM generates them
+- Detail panel now correctly shows the clicked idea (not always the first)
 
 v2.5.0 Bug Fixes & UX Improvements:
 - Fixed detail panel showing wrong idea (defensive fallback in showDetailPanel)
@@ -169,7 +175,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.5.0"
+                    "version": "2.5.1"
                 },
                 grid_position=grid_position
             )
@@ -202,18 +208,27 @@ class IdeaBoardGenerator:
         return theme_preset.get(mode, theme_preset["light"])
 
     def _generate_placeholder_ideas(self, axis_preset: str) -> List[Idea]:
-        """Generate placeholder ideas for testing."""
+        """Generate placeholder ideas for testing.
+
+        v2.5.1: Each idea now gets a unique UUID, and why/how/what are empty
+        so the LLM will generate meaningful content for them.
+        """
         placeholders = [
-            Idea(name="Launch MVP", x_position=75, y_position=80, color="blue",
-                 why="First-mover advantage", how="Agile sprints", what="Market share", benefit_score=4),
-            Idea(name="Fix Bugs", x_position=25, y_position=75, color="green",
-                 why="Quality improvement", how="Sprint allocation", what="Customer satisfaction", benefit_score=3),
-            Idea(name="Research AI", x_position=70, y_position=30, color="purple",
-                 why="Future capability", how="R&D team", what="Competitive edge", benefit_score=4),
-            Idea(name="Update Docs", x_position=30, y_position=25, color="gray",
-                 why="Developer experience", how="Technical writing", what="Reduced support", benefit_score=2),
-            Idea(name="New Feature", x_position=50, y_position=60, color="orange",
-                 why="User request", how="Product team", what="Retention", benefit_score=5),
+            Idea(id=f"idea-{uuid.uuid4().hex[:8]}",
+                 name="Launch MVP", x_position=75, y_position=80, color="blue",
+                 why="", how="", what="", benefit_score=4),
+            Idea(id=f"idea-{uuid.uuid4().hex[:8]}",
+                 name="Fix Bugs", x_position=25, y_position=75, color="green",
+                 why="", how="", what="", benefit_score=3),
+            Idea(id=f"idea-{uuid.uuid4().hex[:8]}",
+                 name="Research AI", x_position=70, y_position=30, color="purple",
+                 why="", how="", what="", benefit_score=4),
+            Idea(id=f"idea-{uuid.uuid4().hex[:8]}",
+                 name="Update Docs", x_position=30, y_position=25, color="gray",
+                 why="", how="", what="", benefit_score=2),
+            Idea(id=f"idea-{uuid.uuid4().hex[:8]}",
+                 name="New Feature", x_position=50, y_position=60, color="orange",
+                 why="", how="", what="", benefit_score=5),
         ]
         return placeholders
 
