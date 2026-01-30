@@ -1,5 +1,5 @@
 """
-IDEA_BOARD HTML Generation Service v2.4.0
+IDEA_BOARD HTML Generation Service v2.5.0
 
 Generates self-contained HTML for IDEA_BOARD 2D matrix visualization.
 Includes embedded CSS and JavaScript for:
@@ -8,6 +8,12 @@ Includes embedded CSS and JavaScript for:
 - Inline editing in detail panel
 - postMessage persistence protocol
 - Light/dark theme support
+
+v2.5.0 Bug Fixes & UX Improvements:
+- Fixed detail panel showing wrong idea (defensive fallback in showDetailPanel)
+- Added click-outside-to-close for detail panel
+- Added LLM-generated why/how/what details for placeholder ideas
+- User edits to generated content persist correctly
 
 v2.4.0 Persistence & UX Improvements:
 - Fixed pre-existing ideas expand button bug (ideasState sync on init)
@@ -64,6 +70,7 @@ import uuid
 import json
 from typing import List, Optional
 
+from utils.llm_service import get_vertex_service
 from models.idea_board_atomic_models import (
     IdeaBoardAtomicRequest,
     IdeaBoardAtomicResponse,
@@ -116,6 +123,9 @@ class IdeaBoardGenerator:
             if request.placeholder_mode and not ideas:
                 ideas = self._generate_placeholder_ideas(request.axis_preset)
 
+            # v2.5: Generate LLM details for ideas that need them
+            ideas = await self._generate_idea_details(ideas, request.axis_preset)
+
             # Generate HTML
             html = self._generate_html(
                 element_id=element_id,
@@ -159,7 +169,7 @@ class IdeaBoardGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "2.4.0"
+                    "version": "2.5.0"
                 },
                 grid_position=grid_position
             )
@@ -207,6 +217,79 @@ class IdeaBoardGenerator:
         ]
         return placeholders
 
+    async def _generate_idea_details(self, ideas: List[Idea], axis_preset: str) -> List[Idea]:
+        """
+        Generate why/how/what details for ideas using LLM.
+
+        v2.5: Generates meaningful descriptions for placeholder ideas
+        that don't already have why/how/what content filled in.
+        """
+        # Filter ideas that need details (empty why/how/what)
+        needs_details = [i for i in ideas if not i.why or not i.how or not i.what]
+        if not needs_details:
+            return ideas
+
+        try:
+            llm_service = get_vertex_service()
+
+            # Build prompt with idea names and positions
+            ideas_text = "\n".join([
+                f"- {idea.name} (position: {idea.x_position:.0f}% horizontal, {idea.y_position:.0f}% vertical)"
+                for idea in needs_details
+            ])
+
+            # Format axis preset for readability
+            axis_description = axis_preset.replace("_", "/").title()
+
+            prompt = f"""Generate brief details for these ideas on a {axis_description} prioritization board:
+
+{ideas_text}
+
+For EACH idea, generate 1-2 sentences each for:
+- why: Why is this useful/important?
+- how: How will we accomplish this?
+- what: What are the expected benefits?
+
+Return ONLY valid JSON array matching the order above:
+[{{"name": "idea name", "why": "...", "how": "...", "what": "..."}}, ...]
+
+Keep responses concise (under 100 characters each). Be specific and actionable."""
+
+            result = await llm_service.generate_content(
+                prompt=prompt,
+                temperature=0.7,
+                max_tokens=1024,
+                response_format="json"
+            )
+
+            if not result.get("success"):
+                logger.warning(f"[IDEA_BOARD v2.5] LLM failed to generate details: {result.get('error')}")
+                return ideas
+
+            details_list = result.get("content", [])
+            if not isinstance(details_list, list):
+                logger.warning(f"[IDEA_BOARD v2.5] LLM returned non-list: {type(details_list)}")
+                return ideas
+
+            # Match details back to ideas
+            for i, detail in enumerate(details_list):
+                if i < len(needs_details):
+                    idea = needs_details[i]
+                    if not idea.why and detail.get("why"):
+                        idea.why = str(detail.get("why", ""))[:500]
+                    if not idea.how and detail.get("how"):
+                        idea.how = str(detail.get("how", ""))[:500]
+                    if not idea.what and detail.get("what"):
+                        idea.what = str(detail.get("what", ""))[:500]
+
+            logger.info(f"[IDEA_BOARD v2.5] Generated details for {len(needs_details)} ideas")
+
+        except Exception as e:
+            logger.warning(f"[IDEA_BOARD v2.5] Failed to generate idea details: {e}")
+            # Continue without generated details - not a fatal error
+
+        return ideas
+
     def _generate_html(
         self,
         element_id: str,
@@ -249,7 +332,7 @@ class IdeaBoardGenerator:
 
         html = f'''<style>
 /* ============================================
-   IDEA_BOARD CSS v2.4.0 - Post-It Style Design
+   IDEA_BOARD CSS v2.5.0 - Post-It Style Design
    ============================================ */
 
 * {{
@@ -1101,7 +1184,7 @@ class IdeaBoardGenerator:
 
     <script>
     /* ============================================
-       IDEA_BOARD JavaScript v2.4.0 - Persistence & Inline Editing
+       IDEA_BOARD JavaScript v2.5.0 - Bug Fixes & UX Improvements
        ============================================ */
 
     // v2.1: Create global registry for multi-instance support
@@ -1118,7 +1201,7 @@ class IdeaBoardGenerator:
 
         // Verify we got the right container
         if (!container || !container.classList.contains('idea-board-container')) {{
-            console.error('[IdeaBoard v2.4] Script parent is not idea-board-container:', container);
+            console.error('[IdeaBoard v2.5] Script parent is not idea-board-container:', container);
             return;
         }}
 
@@ -1156,7 +1239,7 @@ class IdeaBoardGenerator:
             detailPanel = container.querySelector('.detail-panel');
 
             if (!board || !ideasContainer) {{
-                console.error('[IdeaBoard v2.4] Required elements not found in container');
+                console.error('[IdeaBoard v2.5] Required elements not found in container');
                 return;
             }}
 
@@ -1167,7 +1250,22 @@ class IdeaBoardGenerator:
             initDragDrop();
             initScoreSelector();
             listenForParentMessages();
-            console.log('[IdeaBoard v2.4] Initialized:', containerId, 'with', ideasState.length, 'ideas');
+
+            // v2.5: Click-outside-to-close for detail panel
+            document.addEventListener('click', function(e) {{
+                if (!detailPanel.classList.contains('open')) return;
+
+                // Check if click is outside panel AND not on an idea card
+                var isInsidePanel = detailPanel.contains(e.target);
+                var isOnCard = e.target.closest('.idea-card');
+                var isOnAddButton = e.target.closest('.add-idea-btn');
+
+                if (!isInsidePanel && !isOnCard && !isOnAddButton) {{
+                    closeDetailPanel();
+                }}
+            }});
+
+            console.log('[IdeaBoard v2.5] Initialized:', containerId, 'with', ideasState.length, 'ideas');
         }}
 
         // v2.4: Sync ideasState array with initial cards in DOM
@@ -1209,7 +1307,7 @@ class IdeaBoardGenerator:
                         what: '',
                         benefit_score: 3
                     }});
-                    console.log('[IdeaBoard v2.4] Synced initial card to state:', id);
+                    console.log('[IdeaBoard v2.5] Synced initial card to state:', id);
                 }}
             }});
         }}
@@ -1620,8 +1718,33 @@ class IdeaBoardGenerator:
         return div.innerHTML;
     }}
 
+    // v2.5: Extract idea data from DOM card when not found in state
+    function extractIdeaFromCard(card) {{
+        var nameEl = card.querySelector('.idea-name');
+        var colorMatch = card.className.match(/color-(\\w+)/);
+
+        // Get position from style (percentages or pixels)
+        var left = parseFloat(card.style.left) || 50;
+        var top = parseFloat(card.style.top) || 50;
+
+        // Convert top to y_position (y is inverted: top 0% = y 100%)
+        var y_position = 100 - top;
+
+        return {{
+            id: card.dataset.ideaId,
+            name: nameEl ? nameEl.textContent : 'Unnamed',
+            x_position: left,
+            y_position: y_position,
+            color: colorMatch ? colorMatch[1] : 'blue',
+            why: '',
+            how: '',
+            what: '',
+            benefit_score: 3
+        }};
+    }}
+
     // ============================================
-    // DETAIL PANEL - v2.4 Inline Editing
+    // DETAIL PANEL - v2.5 Bug Fix + Inline Editing
     // ============================================
 
     var panelSelectedColor = 'blue';
@@ -1629,9 +1752,20 @@ class IdeaBoardGenerator:
 
     function showDetailPanel(ideaId) {{
         var idea = findIdea(ideaId);
+
+        // v2.5: Defensive fallback - if idea not in state, extract from DOM
         if (!idea) {{
-            console.warn('[IdeaBoard v2.4] Idea not found:', ideaId);
-            return;
+            console.warn('[IdeaBoard v2.5] Idea not in state, extracting from DOM:', ideaId);
+            var card = ideasContainer.querySelector('[data-idea-id="' + ideaId + '"]');
+            if (card) {{
+                // Create idea object from DOM and add to state
+                idea = extractIdeaFromCard(card);
+                ideasState.push(idea);
+                console.log('[IdeaBoard v2.5] Added extracted idea to state:', ideaId);
+            }} else {{
+                console.error('[IdeaBoard v2.5] Card not found in DOM:', ideaId);
+                return;
+            }}
         }}
 
         currentEditingIdea = idea;
@@ -1727,7 +1861,7 @@ class IdeaBoardGenerator:
             }}, 1000);
         }}
 
-        console.log('[IdeaBoard v2.4] Saved changes for:', currentEditingIdea.id);
+        console.log('[IdeaBoard v2.5] Saved changes for:', currentEditingIdea.id);
     }}
 
     // v2.4: Delete idea from panel
@@ -1756,7 +1890,7 @@ class IdeaBoardGenerator:
         // Notify parent
         notifyStateChange('delete');
 
-        console.log('[IdeaBoard v2.4] Deleted idea:', ideaId);
+        console.log('[IdeaBoard v2.5] Deleted idea:', ideaId);
     }}
 
     // Legacy function kept for backward compatibility
@@ -1824,7 +1958,7 @@ class IdeaBoardGenerator:
                 ideaBoardData: extractIdeaBoardState(),
                 timestamp: Date.now()
             }}, '*');
-            console.log('[IdeaBoard v2.4] State change notified:', action);
+            console.log('[IdeaBoard v2.5] State change notified:', action);
         }} catch (e) {{
             console.warn('[IdeaBoard] Failed to notify parent:', e);
         }}
@@ -1842,7 +1976,7 @@ class IdeaBoardGenerator:
                 restoreIdeaBoardState(e.data.saved_state);
             }}
 
-            console.log('[IdeaBoard v2.4] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
+            console.log('[IdeaBoard v2.5] Received init from parent:', ideaBoardId, 'presentation:', presentationId);
         }});
     }}
 
@@ -1858,7 +1992,7 @@ class IdeaBoardGenerator:
                 addCardToDOM(idea);
             }});
 
-            console.log('[IdeaBoard v2.4] Restored', ideasState.length, 'ideas');
+            console.log('[IdeaBoard v2.5] Restored', ideasState.length, 'ideas');
         }}
 
         // v2.0: Restore axis configuration
@@ -1946,7 +2080,7 @@ class IdeaBoardGenerator:
 
     init();
 
-        console.log('[IdeaBoard v2.4] Registered namespace:', containerId);
+        console.log('[IdeaBoard v2.5] Registered namespace:', containerId);
 
     }})();
     </script>
