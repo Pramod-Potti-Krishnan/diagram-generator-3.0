@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.2.0
+CLOUD_ARCHITECTURE HTML Generation Service v1.2.1
 
 Generates self-contained HTML for cloud architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -12,6 +12,10 @@ Includes embedded CSS and JavaScript for:
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.1 Fixes:
+- FIX: SVG marker arrows now render in iframes (CSS variable fallback colors)
+- SIMPLIFY: Layer color picker replaced with 6 preset color buttons
 
 v1.2.0 Enhancements:
 - FIX: Connection arrows now render reliably with delayed initialization
@@ -996,6 +1000,32 @@ Return ONLY valid JSON, no markdown or explanation."""
     background: #DC2626;
 }}
 
+/* Color Presets - v1.2.1 */
+.color-presets {{
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}}
+
+.color-btn {{
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--arch-border);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}}
+
+.color-btn:hover {{
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}}
+
+.color-btn.selected {{
+    border-color: var(--arch-button-primary);
+    box-shadow: 0 0 0 2px var(--arch-button-primary);
+}}
+
 /* Provider accent */
 .cloud-architecture-container[data-provider="aws"] {{
     --provider-accent: {provider_colors["accent"]};
@@ -1016,7 +1046,7 @@ Return ONLY valid JSON, no markdown or explanation."""
     <svg class="connections-layer" id="connections-{element_id}">
         <defs>
             <marker id="arrowhead-{element_id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="var(--arch-connection-arrow)" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="var(--arch-connection-arrow, #64748b)" />
             </marker>
         </defs>
         <!-- Connections rendered by JavaScript -->
@@ -1103,8 +1133,16 @@ Return ONLY valid JSON, no markdown or explanation."""
                 </select>
             </div>
             <div class="form-group">
-                <label for="layer-color-{element_id}">Color</label>
-                <input type="color" id="layer-color-{element_id}" value="#3B82F6">
+                <label>Layer Color</label>
+                <div class="color-presets" id="layer-color-presets-{element_id}">
+                    <button type="button" class="color-btn" data-color="#DBEAFE" style="background:#DBEAFE;" title="Blue"></button>
+                    <button type="button" class="color-btn" data-color="#DCFCE7" style="background:#DCFCE7;" title="Green"></button>
+                    <button type="button" class="color-btn" data-color="#FED7AA" style="background:#FED7AA;" title="Orange"></button>
+                    <button type="button" class="color-btn" data-color="#E9D5FF" style="background:#E9D5FF;" title="Purple"></button>
+                    <button type="button" class="color-btn" data-color="#E5E7EB" style="background:#E5E7EB;" title="Gray"></button>
+                    <button type="button" class="color-btn" data-color="#CFFAFE" style="background:#CFFAFE;" title="Cyan"></button>
+                </div>
+                <input type="hidden" id="layer-color-{element_id}" value="#DBEAFE">
             </div>
             <div class="form-group" id="layer-reorder-{element_id}" style="display:none;">
                 <label>Reorder Layer</label>
@@ -1169,6 +1207,7 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             initDragDrop();
             initLayerClicks();
+            initColorPresets();
             listenForParentMessages();
 
             // v1.2.0: Delay initial connection rendering to ensure DOM is laid out
@@ -1197,6 +1236,32 @@ Return ONLY valid JSON, no markdown or explanation."""
             }});
         }}
 
+        // v1.2.1: Initialize color preset buttons
+        function initColorPresets() {{
+            var presetsContainer = container.querySelector('#layer-color-presets-' + containerId);
+            if (!presetsContainer) return;
+
+            presetsContainer.querySelectorAll('.color-btn').forEach(function(btn) {{
+                btn.addEventListener('click', function() {{
+                    selectColorPreset(btn.dataset.color);
+                }});
+            }});
+        }}
+
+        // v1.2.1: Select a color preset
+        function selectColorPreset(color) {{
+            var presetsContainer = container.querySelector('#layer-color-presets-' + containerId);
+            var hiddenInput = container.querySelector('#layer-color-' + containerId);
+
+            // Update hidden input
+            hiddenInput.value = color;
+
+            // Update button selection state
+            presetsContainer.querySelectorAll('.color-btn').forEach(function(btn) {{
+                btn.classList.toggle('selected', btn.dataset.color === color);
+            }});
+        }}
+
         // v1.2.0: Track current layer index for reordering
         var currentEditingLayerIndex = -1;
 
@@ -1208,7 +1273,7 @@ Return ONLY valid JSON, no markdown or explanation."""
             container.querySelector('#layer-reorder-' + containerId).style.display = 'none';
             container.querySelector('#layer-name-' + containerId).value = '';
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
-            container.querySelector('#layer-color-' + containerId).value = '#3B82F6';
+            selectColorPreset('#DBEAFE'); // v1.2.1: Default to blue preset
             layerModal.classList.add('open');
         }}
 
@@ -1231,7 +1296,7 @@ Return ONLY valid JSON, no markdown or explanation."""
             container.querySelector('#layer-reorder-' + containerId).style.display = 'block';
             container.querySelector('#layer-name-' + containerId).value = layer.name.replace(/_/g, ' ');
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
-            container.querySelector('#layer-color-' + containerId).value = layer.color || '#3B82F6';
+            selectColorPreset(layer.color || '#DBEAFE'); // v1.2.1: Select current or default color preset
             layerModal.classList.add('open');
         }}
 

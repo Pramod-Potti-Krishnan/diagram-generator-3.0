@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.2.0
+LOGICAL_ARCHITECTURE HTML Generation Service v1.2.1
 
 Generates self-contained HTML for logical/system architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -11,6 +11,9 @@ Includes embedded CSS and JavaScript for:
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.1 Fixes:
+- FIX: SVG marker arrows now render in iframes (CSS variable fallback colors)
 
 v1.2.0 Enhancements:
 - FIX: Connection arrows now render reliably with delayed initialization
@@ -1063,10 +1066,10 @@ Return ONLY valid JSON, no markdown or explanation."""
     <svg class="connections-layer" id="connections-{element_id}">
         <defs>
             <marker id="arrowhead-{element_id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="var(--larch-connection-arrow)" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="var(--larch-connection-arrow, #64748b)" />
             </marker>
             <marker id="arrowhead-back-{element_id}" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
-                <polygon points="10 0, 0 3.5, 10 7" fill="var(--larch-connection-arrow)" />
+                <polygon points="10 0, 0 3.5, 10 7" fill="var(--larch-connection-arrow, #64748b)" />
             </marker>
         </defs>
     </svg>
