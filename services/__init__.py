@@ -11,6 +11,8 @@ Atomic component generators:
 - AtomicCodeDisplayGenerator: Atomic CODE_DISPLAY endpoint generator
 - KanbanAtomicGenerator: Atomic KANBAN_BOARD endpoint generator
 - GanttAtomicGenerator: Atomic GANTT_CHART endpoint generator
+- CloudArchitectureGenerator: Atomic CLOUD_ARCHITECTURE endpoint generator
+- LogicalArchitectureGenerator: Atomic LOGICAL_ARCHITECTURE endpoint generator
 """
 
 from .gantt_generator import GanttGenerator
@@ -20,6 +22,8 @@ from .chevron_generator import ChevronGenerator
 from .code_display_service import CodeDisplayGenerator as AtomicCodeDisplayGenerator
 from .kanban_atomic_service import KanbanAtomicGenerator
 from .gantt_atomic_service import GanttAtomicGenerator
+from .cloud_architecture_atomic_service import CloudArchitectureGenerator
+from .logical_architecture_atomic_service import LogicalArchitectureGenerator
 
 __all__ = [
     "GanttGenerator",
@@ -29,4 +33,6 @@ __all__ = [
     "AtomicCodeDisplayGenerator",
     "KanbanAtomicGenerator",
     "GanttAtomicGenerator",
+    "CloudArchitectureGenerator",
+    "LogicalArchitectureGenerator",
 ]

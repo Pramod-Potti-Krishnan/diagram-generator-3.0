@@ -11,6 +11,8 @@ Endpoints:
 - POST /v1.2/atomic/GANTT_CHART - Generate interactive Gantt chart HTML
 - POST /v1.2/atomic/CHEVRON_MATURITY - Generate interactive chevron maturity chart HTML
 - POST /v1.2/atomic/IDEA_BOARD - Generate interactive 2D matrix idea board HTML
+- POST /v1.2/atomic/CLOUD_ARCHITECTURE - Generate interactive cloud architecture diagram HTML
+- POST /v1.2/atomic/LOGICAL_ARCHITECTURE - Generate interactive logical architecture diagram HTML
 - GET /v1.2/atomic/health - Health check for atomic endpoints
 - GET /v1.2/atomic/components - List available atomic components
 
@@ -66,6 +68,28 @@ IDEA_BOARD (v1.0.0):
 - Light/dark mode theming with CSS variables
 - State persistence via postMessage + auto-save
 
+CLOUD_ARCHITECTURE (v1.0.0):
+- Interactive cloud architecture diagrams
+- 2 position presets: full_content, left_four_fifths
+- 4 cloud providers: AWS (orange), GCP (blue), Azure (blue), Generic (purple)
+- Horizontal layer visualization (presentation, application, data, infrastructure)
+- Draggable cloud service components
+- SVG bezier curve connections with arrow markers
+- Add/edit/delete components via modal
+- Light/dark mode theming with CSS variables
+- State persistence via postMessage + auto-save
+
+LOGICAL_ARCHITECTURE (v1.0.0):
+- Interactive logical/system architecture diagrams
+- 2 position presets: full_content, left_four_fifths
+- 14 component types: service, module, interface, database, api, gateway, etc.
+- 6 group/boundary types: boundary, subsystem, layer, domain, zone, cluster
+- Dashed rectangle group boundaries for component grouping
+- SVG connections with solid, dashed, or dotted styles
+- UML-style stereotypes (e.g., <<controller>>, <<repository>>)
+- Light/dark mode theming with CSS variables
+- State persistence via postMessage + auto-save
+
 v1.0.0: Initial atomic CODE_DISPLAY endpoint
 v1.1.0: Added position presets, color themes, external margin, scrolling, prompt generation
 v1.2.0: Refactored to inline styles for Layout Service compatibility, added border_radius
@@ -73,6 +97,8 @@ v1.3.0: Added KANBAN_BOARD atomic endpoint
 v1.4.0: Added GANTT_CHART atomic endpoint
 v1.5.0: Added CHEVRON_MATURITY atomic endpoint
 v1.6.0: Added IDEA_BOARD atomic endpoint
+v1.7.0: Added CLOUD_ARCHITECTURE atomic endpoint (cloud service diagrams with AWS/GCP/Azure styling)
+v1.8.0: Added LOGICAL_ARCHITECTURE atomic endpoint (system component diagrams with groups and connections)
 """
 
 import asyncio
@@ -102,11 +128,23 @@ from models.idea_board_atomic_models import (
     IdeaBoardAtomicResponse,
     IDEABOARD_POSITION_PRESETS
 )
+from models.cloud_architecture_atomic_models import (
+    CloudArchitectureAtomicRequest,
+    CloudArchitectureAtomicResponse,
+    CLOUD_ARCH_POSITION_PRESETS
+)
+from models.logical_architecture_atomic_models import (
+    LogicalArchitectureAtomicRequest,
+    LogicalArchitectureAtomicResponse,
+    LOGICAL_ARCH_POSITION_PRESETS
+)
 from services.code_display_service import CodeDisplayGenerator
 from services.kanban_atomic_service import KanbanAtomicGenerator
 from services.gantt_atomic_service import GanttAtomicGenerator
 from services.chevron_atomic_service import ChevronAtomicGenerator
 from services.idea_board_atomic_service import IdeaBoardGenerator
+from services.cloud_architecture_atomic_service import CloudArchitectureGenerator
+from services.logical_architecture_atomic_service import LogicalArchitectureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +157,8 @@ _kanban_generator: KanbanAtomicGenerator = None
 _gantt_generator: GanttAtomicGenerator = None
 _chevron_generator: ChevronAtomicGenerator = None
 _ideaboard_generator: IdeaBoardGenerator = None
+_cloudarch_generator: CloudArchitectureGenerator = None
+_logicalarch_generator: LogicalArchitectureGenerator = None
 
 
 def get_code_generator() -> CodeDisplayGenerator:
@@ -159,6 +199,22 @@ def get_ideaboard_generator() -> IdeaBoardGenerator:
     if _ideaboard_generator is None:
         _ideaboard_generator = IdeaBoardGenerator()
     return _ideaboard_generator
+
+
+def get_cloudarch_generator() -> CloudArchitectureGenerator:
+    """Get or create the CloudArchitectureGenerator singleton."""
+    global _cloudarch_generator
+    if _cloudarch_generator is None:
+        _cloudarch_generator = CloudArchitectureGenerator()
+    return _cloudarch_generator
+
+
+def get_logicalarch_generator() -> LogicalArchitectureGenerator:
+    """Get or create the LogicalArchitectureGenerator singleton."""
+    global _logicalarch_generator
+    if _logicalarch_generator is None:
+        _logicalarch_generator = LogicalArchitectureGenerator()
+    return _logicalarch_generator
 
 
 # =============================================================================
@@ -714,6 +770,135 @@ async def generate_idea_board(
 
 
 # =============================================================================
+# POST /v1.2/atomic/CLOUD_ARCHITECTURE
+# =============================================================================
+
+@router.post("/CLOUD_ARCHITECTURE", response_model=CloudArchitectureAtomicResponse)
+async def generate_cloud_architecture(
+    request: CloudArchitectureAtomicRequest
+) -> CloudArchitectureAtomicResponse:
+    """
+    Generate CLOUD_ARCHITECTURE atomic component (interactive cloud architecture diagram).
+
+    The cloud architecture diagram includes:
+    - Draggable cloud service components
+    - SVG connection paths with bezier curves and arrow markers
+    - Layer visualization (presentation, application, data, infrastructure)
+    - Add/edit/delete components via modal
+    - 4 cloud providers: AWS (orange), GCP (blue), Azure (blue), Generic (purple)
+    - Light/dark mode theming with CSS variables
+    - State persistence via postMessage
+
+    **Request Body**:
+    - provider: Default cloud provider (aws, gcp, azure, generic)
+    - title: Diagram title (optional)
+    - components: List of cloud components
+    - connections: List of connections between components
+    - show_layers: Show horizontal layer bands (default: True)
+    - layers: Layers to display (presentation, application, data, infrastructure)
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth/gridHeight: Grid dimensions
+    - external_margin: Margin in pixels
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Cloud Providers**:
+    - aws: Amazon Web Services (orange accent)
+    - gcp: Google Cloud Platform (blue accent)
+    - azure: Microsoft Azure (blue accent)
+    - generic: Generic cloud (purple accent)
+    """
+    try:
+        generator = get_cloudarch_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-CLOUD_ARCHITECTURE-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-CLOUD_ARCHITECTURE-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# POST /v1.2/atomic/LOGICAL_ARCHITECTURE
+# =============================================================================
+
+@router.post("/LOGICAL_ARCHITECTURE", response_model=LogicalArchitectureAtomicResponse)
+async def generate_logical_architecture(
+    request: LogicalArchitectureAtomicRequest
+) -> LogicalArchitectureAtomicResponse:
+    """
+    Generate LOGICAL_ARCHITECTURE atomic component (interactive system architecture diagram).
+
+    The logical architecture diagram includes:
+    - Draggable system components with type labels and stereotypes
+    - Group/boundary containers with dashed borders
+    - SVG connection paths (solid, dashed, dotted styles)
+    - Add/edit/delete components and groups via modals
+    - Light/dark mode theming with CSS variables
+    - State persistence via postMessage
+
+    **Request Body**:
+    - title: Diagram title (optional)
+    - components: List of system components
+    - groups: List of group/boundary containers
+    - connections: List of connections between components
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth/gridHeight: Grid dimensions
+    - external_margin: Margin in pixels
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Component Types**:
+    service, module, interface, database, api, gateway, queue, cache,
+    worker, external, client, auth, storage, generic
+
+    **Group Types**:
+    boundary, subsystem, layer, domain, zone, cluster
+
+    **Connection Styles**:
+    solid, dashed, dotted
+    """
+    try:
+        generator = get_logicalarch_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-LOGICAL_ARCHITECTURE-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-LOGICAL_ARCHITECTURE-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # GET /v1.2/atomic/health
 # =============================================================================
 
@@ -727,7 +912,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -899,6 +1084,74 @@ async def atomic_health():
                     "theme": "default",
                     "theme_mode": "light",
                     "axis_preset": "impact_urgency",
+                    "external_margin": 10
+                }
+            },
+            "CLOUD_ARCHITECTURE": {
+                "path": "/v1.2/atomic/CLOUD_ARCHITECTURE",
+                "component_id": "cloud_architecture",
+                "count_range": "1 (single diagram)",
+                "flexible_items": True,
+                "cloud_providers": ["aws", "gcp", "azure", "generic"],
+                "layers": ["presentation", "application", "data", "infrastructure"],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "drag_and_drop": True,
+                    "add_component": True,
+                    "edit_component": True,
+                    "delete_component": True,
+                    "svg_connections": True,
+                    "bezier_paths": True,
+                    "layer_visualization": True,
+                    "provider_colors": True,
+                    "placeholder_mode": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "provider": "generic",
+                    "theme_mode": "light",
+                    "show_layers": True,
+                    "external_margin": 10
+                }
+            },
+            "LOGICAL_ARCHITECTURE": {
+                "path": "/v1.2/atomic/LOGICAL_ARCHITECTURE",
+                "component_id": "logical_architecture",
+                "count_range": "1 (single diagram)",
+                "flexible_items": True,
+                "component_types": [
+                    "service", "module", "interface", "database", "api",
+                    "gateway", "queue", "cache", "worker", "external"
+                ],
+                "group_types": ["boundary", "subsystem", "layer", "domain", "zone", "cluster"],
+                "connection_styles": ["solid", "dashed", "dotted"],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "drag_and_drop": True,
+                    "add_component": True,
+                    "edit_component": True,
+                    "delete_component": True,
+                    "group_boundaries": True,
+                    "svg_connections": True,
+                    "bezier_paths": True,
+                    "stereotypes": True,
+                    "placeholder_mode": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "theme_mode": "light",
                     "external_margin": 10
                 }
             }
@@ -1274,6 +1527,191 @@ async def list_atomic_components():
                     "state_persistence": "postMessage-based state sync for auto-save integration",
                     "detail_panel": "Slide-in panel with Why/How/What fields and benefit score stars",
                     "axis_presets": "5 built-in axis configurations with custom override support"
+                }
+            },
+            {
+                "type": "CLOUD_ARCHITECTURE",
+                "component_id": "cloud_architecture",
+                "version": "1.0.0",
+                "description": "Interactive cloud architecture diagram with draggable components, SVG bezier connections, layer visualization, provider-specific styling, light/dark mode, and state persistence",
+                "use_cases": [
+                    "cloud infrastructure diagrams",
+                    "AWS architecture",
+                    "GCP architecture",
+                    "Azure architecture",
+                    "serverless architectures",
+                    "microservices deployment",
+                    "multi-tier applications"
+                ],
+                "instance_range": {"min": 1, "max": 1},
+                "cloud_providers": {
+                    "aws": {"accent": "#FF9900", "description": "Amazon Web Services"},
+                    "gcp": {"accent": "#4285F4", "description": "Google Cloud Platform"},
+                    "azure": {"accent": "#0078D4", "description": "Microsoft Azure"},
+                    "generic": {"accent": "#8B5CF6", "description": "Generic cloud provider"}
+                },
+                "layer_types": ["presentation", "application", "data", "infrastructure", "network", "security"],
+                "component_types": [
+                    "compute", "lambda", "container", "kubernetes",
+                    "storage", "database", "cache", "queue",
+                    "api_gateway", "load_balancer", "cdn",
+                    "iam", "vpc", "firewall", "dns",
+                    "monitoring", "logging", "ml", "analytics"
+                ],
+                "position_presets": {
+                    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+                    "left_four_fifths": {"start_col": 2, "start_row": 4, "gridWidth": 24, "gridHeight": 14}
+                },
+                "flexible_items": True,
+                "supports_placeholder_mode": True,
+                "supports_prompt_generation": False,
+                "default_options": {
+                    "provider": "generic",
+                    "theme_mode": "light",
+                    "show_layers": True,
+                    "external_margin": 10
+                },
+                "interactive_features": {
+                    "drag_and_drop": {
+                        "description": "Drag cloud components to reposition on the diagram",
+                        "mode": "view"
+                    },
+                    "add_component": {
+                        "description": "Click '+ Add Component' button to add new components via modal",
+                        "mode": "view"
+                    },
+                    "edit_component": {
+                        "description": "Click component to edit via modal (name, type, provider, layer)",
+                        "mode": "view"
+                    },
+                    "delete_component": {
+                        "description": "Delete button in edit modal",
+                        "mode": "view"
+                    },
+                    "svg_connections": {
+                        "description": "SVG bezier curve connections with arrow markers between components",
+                        "mode": "view"
+                    },
+                    "layer_visualization": {
+                        "description": "Horizontal layer bands with labels (presentation, application, data, infrastructure)",
+                        "mode": "view"
+                    }
+                },
+                "component_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "name": {"type": "string", "max_length": 30, "required": True},
+                    "type": {"type": "enum", "values": ["compute", "lambda", "container", "storage", "database", "cache", "queue", "api_gateway", "load_balancer", "cdn", "iam", "vpc", "firewall", "monitoring"], "required": True},
+                    "provider": {"type": "enum", "values": ["aws", "gcp", "azure", "generic"], "optional": True},
+                    "layer": {"type": "enum", "values": ["presentation", "application", "data", "infrastructure", "network", "security"], "optional": True},
+                    "x_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "y_position": {"type": "float", "min": 0, "max": 100, "required": True}
+                },
+                "connection_properties": {
+                    "from_id": {"type": "string", "required": True},
+                    "to_id": {"type": "string", "required": True},
+                    "label": {"type": "string", "max_length": 20, "optional": True},
+                    "connection_type": {"type": "enum", "values": ["sync", "async", "data", "event"], "default": "sync"}
+                },
+                "v1.0.0_features": {
+                    "inline_styles": "All critical styles are inline for Layout Service compatibility",
+                    "view_mode_interactivity": "Add, edit, delete, drag components without entering edit mode",
+                    "theme_support": "Light/dark mode via CSS variables with provider-specific accent colors",
+                    "state_persistence": "postMessage-based state sync for auto-save integration",
+                    "svg_connections": "Bezier curve paths with arrow markers for component connections",
+                    "layer_bands": "Optional horizontal layer visualization with semi-transparent backgrounds"
+                }
+            },
+            {
+                "type": "LOGICAL_ARCHITECTURE",
+                "component_id": "logical_architecture",
+                "version": "1.0.0",
+                "description": "Interactive logical/system architecture diagram with draggable components, group boundaries, SVG connections with multiple styles, stereotypes, light/dark mode, and state persistence",
+                "use_cases": [
+                    "system architecture diagrams",
+                    "software design",
+                    "component diagrams",
+                    "layer architecture",
+                    "domain-driven design",
+                    "microservices architecture",
+                    "API design visualization"
+                ],
+                "instance_range": {"min": 1, "max": 1},
+                "component_types": [
+                    "service", "module", "interface", "database", "api",
+                    "gateway", "queue", "cache", "worker", "external",
+                    "client", "auth", "storage", "generic"
+                ],
+                "group_types": ["boundary", "subsystem", "layer", "domain", "zone", "cluster"],
+                "connection_styles": ["solid", "dashed", "dotted"],
+                "position_presets": {
+                    "full_content": {"start_col": 2, "start_row": 4, "gridWidth": 30, "gridHeight": 14},
+                    "left_four_fifths": {"start_col": 2, "start_row": 4, "gridWidth": 24, "gridHeight": 14}
+                },
+                "flexible_items": True,
+                "supports_placeholder_mode": True,
+                "supports_prompt_generation": False,
+                "default_options": {
+                    "theme_mode": "light",
+                    "external_margin": 10
+                },
+                "interactive_features": {
+                    "drag_and_drop": {
+                        "description": "Drag system components to reposition on the diagram",
+                        "mode": "view"
+                    },
+                    "add_component": {
+                        "description": "Click '+ Add Component' button to add new components via modal",
+                        "mode": "view"
+                    },
+                    "edit_component": {
+                        "description": "Click component to edit via modal (name, type, stereotype)",
+                        "mode": "view"
+                    },
+                    "delete_component": {
+                        "description": "Delete button in edit modal",
+                        "mode": "view"
+                    },
+                    "group_boundaries": {
+                        "description": "Dashed rectangle boundaries to group related components",
+                        "mode": "view"
+                    },
+                    "svg_connections": {
+                        "description": "SVG bezier curve connections with solid/dashed/dotted styles",
+                        "mode": "view"
+                    }
+                },
+                "component_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "name": {"type": "string", "max_length": 30, "required": True},
+                    "type": {"type": "enum", "values": ["service", "module", "interface", "database", "api", "gateway", "queue", "cache", "worker", "external", "client", "auth", "storage", "generic"], "required": True},
+                    "stereotype": {"type": "string", "max_length": 20, "optional": True, "description": "UML-style stereotype like <<controller>> or <<repository>>"},
+                    "x_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "y_position": {"type": "float", "min": 0, "max": 100, "required": True}
+                },
+                "group_properties": {
+                    "id": {"type": "string", "auto_generated": True},
+                    "name": {"type": "string", "max_length": 30, "required": True},
+                    "type": {"type": "enum", "values": ["boundary", "subsystem", "layer", "domain", "zone", "cluster"], "default": "boundary"},
+                    "x_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "y_position": {"type": "float", "min": 0, "max": 100, "required": True},
+                    "width": {"type": "float", "min": 10, "max": 100, "required": True},
+                    "height": {"type": "float", "min": 10, "max": 100, "required": True}
+                },
+                "connection_properties": {
+                    "from_id": {"type": "string", "required": True},
+                    "to_id": {"type": "string", "required": True},
+                    "label": {"type": "string", "max_length": 20, "optional": True},
+                    "style": {"type": "enum", "values": ["solid", "dashed", "dotted"], "default": "solid"},
+                    "direction": {"type": "enum", "values": ["forward", "backward", "bidirectional"], "default": "forward"}
+                },
+                "v1.0.0_features": {
+                    "inline_styles": "All critical styles are inline for Layout Service compatibility",
+                    "view_mode_interactivity": "Add, edit, delete, drag components without entering edit mode",
+                    "theme_support": "Light/dark mode via CSS variables with component type colors",
+                    "state_persistence": "postMessage-based state sync for auto-save integration",
+                    "svg_connections": "Bezier curve paths with solid/dashed/dotted styles and arrow markers",
+                    "group_boundaries": "Dashed rectangle containers for grouping related components",
+                    "stereotypes": "UML-style stereotypes displayed above component names"
                 }
             }
         ]

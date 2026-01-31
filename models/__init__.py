@@ -28,6 +28,30 @@ from .gantt_atomic_models import (
     GANTT_STATUS_COLORS
 )
 
+from .cloud_architecture_atomic_models import (
+    CloudComponent,
+    CloudConnection,
+    CloudArchitectureAtomicRequest,
+    CloudArchitectureAtomicResponse,
+    CLOUD_ARCH_POSITION_PRESETS,
+    CLOUD_ARCH_THEMES,
+    PROVIDER_COLORS,
+    LAYER_COLORS,
+    COMPONENT_TYPE_COLORS
+)
+
+from .logical_architecture_atomic_models import (
+    LogicalComponent,
+    LogicalGroup,
+    LogicalConnection,
+    LogicalArchitectureAtomicRequest,
+    LogicalArchitectureAtomicResponse,
+    LOGICAL_ARCH_POSITION_PRESETS,
+    LOGICAL_ARCH_THEMES,
+    LOGICAL_COMPONENT_COLORS,
+    GROUP_COLORS
+)
+
 from .diagram_models import (
     DiagramSpec,
     DiagramType,
@@ -93,6 +117,26 @@ __all__ = [
     "GANTT_POSITION_PRESETS",
     "GANTT_THEMES",
     "GANTT_STATUS_COLORS",
+    # Cloud Architecture models
+    "CloudComponent",
+    "CloudConnection",
+    "CloudArchitectureAtomicRequest",
+    "CloudArchitectureAtomicResponse",
+    "CLOUD_ARCH_POSITION_PRESETS",
+    "CLOUD_ARCH_THEMES",
+    "PROVIDER_COLORS",
+    "LAYER_COLORS",
+    "COMPONENT_TYPE_COLORS",
+    # Logical Architecture models
+    "LogicalComponent",
+    "LogicalGroup",
+    "LogicalConnection",
+    "LogicalArchitectureAtomicRequest",
+    "LogicalArchitectureAtomicResponse",
+    "LOGICAL_ARCH_POSITION_PRESETS",
+    "LOGICAL_ARCH_THEMES",
+    "LOGICAL_COMPONENT_COLORS",
+    "GROUP_COLORS",
     # Existing exports
     "DiagramRequest",
     "DiagramSpec",
