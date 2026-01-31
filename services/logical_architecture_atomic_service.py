@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.0.0
+LOGICAL_ARCHITECTURE HTML Generation Service v1.1.0
 
 Generates self-contained HTML for logical/system architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -7,8 +7,17 @@ Includes embedded CSS and JavaScript for:
 - Group/boundary containers with dashed borders
 - SVG connection paths with multiple line styles
 - Add/Edit/Delete modals for components and groups
+- Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+- LLM-based diagram generation from prompts
+
+v1.1.0 Enhancements:
+- Professional SVG icons for all component types (15+ icons)
+- Wider component cards (130px vs 100px) with 2-line text support
+- Dynamic group management UI (add/edit/delete/resize groups)
+- LLM-based generation via Gemini
+- Improved connection arrow rendering
 
 v1.0.0 Initial Release:
 - Complete HTML generation with embedded styles
@@ -25,6 +34,7 @@ import logging
 import time
 import uuid
 import json
+import os
 from typing import List, Optional
 
 from models.logical_architecture_atomic_models import (
@@ -40,6 +50,72 @@ from models.logical_architecture_atomic_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# SVG Icon Library v1.1.0
+# =============================================================================
+
+LOGICAL_SVG_ICONS = {
+    # Service - Gear icon
+    "service": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+
+    # Module - Package/Box icon
+    "module": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+
+    # Interface - Plug icon
+    "interface": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6"/><path d="M12 22v-6"/><circle cx="12" cy="12" r="4"/><path d="M2 12h6"/><path d="M22 12h-6"/></svg>',
+
+    # Database - Cylinder icon
+    "database": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+
+    # API - Link icon
+    "api": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>',
+
+    # Gateway - Door icon
+    "gateway": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 9l3 3-3 3"/></svg>',
+
+    # Queue - Layers icon
+    "queue": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+
+    # Cache - Lightning icon
+    "cache": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+
+    # Worker - Hard hat icon
+    "worker": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+
+    # Scheduler - Clock icon
+    "scheduler": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+
+    # External - Globe with arrow
+    "external": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8"/><polyline points="16 14 16 8 10 8"/></svg>',
+
+    # Client - User icon
+    "client": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+
+    # Auth - Lock icon
+    "auth": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+
+    # Storage - HDD icon
+    "storage": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+
+    # Config - Sliders icon
+    "config": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>',
+
+    # Logging - File text icon
+    "logging": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>',
+
+    # Monitoring - Activity icon
+    "monitoring": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+
+    # Proxy - Shield icon
+    "proxy": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+
+    # Load Balancer - Balance icon
+    "load_balancer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="4 8 12 5 20 8"/><circle cx="4" cy="14" r="3"/><circle cx="20" cy="14" r="3"/></svg>',
+
+    # Generic - Box icon
+    "generic": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+}
 
 
 class LogicalArchitectureGenerator:
@@ -77,6 +153,10 @@ class LogicalArchitectureGenerator:
             components = list(request.components)
             groups = list(request.groups)
             connections = list(request.connections)
+
+            # Check for LLM prompt generation
+            if request.prompt and not components:
+                components, groups, connections = await self._generate_architecture_from_prompt(request.prompt)
 
             if request.placeholder_mode and not components:
                 components, groups, connections = self._generate_placeholder_architecture()
@@ -140,7 +220,7 @@ class LogicalArchitectureGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "1.0.0"
+                    "version": "1.1.0"
                 },
                 grid_position=grid_position
             )
@@ -152,6 +232,119 @@ class LogicalArchitectureGenerator:
                 component_type="logical_architecture",
                 error=str(e)
             )
+
+    async def _generate_architecture_from_prompt(self, prompt: str) -> tuple:
+        """
+        Generate logical architecture from natural language prompt using Gemini.
+
+        Args:
+            prompt: Natural language description of the architecture
+
+        Returns:
+            Tuple of (components, groups, connections)
+        """
+        try:
+            import google.generativeai as genai
+
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if not api_key:
+                logger.warning("[LOGICAL_ARCHITECTURE] No Gemini API key found, using placeholder")
+                return self._generate_placeholder_architecture()
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
+            system_prompt = f"""You are a software architect. Generate a logical architecture diagram based on the user's description.
+
+User Request: {prompt}
+
+Generate a JSON response with:
+1. groups: Array of logical groups/boundaries with:
+   - id: unique string like "grp_1", "grp_2", etc.
+   - name: group name (max 30 chars)
+   - type: one of [boundary, subsystem, layer, domain, zone, cluster]
+   - x_position: 5-70 (percentage, left edge)
+   - y_position: 5-60 (percentage, top edge)
+   - width: 20-40 (percentage)
+   - height: 25-45 (percentage)
+
+2. components: Array of components with:
+   - id: unique string like "comp_1", "comp_2", etc.
+   - name: component name (max 25 chars)
+   - type: one of [service, module, interface, database, api, gateway, queue, cache, worker, external, client, auth, storage]
+   - group_id: id of parent group (or empty string if not in a group)
+   - x_position: 5-95 (percentage, center position)
+   - y_position: 5-95 (percentage, center position)
+   - stereotype: optional UML stereotype like "<<service>>", "<<controller>>"
+
+3. connections: Array of connections with:
+   - from_id: source component id
+   - to_id: target component id
+   - label: optional connection label (e.g., "HTTP", "SQL", "Event")
+   - style: one of [solid, dashed, dotted]
+   - direction: one of [forward, backward, bidirectional]
+
+Guidelines:
+- Create 2-4 logical groups
+- Place 6-10 components distributed across groups
+- Components inside a group should have positions within the group bounds
+- Create meaningful connections between components
+- Use appropriate stereotypes for component types
+
+Return ONLY valid JSON, no markdown or explanation."""
+
+            response = model.generate_content(system_prompt)
+            response_text = response.text.strip()
+
+            # Clean up response if wrapped in markdown
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            data = json.loads(response_text)
+
+            groups = []
+            for grp_data in data.get("groups", []):
+                groups.append(LogicalGroup(
+                    id=grp_data.get("id", f"grp-{uuid.uuid4().hex[:8]}"),
+                    name=grp_data.get("name", "Group"),
+                    type=grp_data.get("type", "boundary"),
+                    x_position=float(grp_data.get("x_position", 10)),
+                    y_position=float(grp_data.get("y_position", 10)),
+                    width=float(grp_data.get("width", 30)),
+                    height=float(grp_data.get("height", 30))
+                ))
+
+            components = []
+            for comp_data in data.get("components", []):
+                components.append(LogicalComponent(
+                    id=comp_data.get("id", f"lcomp-{uuid.uuid4().hex[:8]}"),
+                    name=comp_data.get("name", "Component"),
+                    type=comp_data.get("type", "service"),
+                    group_id=comp_data.get("group_id"),
+                    x_position=float(comp_data.get("x_position", 50)),
+                    y_position=float(comp_data.get("y_position", 50)),
+                    stereotype=comp_data.get("stereotype")
+                ))
+
+            connections = []
+            for conn_data in data.get("connections", []):
+                connections.append(LogicalConnection(
+                    from_id=conn_data.get("from_id", ""),
+                    to_id=conn_data.get("to_id", ""),
+                    label=conn_data.get("label"),
+                    style=conn_data.get("style", "solid"),
+                    direction=conn_data.get("direction", "forward")
+                ))
+
+            logger.info(f"[LOGICAL_ARCHITECTURE] Generated {len(components)} components, {len(groups)} groups, {len(connections)} connections from prompt")
+            return components, groups, connections
+
+        except Exception as e:
+            logger.error(f"[LOGICAL_ARCHITECTURE] LLM generation failed: {e}", exc_info=True)
+            return self._generate_placeholder_architecture()
 
     def _generate_placeholder_architecture(self) -> tuple:
         """Generate placeholder architecture for testing."""
@@ -293,7 +486,7 @@ class LogicalArchitectureGenerator:
         dark_colors = LOGICAL_ARCH_THEMES["dark"]
 
         return f'''<style>
-/* Deckster LOGICAL_ARCHITECTURE Theme Variables - v1.0.0 */
+/* Deckster LOGICAL_ARCHITECTURE Theme Variables - v1.1.0 */
 :root {{
     --larch-bg: {light_colors["bg"]};
     --larch-container-bg: {light_colors["container_bg"]};
@@ -310,6 +503,7 @@ class LogicalArchitectureGenerator:
     --larch-button-hover: {light_colors["button_hover"]};
     --larch-input-bg: {light_colors["input_bg"]};
     --larch-input-border: {light_colors["input_border"]};
+    --larch-icon-color: {light_colors["text_secondary"]};
 }}
 :root.theme-dark {{
     --larch-bg: {dark_colors["bg"]};
@@ -327,6 +521,7 @@ class LogicalArchitectureGenerator:
     --larch-button-hover: {dark_colors["button_hover"]};
     --larch-input-bg: {dark_colors["input_bg"]};
     --larch-input-border: {dark_colors["input_border"]};
+    --larch-icon-color: {dark_colors["text_secondary"]};
 }}
 </style>'''
 
@@ -345,6 +540,10 @@ class LogicalArchitectureGenerator:
 })();
 </script>'''
 
+    def _get_svg_icon(self, comp_type: str) -> str:
+        """Get SVG icon for component type."""
+        return LOGICAL_SVG_ICONS.get(comp_type, LOGICAL_SVG_ICONS.get("generic", ""))
+
     def _generate_groups_html(self, groups: List[LogicalGroup], theme_mode: str) -> str:
         """Generate HTML for group/boundary containers."""
         html_parts = []
@@ -356,22 +555,27 @@ class LogicalArchitectureGenerator:
 
             html_parts.append(f'''<div class="logical-group group-{grp.type}"
      data-group-id="{grp.id}"
+     data-group-type="{grp.type}"
      style="left: {grp.x_position}%; top: {grp.y_position}%; width: {grp.width}%; height: {grp.height}%; --group-border: {colors["border"]}; --group-bg: {colors["bg"]};">
-    <div class="group-header">
+    <div class="group-header" onclick="logArchs[this.closest('.logical-architecture-container').id].openEditGroupModal('{grp.id}')">
         <span class="group-name">{self._escape_html(grp.name)}</span>
         <span class="group-type">[{grp.type.upper()}]</span>
     </div>
+    <div class="group-resize-handle resize-se"></div>
 </div>''')
 
         return "\n".join(html_parts)
 
     def _generate_components_html(self, components: List[LogicalComponent], element_id: str) -> str:
-        """Generate HTML for logical components."""
+        """Generate HTML for logical components with SVG icons."""
         html_parts = []
 
         for comp in components:
             # Get component color
             type_color = LOGICAL_COMPONENT_COLORS.get(comp.type, LOGICAL_COMPONENT_COLORS["service"])
+
+            # Get SVG icon
+            svg_icon = self._get_svg_icon(comp.type)
 
             # Stereotype label
             stereotype_html = ""
@@ -383,6 +587,7 @@ class LogicalArchitectureGenerator:
      data-component-type="{comp.type}"
      data-group-id="{comp.group_id or ''}"
      style="left: {comp.x_position}%; top: {comp.y_position}%; --comp-color: {type_color};">
+    <div class="component-icon">{svg_icon}</div>
     {stereotype_html}
     <div class="component-name">{self._escape_html(comp.name)}</div>
     <div class="component-type-label">{comp.type.replace('_', ' ').title()}</div>
@@ -454,13 +659,16 @@ class LogicalArchitectureGenerator:
         pixel_width = request.gridWidth * 60 - 20
         pixel_height = request.gridHeight * 60 - 20
 
+        # SVG icons JSON for JavaScript
+        svg_icons_json = json.dumps(LOGICAL_SVG_ICONS)
+
         theme_class = "theme-dark" if theme_mode == "dark" else "theme-light"
 
         html = f'''{theme_css}
 {theme_sync_script}
 <style>
 /* ============================================
-   LOGICAL_ARCHITECTURE CSS v1.0.0
+   LOGICAL_ARCHITECTURE CSS v1.1.0
    ============================================ */
 
 * {{
@@ -506,6 +714,14 @@ class LogicalArchitectureGenerator:
     align-items: center;
     gap: 8px;
     margin-bottom: 4px;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}}
+
+.group-header:hover {{
+    background: rgba(0,0,0,0.05);
 }}
 
 .group-name {{
@@ -519,6 +735,27 @@ class LogicalArchitectureGenerator:
     font-weight: 500;
     color: var(--larch-text-secondary);
     text-transform: uppercase;
+}}
+
+/* Group Resize Handle */
+.group-resize-handle {{
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    background: var(--group-border, var(--larch-border));
+    border-radius: 2px;
+    cursor: se-resize;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}}
+
+.logical-group:hover .group-resize-handle {{
+    opacity: 0.6;
+}}
+
+.group-resize-handle.resize-se {{
+    bottom: 2px;
+    right: 2px;
 }}
 
 /* SVG Connections Layer */
@@ -563,12 +800,12 @@ class LogicalArchitectureGenerator:
     z-index: 10;
 }}
 
-/* Logical Component */
+/* Logical Component - v1.1.0 wider cards with icons */
 .logical-component {{
     position: absolute;
-    min-width: 100px;
-    min-height: 60px;
-    padding: 10px 14px;
+    min-width: 130px;
+    min-height: 85px;
+    padding: 12px 16px;
     background: var(--larch-component-bg);
     border: 2px solid var(--comp-color, var(--larch-component-border));
     border-radius: 6px;
@@ -592,6 +829,19 @@ class LogicalArchitectureGenerator:
     opacity: 0.9;
 }}
 
+/* SVG Icon Styling */
+.component-icon {{
+    width: 24px;
+    height: 24px;
+    margin: 0 auto 4px auto;
+    color: var(--comp-color, var(--larch-icon-color));
+}}
+
+.component-icon svg {{
+    width: 100%;
+    height: 100%;
+}}
+
 .component-stereotype {{
     font-size: 9px;
     font-weight: 500;
@@ -600,15 +850,19 @@ class LogicalArchitectureGenerator:
     font-style: italic;
 }}
 
+/* Component Name - v1.1.0 2-line support */
 .component-name {{
     font-size: 12px;
     font-weight: 600;
     color: var(--larch-text-primary);
-    line-height: 1.2;
-    max-width: 100px;
+    line-height: 1.3;
+    max-width: 110px;
+    margin: 0 auto;
     overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }}
 
 .component-type-label {{
@@ -618,11 +872,18 @@ class LogicalArchitectureGenerator:
     margin-top: 4px;
 }}
 
-/* Add Component Button */
-.add-component-btn {{
+/* Action Buttons */
+.action-buttons {{
     position: absolute;
     bottom: 15px;
     right: 15px;
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+}}
+
+.add-component-btn,
+.add-group-btn {{
     padding: 8px 16px;
     background: var(--larch-button-primary);
     color: white;
@@ -633,13 +894,21 @@ class LogicalArchitectureGenerator:
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    z-index: 50;
 }}
 
-.add-component-btn:hover {{
+.add-component-btn:hover,
+.add-group-btn:hover {{
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     background: var(--larch-button-hover);
+}}
+
+.add-group-btn {{
+    background: var(--larch-text-secondary);
+}}
+
+.add-group-btn:hover {{
+    background: var(--larch-text-primary);
 }}
 
 /* Modal Overlay */
@@ -800,9 +1069,12 @@ class LogicalArchitectureGenerator:
         {components_html}
     </div>
 
-    <button class="add-component-btn" onclick="logArchs['{element_id}'].openAddModal()">+ Add Component</button>
+    <div class="action-buttons">
+        <button class="add-group-btn" onclick="logArchs['{element_id}'].openAddGroupModal()">+ Group</button>
+        <button class="add-component-btn" onclick="logArchs['{element_id}'].openAddModal()">+ Component</button>
+    </div>
 
-    <!-- Modal -->
+    <!-- Component Modal -->
     <div class="modal-overlay" id="modal-{element_id}">
         <div class="modal-dialog">
             <div class="modal-header">
@@ -848,9 +1120,43 @@ class LogicalArchitectureGenerator:
         </div>
     </div>
 
+    <!-- Group Modal -->
+    <div class="modal-overlay" id="group-modal-{element_id}">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="group-modal-title-{element_id}">Add Group</h3>
+                <button class="modal-close" onclick="logArchs['{element_id}'].closeGroupModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="group-name-{element_id}">Group Name</label>
+                <input type="text" id="group-name-{element_id}" maxlength="50" placeholder="e.g., Core Services">
+            </div>
+            <div class="form-group">
+                <label for="group-type-{element_id}">Group Type</label>
+                <select id="group-type-{element_id}">
+                    <option value="boundary">Boundary</option>
+                    <option value="subsystem">Subsystem</option>
+                    <option value="layer">Layer</option>
+                    <option value="domain">Domain</option>
+                    <option value="zone">Zone</option>
+                    <option value="cluster">Cluster</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="group-desc-{element_id}">Description (optional)</label>
+                <textarea id="group-desc-{element_id}" rows="2" placeholder="Brief description..."></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="group-delete-{element_id}" onclick="logArchs['{element_id}'].deleteGroup()" style="display:none;">Delete</button>
+                <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeGroupModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveGroup()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     /* ============================================
-       LOGICAL_ARCHITECTURE JavaScript v1.0.0
+       LOGICAL_ARCHITECTURE JavaScript v1.1.0
        ============================================ */
 
     window.logArchs = window.logArchs || {{}};
@@ -862,9 +1168,10 @@ class LogicalArchitectureGenerator:
         var containerId = container.id;
         var presentationId = '';
         var currentEditingComponent = null;
+        var currentEditingGroup = null;
 
         // DOM elements
-        var componentsLayer, groupsLayer, connectionsLayer, modal;
+        var componentsLayer, groupsLayer, connectionsLayer, modal, groupModal;
 
         // State
         var componentsState = {components_json};
@@ -874,6 +1181,12 @@ class LogicalArchitectureGenerator:
         // Component type colors
         var typeColors = {json.dumps(LOGICAL_COMPONENT_COLORS)};
 
+        // Group colors
+        var groupColors = {json.dumps(GROUP_COLORS)};
+
+        // SVG Icons
+        var svgIcons = {svg_icons_json};
+
         // ============================================
         // INITIALIZATION
         // ============================================
@@ -882,18 +1195,220 @@ class LogicalArchitectureGenerator:
             componentsLayer = container.querySelector('.components-layer');
             groupsLayer = container.querySelector('.groups-layer');
             connectionsLayer = container.querySelector('.connections-layer');
-            modal = container.querySelector('.modal-overlay');
+            modal = container.querySelector('#modal-' + containerId);
+            groupModal = container.querySelector('#group-modal-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[LogArch v1.0] Required elements not found');
+                console.error('[LogArch v1.1] Required elements not found');
                 return;
             }}
 
             initDragDrop();
+            initGroupResize();
             renderConnections();
             listenForParentMessages();
 
-            console.log('[LogArch v1.0] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[LogArch v1.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+        }}
+
+        // ============================================
+        // GROUP MANAGEMENT
+        // ============================================
+
+        function initGroupResize() {{
+            groupsLayer.querySelectorAll('.group-resize-handle').forEach(function(handle) {{
+                handle.addEventListener('mousedown', startGroupResize);
+            }});
+        }}
+
+        var isResizing = false;
+        var resizingGroup = null;
+        var resizeStartPos = {{ x: 0, y: 0 }};
+        var resizeStartSize = {{ width: 0, height: 0 }};
+
+        function startGroupResize(e) {{
+            e.stopPropagation();
+            var group = e.target.closest('.logical-group');
+            if (!group) return;
+
+            isResizing = true;
+            resizingGroup = group;
+            resizeStartPos.x = e.clientX;
+            resizeStartPos.y = e.clientY;
+            resizeStartSize.width = group.offsetWidth;
+            resizeStartSize.height = group.offsetHeight;
+
+            document.addEventListener('mousemove', onGroupResize);
+            document.addEventListener('mouseup', endGroupResize);
+        }}
+
+        function onGroupResize(e) {{
+            if (!isResizing || !resizingGroup) return;
+
+            var containerRect = container.getBoundingClientRect();
+            var dx = e.clientX - resizeStartPos.x;
+            var dy = e.clientY - resizeStartPos.y;
+
+            var newWidth = resizeStartSize.width + dx;
+            var newHeight = resizeStartSize.height + dy;
+
+            // Min/max constraints
+            newWidth = Math.max(100, Math.min(newWidth, containerRect.width * 0.8));
+            newHeight = Math.max(80, Math.min(newHeight, containerRect.height * 0.8));
+
+            resizingGroup.style.width = (newWidth / containerRect.width * 100) + '%';
+            resizingGroup.style.height = (newHeight / containerRect.height * 100) + '%';
+        }}
+
+        function endGroupResize(e) {{
+            if (!isResizing || !resizingGroup) return;
+
+            // Update state
+            var containerRect = container.getBoundingClientRect();
+            var groupId = resizingGroup.dataset.groupId;
+            var grp = findGroup(groupId);
+            if (grp) {{
+                grp.width = parseFloat(resizingGroup.style.width);
+                grp.height = parseFloat(resizingGroup.style.height);
+                notifyStateChange('group-resize');
+            }}
+
+            isResizing = false;
+            resizingGroup = null;
+            document.removeEventListener('mousemove', onGroupResize);
+            document.removeEventListener('mouseup', endGroupResize);
+        }}
+
+        function openAddGroupModal() {{
+            currentEditingGroup = null;
+            container.querySelector('#group-modal-title-' + containerId).textContent = 'Add Group';
+            container.querySelector('#group-delete-' + containerId).style.display = 'none';
+            container.querySelector('#group-name-' + containerId).value = '';
+            container.querySelector('#group-type-' + containerId).value = 'boundary';
+            container.querySelector('#group-desc-' + containerId).value = '';
+            groupModal.classList.add('open');
+        }}
+
+        function openEditGroupModal(groupId) {{
+            var grp = findGroup(groupId);
+            if (!grp) return;
+
+            currentEditingGroup = grp;
+            container.querySelector('#group-modal-title-' + containerId).textContent = 'Edit Group';
+            container.querySelector('#group-delete-' + containerId).style.display = 'block';
+            container.querySelector('#group-name-' + containerId).value = grp.name;
+            container.querySelector('#group-type-' + containerId).value = grp.type;
+            container.querySelector('#group-desc-' + containerId).value = grp.description || '';
+            groupModal.classList.add('open');
+        }}
+
+        function closeGroupModal() {{
+            groupModal.classList.remove('open');
+            currentEditingGroup = null;
+        }}
+
+        function findGroup(groupId) {{
+            for (var i = 0; i < groupsState.length; i++) {{
+                if (groupsState[i].id === groupId) return groupsState[i];
+            }}
+            return null;
+        }}
+
+        function saveGroup() {{
+            var name = container.querySelector('#group-name-' + containerId).value.trim();
+            if (!name) {{
+                alert('Please enter a group name');
+                return;
+            }}
+
+            var groupData = {{
+                name: name,
+                type: container.querySelector('#group-type-' + containerId).value,
+                description: container.querySelector('#group-desc-' + containerId).value.trim()
+            }};
+
+            if (currentEditingGroup) {{
+                Object.assign(currentEditingGroup, groupData);
+                updateGroupInDOM(currentEditingGroup);
+                notifyStateChange('group-edit');
+            }} else {{
+                groupData.id = 'grp-' + Math.random().toString(36).substr(2, 8);
+                groupData.x_position = 10;
+                groupData.y_position = 10;
+                groupData.width = 30;
+                groupData.height = 30;
+                groupsState.push(groupData);
+                addGroupToDOM(groupData);
+                notifyStateChange('group-add');
+            }}
+
+            closeGroupModal();
+        }}
+
+        function deleteGroup() {{
+            if (!currentEditingGroup) return;
+            if (!confirm('Delete this group? Components inside will be unassigned.')) return;
+
+            var groupId = currentEditingGroup.id;
+
+            // Remove from state
+            groupsState = groupsState.filter(function(g) {{ return g.id !== groupId; }});
+
+            // Unassign components
+            componentsState.forEach(function(comp) {{
+                if (comp.group_id === groupId) comp.group_id = '';
+            }});
+
+            // Remove from DOM
+            var el = groupsLayer.querySelector('[data-group-id="' + groupId + '"]');
+            if (el) el.remove();
+
+            closeGroupModal();
+            notifyStateChange('group-delete');
+        }}
+
+        function addGroupToDOM(grp) {{
+            var themeMode = document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
+            var groupStyle = groupColors[grp.type] || groupColors['boundary'];
+            var colors = groupStyle[themeMode] || groupStyle['light'];
+
+            var div = document.createElement('div');
+            div.className = 'logical-group group-' + grp.type;
+            div.dataset.groupId = grp.id;
+            div.dataset.groupType = grp.type;
+            div.style.left = grp.x_position + '%';
+            div.style.top = grp.y_position + '%';
+            div.style.width = grp.width + '%';
+            div.style.height = grp.height + '%';
+            div.style.setProperty('--group-border', colors.border);
+            div.style.setProperty('--group-bg', colors.bg);
+
+            div.innerHTML = '<div class="group-header" onclick="logArchs[\\\'' + containerId + '\\\'].openEditGroupModal(\\\'' + grp.id + '\\\')">' +
+                '<span class="group-name">' + escapeHtml(grp.name) + '</span>' +
+                '<span class="group-type">[' + grp.type.toUpperCase() + ']</span>' +
+                '</div>' +
+                '<div class="group-resize-handle resize-se"></div>';
+
+            groupsLayer.appendChild(div);
+
+            // Initialize resize on new handle
+            div.querySelector('.group-resize-handle').addEventListener('mousedown', startGroupResize);
+        }}
+
+        function updateGroupInDOM(grp) {{
+            var el = groupsLayer.querySelector('[data-group-id="' + grp.id + '"]');
+            if (!el) return;
+
+            var themeMode = document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
+            var groupStyle = groupColors[grp.type] || groupColors['boundary'];
+            var colors = groupStyle[themeMode] || groupStyle['light'];
+
+            el.className = 'logical-group group-' + grp.type;
+            el.dataset.groupType = grp.type;
+            el.style.setProperty('--group-border', colors.border);
+            el.style.setProperty('--group-bg', colors.bg);
+            el.querySelector('.group-name').textContent = grp.name;
+            el.querySelector('.group-type').textContent = '[' + grp.type.toUpperCase() + ']';
         }}
 
         // ============================================
@@ -953,8 +1468,8 @@ class LogicalArchitectureGenerator:
             var y = e.clientY - containerRect.top - dragOffset.y;
 
             // Clamp to container
-            x = Math.max(50, Math.min(x, containerRect.width - 50));
-            y = Math.max(30, Math.min(y, containerRect.height - 30));
+            x = Math.max(65, Math.min(x, containerRect.width - 65));
+            y = Math.max(42, Math.min(y, containerRect.height - 42));
 
             draggedComponent.style.left = (x / containerRect.width * 100) + '%';
             draggedComponent.style.top = (y / containerRect.height * 100) + '%';
@@ -1196,6 +1711,7 @@ class LogicalArchitectureGenerator:
 
         function addComponentToDOM(comp) {{
             var typeColor = typeColors[comp.type] || typeColors['service'];
+            var svgIcon = svgIcons[comp.type] || svgIcons['generic'];
 
             var div = document.createElement('div');
             div.className = 'logical-component';
@@ -1208,7 +1724,7 @@ class LogicalArchitectureGenerator:
 
             var stereotypeHtml = comp.stereotype ? '<div class="component-stereotype">' + escapeHtml(comp.stereotype) + '</div>' : '';
 
-            div.innerHTML = stereotypeHtml +
+            div.innerHTML = '<div class="component-icon">' + svgIcon + '</div>' + stereotypeHtml +
                 '<div class="component-name">' + escapeHtml(comp.name) + '</div>' +
                 '<div class="component-type-label">' + comp.type.replace('_', ' ').replace(/\\b\\w/g, function(l){{ return l.toUpperCase(); }}) + '</div>';
 
@@ -1223,9 +1739,11 @@ class LogicalArchitectureGenerator:
             if (!el) return;
 
             var typeColor = typeColors[comp.type] || typeColors['service'];
+            var svgIcon = svgIcons[comp.type] || svgIcons['generic'];
 
             el.dataset.componentType = comp.type;
             el.style.setProperty('--comp-color', typeColor);
+            el.querySelector('.component-icon').innerHTML = svgIcon;
 
             var stereotypeEl = el.querySelector('.component-stereotype');
             if (comp.stereotype) {{
@@ -1235,7 +1753,7 @@ class LogicalArchitectureGenerator:
                     var newStereo = document.createElement('div');
                     newStereo.className = 'component-stereotype';
                     newStereo.textContent = comp.stereotype;
-                    el.insertBefore(newStereo, el.firstChild);
+                    el.querySelector('.component-icon').after(newStereo);
                 }}
             }} else if (stereotypeEl) {{
                 stereotypeEl.remove();
@@ -1273,7 +1791,7 @@ class LogicalArchitectureGenerator:
                     logArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[LogArch v1.0] State change notified:', action);
+                console.log('[LogArch v1.1] State change notified:', action);
             }} catch (e) {{
                 console.warn('[LogArch] Failed to notify parent:', e);
             }}
@@ -1289,12 +1807,21 @@ class LogicalArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[LogArch v1.0] Received init from parent');
+                console.log('[LogArch v1.1] Received init from parent');
             }});
         }}
 
         function restoreState(state) {{
             if (!state) return;
+
+            if (state.groups && state.groups.length > 0) {{
+                groupsLayer.innerHTML = '';
+                groupsState = state.groups;
+
+                groupsState.forEach(function(grp) {{
+                    addGroupToDOM(grp);
+                }});
+            }}
 
             if (state.components && state.components.length > 0) {{
                 componentsLayer.innerHTML = '';
@@ -1305,16 +1832,12 @@ class LogicalArchitectureGenerator:
                 }});
             }}
 
-            if (state.groups) {{
-                groupsState = state.groups;
-            }}
-
             if (state.connections) {{
                 connectionsState = state.connections;
                 renderConnections();
             }}
 
-            console.log('[LogArch v1.0] Restored state');
+            console.log('[LogArch v1.1] Restored state');
         }}
 
         // ============================================
@@ -1325,7 +1848,12 @@ class LogicalArchitectureGenerator:
             openAddModal: openAddModal,
             closeModal: closeModal,
             saveComponent: saveComponent,
-            deleteComponent: deleteComponent
+            deleteComponent: deleteComponent,
+            openAddGroupModal: openAddGroupModal,
+            openEditGroupModal: openEditGroupModal,
+            closeGroupModal: closeGroupModal,
+            saveGroup: saveGroup,
+            deleteGroup: deleteGroup
         }};
 
         // ============================================
@@ -1333,7 +1861,7 @@ class LogicalArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[LogArch v1.0] Registered namespace:', containerId);
+        console.log('[LogArch v1.1] Registered namespace:', containerId);
 
     }})();
     </script>

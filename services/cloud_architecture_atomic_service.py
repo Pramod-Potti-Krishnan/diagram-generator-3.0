@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.0.0
+CLOUD_ARCHITECTURE HTML Generation Service v1.1.0
 
 Generates self-contained HTML for cloud architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -7,9 +7,18 @@ Includes embedded CSS and JavaScript for:
 - SVG connection paths with bezier curves and arrow markers
 - Layer visualization (horizontal bands)
 - Add/Edit/Delete modal for components
+- Dynamic layer management UI
 - Connection drawing between components
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+- LLM-based diagram generation from prompts
+
+v1.1.0 Enhancements:
+- Professional SVG icons for all component types (20+ icons)
+- Wider component cards (130px vs 100px) with 2-line text support
+- Dynamic layer management UI (add/edit/delete layers)
+- LLM-based generation via Gemini
+- Improved connection arrow rendering
 
 v1.0.0 Initial Release:
 - Complete HTML generation with embedded styles
@@ -26,6 +35,7 @@ import logging
 import time
 import uuid
 import json
+import os
 from typing import List, Optional
 
 from models.cloud_architecture_atomic_models import (
@@ -41,6 +51,93 @@ from models.cloud_architecture_atomic_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# =============================================================================
+# SVG Icon Library v1.1.0
+# =============================================================================
+
+CLOUD_SVG_ICONS = {
+    # Compute - Server/CPU icon
+    "compute": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+    "ec2": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+    "vm": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+
+    # Lambda - Function/Lightning icon
+    "lambda": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    "function": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+
+    # Container - Box/Cube icon
+    "container": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+    "ecs": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
+    "eks": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>',
+
+    # Storage - HDD/Layers icon
+    "storage": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+    "s3": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12l10-7 10 7-10 7z"/><path d="M2 17l10 5 10-5"/><path d="M2 7l10 5 10-5"/></svg>',
+    "blob": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+    "gcs": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+
+    # Database - Cylinder icon
+    "database": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+    "rds": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>',
+    "dynamodb": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/><circle cx="12" cy="12" r="3"/></svg>',
+    "firestore": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+
+    # API Gateway - Door/Gate icon
+    "api_gateway": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 9l3 3-3 3"/></svg>',
+
+    # Load Balancer - Balance scale icon
+    "load_balancer": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="3" x2="12" y2="21"/><polyline points="4 8 12 5 20 8"/><circle cx="4" cy="14" r="3"/><circle cx="20" cy="14" r="3"/></svg>',
+
+    # CDN - Globe icon
+    "cdn": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    "cloudfront": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+
+    # DNS - Network icon
+    "dns": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    "route53": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+
+    # Queue - Layers icon
+    "queue": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    "sqs": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    "pubsub": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    "sns": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>',
+    "eventbridge": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+    "bus": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>',
+
+    # Cache - Zap/Lightning icon
+    "cache": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    "elasticache": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    "redis": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+    "memcached": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+
+    # Auth - Lock icon
+    "auth": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    "cognito": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    "iam": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    "kms": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>',
+    "waf": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+    "firewall": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>',
+
+    # Analytics - Chart icon
+    "analytics": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    "athena": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    "bigquery": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    "redshift": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+
+    # User/Client - User icon
+    "user": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+    "client": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+
+    # External - Globe with arrow icon
+    "external": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8l-8 8"/><polyline points="16 14 16 8 10 8"/></svg>',
+
+    # Service - Gear icon
+    "service": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>',
+
+    # Generic - Box icon
+    "generic": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>',
+}
 
 
 class CloudArchitectureGenerator:
@@ -77,6 +174,12 @@ class CloudArchitectureGenerator:
             # Generate components (or placeholders)
             components = list(request.components)
             connections = list(request.connections)
+
+            # Check for LLM prompt generation
+            if request.prompt and not components:
+                components, connections = await self._generate_architecture_from_prompt(
+                    request.prompt, request.provider, request.layers
+                )
 
             if request.placeholder_mode and not components:
                 components, connections = self._generate_placeholder_architecture(request.provider)
@@ -134,7 +237,7 @@ class CloudArchitectureGenerator:
                         "width": request.gridWidth * 60 - 20,
                         "height": request.gridHeight * 60 - 20
                     },
-                    "version": "1.0.0"
+                    "version": "1.1.0"
                 },
                 grid_position=grid_position
             )
@@ -146,6 +249,103 @@ class CloudArchitectureGenerator:
                 component_type="cloud_architecture",
                 error=str(e)
             )
+
+    async def _generate_architecture_from_prompt(
+        self, prompt: str, provider: str, layers: List[str]
+    ) -> tuple:
+        """
+        Generate cloud architecture from natural language prompt using Gemini.
+
+        Args:
+            prompt: Natural language description of the architecture
+            provider: Cloud provider (aws, gcp, azure, generic)
+            layers: List of layers to use
+
+        Returns:
+            Tuple of (components, connections)
+        """
+        try:
+            import google.generativeai as genai
+
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if not api_key:
+                logger.warning("[CLOUD_ARCHITECTURE] No Gemini API key found, using placeholder")
+                return self._generate_placeholder_architecture(provider)
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
+            system_prompt = f"""You are a cloud architect. Generate a cloud architecture diagram based on the user's description.
+
+User Request: {prompt}
+
+Cloud Provider: {provider}
+Available Layers (top to bottom): {', '.join(layers)}
+
+Generate a JSON response with:
+1. components: Array of cloud components with:
+   - id: unique string like "comp_1", "comp_2", etc.
+   - name: component name (max 25 chars)
+   - type: one of [compute, lambda, container, storage, database, api_gateway, load_balancer, cdn, queue, cache, auth, analytics, service, external, user, client]
+   - layer: one of [{', '.join(layers)}]
+   - x_position: 5-95 (percentage, spread components horizontally)
+   - y_position: 5-95 (percentage, based on layer - presentation at top, infrastructure at bottom)
+
+2. connections: Array of connections with:
+   - from_id: source component id
+   - to_id: target component id
+   - label: optional connection label (e.g., "HTTP", "SQL", "Event")
+   - connection_type: one of [request, response, data, event, sync, async]
+
+Guidelines:
+- Place 6-12 components for a typical architecture
+- Distribute components across layers appropriately
+- Create logical connections between components
+- Use appropriate component types for the architecture
+- Spread components horizontally within each layer (x: 15, 35, 55, 75, etc.)
+- Vertical position should reflect layer (presentation: 10-25, application: 30-50, data: 55-70, infrastructure: 75-90)
+
+Return ONLY valid JSON, no markdown or explanation."""
+
+            response = model.generate_content(system_prompt)
+            response_text = response.text.strip()
+
+            # Clean up response if wrapped in markdown
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            data = json.loads(response_text)
+
+            components = []
+            for comp_data in data.get("components", []):
+                components.append(CloudComponent(
+                    id=comp_data.get("id", f"comp-{uuid.uuid4().hex[:8]}"),
+                    name=comp_data.get("name", "Component"),
+                    type=comp_data.get("type", "service"),
+                    provider=provider,
+                    layer=comp_data.get("layer"),
+                    x_position=float(comp_data.get("x_position", 50)),
+                    y_position=float(comp_data.get("y_position", 50))
+                ))
+
+            connections = []
+            for conn_data in data.get("connections", []):
+                connections.append(CloudConnection(
+                    from_id=conn_data.get("from_id", ""),
+                    to_id=conn_data.get("to_id", ""),
+                    label=conn_data.get("label"),
+                    connection_type=conn_data.get("connection_type", "request")
+                ))
+
+            logger.info(f"[CLOUD_ARCHITECTURE] Generated {len(components)} components and {len(connections)} connections from prompt")
+            return components, connections
+
+        except Exception as e:
+            logger.error(f"[CLOUD_ARCHITECTURE] LLM generation failed: {e}", exc_info=True)
+            return self._generate_placeholder_architecture(provider)
 
     def _generate_placeholder_architecture(self, provider: str) -> tuple:
         """Generate placeholder architecture for testing."""
@@ -263,7 +463,7 @@ class CloudArchitectureGenerator:
         dark_colors = CLOUD_ARCH_THEMES["dark"]
 
         return f'''<style>
-/* Deckster CLOUD_ARCHITECTURE Theme Variables - v1.0.0 */
+/* Deckster CLOUD_ARCHITECTURE Theme Variables - v1.1.0 */
 :root {{
     --arch-bg: {light_colors["bg"]};
     --arch-container-bg: {light_colors["container_bg"]};
@@ -280,6 +480,7 @@ class CloudArchitectureGenerator:
     --arch-button-hover: {light_colors["button_hover"]};
     --arch-input-bg: {light_colors["input_bg"]};
     --arch-input-border: {light_colors["input_border"]};
+    --arch-icon-color: {light_colors["text_secondary"]};
 }}
 :root.theme-dark {{
     --arch-bg: {dark_colors["bg"]};
@@ -297,6 +498,7 @@ class CloudArchitectureGenerator:
     --arch-button-hover: {dark_colors["button_hover"]};
     --arch-input-bg: {dark_colors["input_bg"]};
     --arch-input-border: {dark_colors["input_border"]};
+    --arch-icon-color: {dark_colors["text_secondary"]};
 }}
 </style>'''
 
@@ -337,40 +539,26 @@ class CloudArchitectureGenerator:
 
         return "\n".join(css_parts)
 
+    def _get_svg_icon(self, comp_type: str) -> str:
+        """Get SVG icon for component type."""
+        return CLOUD_SVG_ICONS.get(comp_type, CLOUD_SVG_ICONS.get("generic", ""))
+
     def _generate_components_html(self, components: List[CloudComponent], element_id: str) -> str:
-        """Generate HTML for cloud components."""
+        """Generate HTML for cloud components with SVG icons."""
         html_parts = []
 
         for comp in components:
             # Get component color
             type_color = COMPONENT_TYPE_COLORS.get(comp.type, COMPONENT_TYPE_COLORS["service"])
 
-            # Generate icon (simplified letter-based for now)
-            icon_letter = comp.type[0].upper() if comp.type else "S"
-            if comp.type in ["api_gateway", "load_balancer"]:
-                icon_letter = "⚡"
-            elif comp.type in ["database", "rds", "dynamodb"]:
-                icon_letter = "🗄"
-            elif comp.type in ["storage", "s3", "blob"]:
-                icon_letter = "📦"
-            elif comp.type in ["lambda", "function"]:
-                icon_letter = "λ"
-            elif comp.type in ["queue", "sqs", "pubsub"]:
-                icon_letter = "📨"
-            elif comp.type in ["cache", "redis"]:
-                icon_letter = "⚡"
-            elif comp.type in ["auth", "cognito", "iam"]:
-                icon_letter = "🔐"
-            elif comp.type in ["user", "client"]:
-                icon_letter = "👤"
-            elif comp.type in ["cdn", "cloudfront"]:
-                icon_letter = "🌐"
+            # Get SVG icon
+            svg_icon = self._get_svg_icon(comp.type)
 
             html_parts.append(f'''<div class="cloud-component"
      data-component-id="{comp.id}"
      data-component-type="{comp.type}"
      style="left: {comp.x_position}%; top: {comp.y_position}%; --comp-color: {type_color};">
-    <div class="component-icon">{icon_letter}</div>
+    <div class="component-icon">{svg_icon}</div>
     <div class="component-name">{self._escape_html(comp.name)}</div>
     <div class="component-type">{comp.type.replace('_', ' ').upper()}</div>
 </div>''')
@@ -400,15 +588,23 @@ class CloudArchitectureGenerator:
             "description": comp.description or ""
         } for comp in components])
 
+    def _generate_layers_json(self, layers: List[str]) -> str:
+        """Generate JSON data for layers."""
+        return json.dumps([{
+            "id": f"layer-{i}",
+            "name": layer,
+            "order": i
+        } for i, layer in enumerate(layers)])
+
     def _generate_layers_html(self, layers: List[str]) -> str:
         """Generate HTML for layer bands."""
         if not layers:
             return ""
 
         html_parts = ['<div class="layers-background">']
-        for layer in layers:
+        for i, layer in enumerate(layers):
             label = layer.replace("_", " ").title()
-            html_parts.append(f'<div class="layer-band layer-{layer}"><span class="layer-label">{label}</span></div>')
+            html_parts.append(f'<div class="layer-band layer-{layer}" data-layer-id="layer-{i}" data-layer-name="{layer}"><span class="layer-label">{label}</span></div>')
         html_parts.append('</div>')
 
         return "\n".join(html_parts)
@@ -428,6 +624,7 @@ class CloudArchitectureGenerator:
         components_html = self._generate_components_html(components, element_id)
         components_json = self._generate_components_json(components)
         connections_json = self._generate_connections_json(connections)
+        layers_json = self._generate_layers_json(request.layers) if request.show_layers else "[]"
 
         # Generate layers HTML
         layers_html = self._generate_layers_html(request.layers) if request.show_layers else ""
@@ -444,13 +641,16 @@ class CloudArchitectureGenerator:
         # Get provider color
         provider_colors = PROVIDER_COLORS.get(request.provider, PROVIDER_COLORS["generic"])
 
+        # SVG icons JSON for JavaScript
+        svg_icons_json = json.dumps(CLOUD_SVG_ICONS)
+
         theme_class = "theme-dark" if theme_mode == "dark" else "theme-light"
 
         html = f'''{theme_css}
 {theme_sync_script}
 <style>
 /* ============================================
-   CLOUD_ARCHITECTURE CSS v1.0.0
+   CLOUD_ARCHITECTURE CSS v1.1.0
    ============================================ */
 
 * {{
@@ -489,6 +689,12 @@ class CloudArchitectureGenerator:
     display: flex;
     align-items: flex-start;
     padding: 8px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}}
+
+.layer-band:hover {{
+    filter: brightness(0.95);
 }}
 
 .layer-label {{
@@ -541,12 +747,12 @@ class CloudArchitectureGenerator:
     z-index: 10;
 }}
 
-/* Cloud Component */
+/* Cloud Component - v1.1.0 wider cards */
 .cloud-component {{
     position: absolute;
-    min-width: 100px;
-    min-height: 70px;
-    padding: 12px 16px;
+    min-width: 130px;
+    min-height: 85px;
+    padding: 14px 18px;
     background: var(--arch-component-bg);
     border: 2px solid var(--comp-color, var(--arch-component-border));
     border-radius: 8px;
@@ -570,20 +776,32 @@ class CloudArchitectureGenerator:
     opacity: 0.9;
 }}
 
+/* SVG Icon Styling */
 .component-icon {{
-    font-size: 20px;
-    margin-bottom: 4px;
+    width: 28px;
+    height: 28px;
+    margin: 0 auto 6px auto;
+    color: var(--comp-color, var(--arch-icon-color));
 }}
 
+.component-icon svg {{
+    width: 100%;
+    height: 100%;
+}}
+
+/* Component Name - v1.1.0 2-line support */
 .component-name {{
     font-size: 13px;
     font-weight: 600;
     color: var(--arch-text-primary);
-    line-height: 1.2;
-    max-width: 120px;
+    line-height: 1.3;
+    max-width: 110px;
+    margin: 0 auto;
     overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }}
 
 .component-type {{
@@ -595,11 +813,18 @@ class CloudArchitectureGenerator:
     margin-top: 4px;
 }}
 
-/* Add Component Button */
-.add-component-btn {{
+/* Action Buttons */
+.action-buttons {{
     position: absolute;
     bottom: 15px;
     right: 15px;
+    display: flex;
+    gap: 8px;
+    z-index: 50;
+}}
+
+.add-component-btn,
+.add-layer-btn {{
     padding: 8px 16px;
     background: var(--arch-button-primary);
     color: white;
@@ -610,13 +835,21 @@ class CloudArchitectureGenerator:
     cursor: pointer;
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-    z-index: 50;
 }}
 
-.add-component-btn:hover {{
+.add-component-btn:hover,
+.add-layer-btn:hover {{
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
     background: var(--arch-button-hover);
+}}
+
+.add-layer-btn {{
+    background: var(--arch-text-secondary);
+}}
+
+.add-layer-btn:hover {{
+    background: var(--arch-text-primary);
 }}
 
 /* Modal Overlay */
@@ -787,9 +1020,12 @@ class CloudArchitectureGenerator:
         {components_html}
     </div>
 
-    <button class="add-component-btn" onclick="cloudArchs['{element_id}'].openAddModal()">+ Add Component</button>
+    <div class="action-buttons">
+        <button class="add-layer-btn" onclick="cloudArchs['{element_id}'].openLayerModal()">+ Layer</button>
+        <button class="add-component-btn" onclick="cloudArchs['{element_id}'].openAddModal()">+ Component</button>
+    </div>
 
-    <!-- Modal -->
+    <!-- Component Modal -->
     <div class="modal-overlay" id="modal-{element_id}">
         <div class="modal-dialog">
             <div class="modal-header">
@@ -815,6 +1051,7 @@ class CloudArchitectureGenerator:
                     <option value="load_balancer">Load Balancer</option>
                     <option value="cdn">CDN</option>
                     <option value="auth">Auth/IAM</option>
+                    <option value="analytics">Analytics</option>
                     <option value="external">External</option>
                     <option value="user">User/Client</option>
                 </select>
@@ -841,9 +1078,39 @@ class CloudArchitectureGenerator:
         </div>
     </div>
 
+    <!-- Layer Modal -->
+    <div class="modal-overlay" id="layer-modal-{element_id}">
+        <div class="modal-dialog">
+            <div class="modal-header">
+                <h3 id="layer-modal-title-{element_id}">Add Layer</h3>
+                <button class="modal-close" onclick="cloudArchs['{element_id}'].closeLayerModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="layer-name-{element_id}">Layer Name</label>
+                <input type="text" id="layer-name-{element_id}" maxlength="30" placeholder="e.g., Security, Network...">
+            </div>
+            <div class="form-group">
+                <label for="layer-position-{element_id}">Position</label>
+                <select id="layer-position-{element_id}">
+                    <option value="top">Add at Top</option>
+                    <option value="bottom">Add at Bottom</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="layer-color-{element_id}">Color</label>
+                <input type="color" id="layer-color-{element_id}" value="#3B82F6">
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-danger" id="layer-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteLayer()" style="display:none;">Delete</button>
+                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeLayerModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveLayer()">Save</button>
+            </div>
+        </div>
+    </div>
+
     <script>
     /* ============================================
-       CLOUD_ARCHITECTURE JavaScript v1.0.0
+       CLOUD_ARCHITECTURE JavaScript v1.1.0
        ============================================ */
 
     window.cloudArchs = window.cloudArchs || {{}};
@@ -855,16 +1122,21 @@ class CloudArchitectureGenerator:
         var containerId = container.id;
         var presentationId = '';
         var currentEditingComponent = null;
+        var currentEditingLayer = null;
 
         // DOM elements
-        var componentsLayer, connectionsLayer, modal;
+        var componentsLayer, connectionsLayer, modal, layerModal, layersBackground;
 
         // State
         var componentsState = {components_json};
         var connectionsState = {connections_json};
+        var layersState = {layers_json};
 
         // Component type colors
         var typeColors = {json.dumps(COMPONENT_TYPE_COLORS)};
+
+        // SVG Icons
+        var svgIcons = {svg_icons_json};
 
         // ============================================
         // INITIALIZATION
@@ -873,18 +1145,165 @@ class CloudArchitectureGenerator:
         function init() {{
             componentsLayer = container.querySelector('.components-layer');
             connectionsLayer = container.querySelector('.connections-layer');
-            modal = container.querySelector('.modal-overlay');
+            layersBackground = container.querySelector('.layers-background');
+            modal = container.querySelector('#modal-' + containerId);
+            layerModal = container.querySelector('#layer-modal-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[CloudArch v1.0] Required elements not found');
+                console.error('[CloudArch v1.1] Required elements not found');
                 return;
             }}
 
             initDragDrop();
+            initLayerClicks();
             renderConnections();
             listenForParentMessages();
 
-            console.log('[CloudArch v1.0] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[CloudArch v1.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+        }}
+
+        // ============================================
+        // LAYER MANAGEMENT
+        // ============================================
+
+        function initLayerClicks() {{
+            if (!layersBackground) return;
+            layersBackground.querySelectorAll('.layer-band').forEach(function(band) {{
+                band.addEventListener('click', function(e) {{
+                    if (e.target.classList.contains('layer-band')) {{
+                        var layerId = band.dataset.layerId;
+                        openEditLayerModal(layerId);
+                    }}
+                }});
+            }});
+        }}
+
+        function openLayerModal() {{
+            currentEditingLayer = null;
+            container.querySelector('#layer-modal-title-' + containerId).textContent = 'Add Layer';
+            container.querySelector('#layer-delete-' + containerId).style.display = 'none';
+            container.querySelector('#layer-name-' + containerId).value = '';
+            container.querySelector('#layer-position-' + containerId).value = 'bottom';
+            container.querySelector('#layer-color-' + containerId).value = '#3B82F6';
+            layerModal.classList.add('open');
+        }}
+
+        function openEditLayerModal(layerId) {{
+            var layer = findLayer(layerId);
+            if (!layer) return;
+
+            currentEditingLayer = layer;
+            container.querySelector('#layer-modal-title-' + containerId).textContent = 'Edit Layer';
+            container.querySelector('#layer-delete-' + containerId).style.display = 'block';
+            container.querySelector('#layer-name-' + containerId).value = layer.name.replace(/_/g, ' ');
+            container.querySelector('#layer-position-' + containerId).value = 'bottom';
+            container.querySelector('#layer-color-' + containerId).value = '#3B82F6';
+            layerModal.classList.add('open');
+        }}
+
+        function closeLayerModal() {{
+            layerModal.classList.remove('open');
+            currentEditingLayer = null;
+        }}
+
+        function findLayer(layerId) {{
+            for (var i = 0; i < layersState.length; i++) {{
+                if (layersState[i].id === layerId) return layersState[i];
+            }}
+            return null;
+        }}
+
+        function saveLayer() {{
+            var name = container.querySelector('#layer-name-' + containerId).value.trim();
+            if (!name) {{
+                alert('Please enter a layer name');
+                return;
+            }}
+
+            var layerName = name.toLowerCase().replace(/\\s+/g, '_');
+            var position = container.querySelector('#layer-position-' + containerId).value;
+            var color = container.querySelector('#layer-color-' + containerId).value;
+
+            if (currentEditingLayer) {{
+                currentEditingLayer.name = layerName;
+                updateLayerInDOM(currentEditingLayer);
+            }} else {{
+                var newLayer = {{
+                    id: 'layer-' + layersState.length,
+                    name: layerName,
+                    order: position === 'top' ? 0 : layersState.length,
+                    color: color
+                }};
+
+                if (position === 'top') {{
+                    layersState.forEach(function(l) {{ l.order++; }});
+                    layersState.unshift(newLayer);
+                }} else {{
+                    layersState.push(newLayer);
+                }}
+
+                renderLayers();
+            }}
+
+            closeLayerModal();
+            notifyStateChange('layer-update');
+        }}
+
+        function deleteLayer() {{
+            if (!currentEditingLayer) return;
+            if (!confirm('Delete this layer? Components in this layer will be unassigned.')) return;
+
+            var layerName = currentEditingLayer.name;
+
+            // Remove layer from state
+            layersState = layersState.filter(function(l) {{ return l.id !== currentEditingLayer.id; }});
+
+            // Unassign components from this layer
+            componentsState.forEach(function(comp) {{
+                if (comp.layer === layerName) comp.layer = '';
+            }});
+
+            renderLayers();
+            closeLayerModal();
+            notifyStateChange('layer-delete');
+        }}
+
+        function renderLayers() {{
+            if (!layersBackground) return;
+
+            layersBackground.innerHTML = '';
+            var layerHeight = 100 / layersState.length;
+
+            layersState.forEach(function(layer, i) {{
+                var div = document.createElement('div');
+                div.className = 'layer-band layer-' + layer.name;
+                div.dataset.layerId = layer.id;
+                div.dataset.layerName = layer.name;
+                div.style.top = (i * layerHeight) + '%';
+                div.style.height = layerHeight + '%';
+
+                var label = document.createElement('span');
+                label.className = 'layer-label';
+                label.textContent = layer.name.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) {{ return l.toUpperCase(); }});
+                div.appendChild(label);
+
+                div.addEventListener('click', function(e) {{
+                    if (e.target === div || e.target === label) {{
+                        openEditLayerModal(layer.id);
+                    }}
+                }});
+
+                layersBackground.appendChild(div);
+            }});
+        }}
+
+        function updateLayerInDOM(layer) {{
+            var el = layersBackground.querySelector('[data-layer-id="' + layer.id + '"]');
+            if (el) {{
+                el.dataset.layerName = layer.name;
+                el.className = 'layer-band layer-' + layer.name;
+                el.querySelector('.layer-label').textContent = layer.name.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) {{ return l.toUpperCase(); }});
+            }}
         }}
 
         // ============================================
@@ -944,8 +1363,8 @@ class CloudArchitectureGenerator:
             var y = e.clientY - containerRect.top - dragOffset.y;
 
             // Clamp to container
-            x = Math.max(50, Math.min(x, containerRect.width - 50));
-            y = Math.max(35, Math.min(y, containerRect.height - 35));
+            x = Math.max(65, Math.min(x, containerRect.width - 65));
+            y = Math.max(42, Math.min(y, containerRect.height - 42));
 
             draggedComponent.style.left = (x / containerRect.width * 100) + '%';
             draggedComponent.style.top = (y / containerRect.height * 100) + '%';
@@ -1179,7 +1598,7 @@ class CloudArchitectureGenerator:
 
         function addComponentToDOM(comp) {{
             var typeColor = typeColors[comp.type] || typeColors['service'];
-            var iconLetter = getIconForType(comp.type);
+            var svgIcon = svgIcons[comp.type] || svgIcons['generic'];
 
             var div = document.createElement('div');
             div.className = 'cloud-component';
@@ -1189,7 +1608,7 @@ class CloudArchitectureGenerator:
             div.style.top = comp.y_position + '%';
             div.style.setProperty('--comp-color', typeColor);
 
-            div.innerHTML = '<div class="component-icon">' + iconLetter + '</div>' +
+            div.innerHTML = '<div class="component-icon">' + svgIcon + '</div>' +
                 '<div class="component-name">' + escapeHtml(comp.name) + '</div>' +
                 '<div class="component-type">' + comp.type.replace('_', ' ').toUpperCase() + '</div>';
 
@@ -1204,23 +1623,13 @@ class CloudArchitectureGenerator:
             if (!el) return;
 
             var typeColor = typeColors[comp.type] || typeColors['service'];
-            var iconLetter = getIconForType(comp.type);
+            var svgIcon = svgIcons[comp.type] || svgIcons['generic'];
 
             el.dataset.componentType = comp.type;
             el.style.setProperty('--comp-color', typeColor);
-            el.querySelector('.component-icon').textContent = iconLetter;
+            el.querySelector('.component-icon').innerHTML = svgIcon;
             el.querySelector('.component-name').textContent = comp.name;
             el.querySelector('.component-type').textContent = comp.type.replace('_', ' ').toUpperCase();
-        }}
-
-        function getIconForType(type) {{
-            var icons = {{
-                'api_gateway': '⚡', 'load_balancer': '⚖', 'database': '🗄', 'rds': '🗄', 'dynamodb': '🗄',
-                'storage': '📦', 's3': '📦', 'blob': '📦', 'lambda': 'λ', 'function': 'λ',
-                'queue': '📨', 'sqs': '📨', 'pubsub': '📨', 'cache': '⚡', 'redis': '⚡',
-                'auth': '🔐', 'cognito': '🔐', 'iam': '🔐', 'user': '👤', 'client': '👤', 'cdn': '🌐'
-            }};
-            return icons[type] || type.charAt(0).toUpperCase();
         }}
 
         function escapeHtml(text) {{
@@ -1236,7 +1645,8 @@ class CloudArchitectureGenerator:
         function extractState() {{
             return {{
                 components: componentsState,
-                connections: connectionsState
+                connections: connectionsState,
+                layers: layersState
             }};
         }}
 
@@ -1250,7 +1660,7 @@ class CloudArchitectureGenerator:
                     cloudArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[CloudArch v1.0] State change notified:', action);
+                console.log('[CloudArch v1.1] State change notified:', action);
             }} catch (e) {{
                 console.warn('[CloudArch] Failed to notify parent:', e);
             }}
@@ -1266,7 +1676,7 @@ class CloudArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[CloudArch v1.0] Received init from parent');
+                console.log('[CloudArch v1.1] Received init from parent');
             }});
         }}
 
@@ -1282,12 +1692,17 @@ class CloudArchitectureGenerator:
                 }});
             }}
 
+            if (state.layers && state.layers.length > 0) {{
+                layersState = state.layers;
+                renderLayers();
+            }}
+
             if (state.connections) {{
                 connectionsState = state.connections;
                 renderConnections();
             }}
 
-            console.log('[CloudArch v1.0] Restored state');
+            console.log('[CloudArch v1.1] Restored state');
         }}
 
         // ============================================
@@ -1298,7 +1713,11 @@ class CloudArchitectureGenerator:
             openAddModal: openAddModal,
             closeModal: closeModal,
             saveComponent: saveComponent,
-            deleteComponent: deleteComponent
+            deleteComponent: deleteComponent,
+            openLayerModal: openLayerModal,
+            closeLayerModal: closeLayerModal,
+            saveLayer: saveLayer,
+            deleteLayer: deleteLayer
         }};
 
         // ============================================
@@ -1306,7 +1725,7 @@ class CloudArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[CloudArch v1.0] Registered namespace:', containerId);
+        console.log('[CloudArch v1.1] Registered namespace:', containerId);
 
     }})();
     </script>
