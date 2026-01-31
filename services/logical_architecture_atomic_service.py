@@ -1,7 +1,13 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.2.2
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.0
 
 Generates self-contained HTML for logical/system architecture diagrams.
+
+ARCHITECTURE SEPARATION (v1.3.0):
+- This service is now a PURE VISUALIZATION layer (no LLM calls here)
+- LLM-based planning moved to: logical_architecture_planner.py
+- Auto-routing: if components provided → visualize, if only prompt → plan first
+
 Includes embedded CSS and JavaScript for:
 - Draggable system components
 - Group/boundary containers with dashed borders (draggable)
@@ -10,7 +16,11 @@ Includes embedded CSS and JavaScript for:
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
-- LLM-based diagram generation from prompts
+
+v1.3.0 Architecture Separation:
+- MOVED: LLM generation logic to logical_architecture_planner.py
+- ADDED: Auto-routing between planning and visualization
+- KEPT: Pure visualization (HTML/CSS/JS generation)
 
 v1.2.2 Fixes:
 - FIX: Auto-generate connections when from_id/to_id are empty (service-side)
@@ -28,7 +38,6 @@ v1.1.0 Enhancements:
 - Professional SVG icons for all component types (15+ icons)
 - Wider component cards (130px vs 100px) with 2-line text support
 - Dynamic group management UI (add/edit/delete/resize groups)
-- LLM-based generation via Gemini
 - Improved connection arrow rendering
 
 v1.0.0 Initial Release:
@@ -46,7 +55,6 @@ import logging
 import time
 import uuid
 import json
-import os
 from typing import List, Optional
 
 from models.logical_architecture_atomic_models import (
@@ -59,6 +67,12 @@ from models.logical_architecture_atomic_models import (
     LOGICAL_ARCH_THEMES,
     LOGICAL_COMPONENT_COLORS,
     GROUP_COLORS
+)
+
+# Import planner for auto-routing
+from services.logical_architecture_planner import (
+    LogicalArchitecturePlanner,
+    LogicalArchitecturePlanRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -134,17 +148,26 @@ class LogicalArchitectureGenerator:
     """
     Generate LOGICAL_ARCHITECTURE HTML elements for frontend positioning.
 
+    ARCHITECTURE SEPARATION (v1.3.0):
+    - This class handles VISUALIZATION only (HTML/CSS/JS generation)
+    - LLM-based planning is delegated to LogicalArchitecturePlanner
+    - Auto-routing: components provided → visualize, prompt only → plan first
+
     Each call produces a standalone HTML element that can be
     positioned anywhere on the slide by the frontend.
     """
 
     def __init__(self):
-        """Initialize the LOGICAL_ARCHITECTURE generator."""
-        pass
+        """Initialize the LOGICAL_ARCHITECTURE generator and planner."""
+        self._planner = LogicalArchitecturePlanner()
 
     async def generate(self, request: LogicalArchitectureAtomicRequest) -> LogicalArchitectureAtomicResponse:
         """
         Generate LOGICAL_ARCHITECTURE HTML from request.
+
+        AUTO-ROUTING (v1.3.0):
+        - If components provided → pure visualization (no LLM)
+        - If only prompt provided → planning (LLM) → visualization
 
         Args:
             request: LogicalArchitectureAtomicRequest with components, groups, connections, and styling
@@ -161,17 +184,39 @@ class LogicalArchitectureGenerator:
             # Get theme colors
             theme_colors = LOGICAL_ARCH_THEMES.get(request.theme_mode, LOGICAL_ARCH_THEMES["light"])
 
-            # Generate components/groups (or placeholders)
+            # Get components/groups/connections from request
             components = list(request.components)
             groups = list(request.groups)
             connections = list(request.connections)
 
-            # Check for LLM prompt generation
-            if request.prompt and not components:
-                components, groups, connections = await self._generate_architecture_from_prompt(request.prompt)
+            # =================================================================
+            # AUTO-ROUTING (v1.3.0): Planning vs Visualization
+            # =================================================================
+            # If no components provided but prompt exists → use planner
+            if not components and request.prompt:
+                logger.info("[LOGICAL_ARCHITECTURE] No components provided - routing to planner")
+                plan_result = await self._planner.plan(
+                    LogicalArchitecturePlanRequest(prompt=request.prompt)
+                )
+                components = plan_result.components
+                groups = plan_result.groups
+                connections = plan_result.connections
+                logger.info(
+                    f"[LOGICAL_ARCHITECTURE] Planner returned: "
+                    f"{len(components)} components, {len(groups)} groups, {len(connections)} connections"
+                )
 
+            # If placeholder_mode and still no components, use planner's fallback
             if request.placeholder_mode and not components:
-                components, groups, connections = self._generate_placeholder_architecture()
+                logger.info("[LOGICAL_ARCHITECTURE] Placeholder mode - using fallback architecture")
+                plan_result = self._planner._generate_fallback_architecture("")
+                components = plan_result.components
+                groups = plan_result.groups
+                connections = plan_result.connections
+
+            # =================================================================
+            # VISUALIZATION PATH (pure rendering, no LLM)
+            # =================================================================
 
             # Ensure all components have unique IDs
             for comp in components:
@@ -183,15 +228,14 @@ class LogicalArchitectureGenerator:
                 if not grp.id:
                     grp.id = f"grp-{uuid.uuid4().hex[:8]}"
 
-            # v1.2.2: If connections have empty from_id/to_id, use LLM to infer
-            # architecturally meaningful connections based on component structure
+            # v1.2.2/v1.3.0: If connections have empty from_id/to_id, use planner to infer
             has_invalid_connections = any(
                 not conn.from_id or not conn.to_id
                 for conn in connections
             )
             if has_invalid_connections and len(components) >= 2:
-                logger.info("[LOGICAL_ARCHITECTURE] Empty connection IDs detected - using LLM to infer connections")
-                connections = await self._infer_connections_from_components(components, groups)
+                logger.info("[LOGICAL_ARCHITECTURE] Empty connection IDs detected - using planner to infer connections")
+                connections = await self._planner.infer_connections(components, groups)
 
             # Ensure all connections have unique IDs
             for conn in connections:
@@ -255,376 +299,9 @@ class LogicalArchitectureGenerator:
                 error=str(e)
             )
 
-    async def _generate_architecture_from_prompt(self, prompt: str) -> tuple:
-        """
-        Generate logical architecture from natural language prompt using Gemini.
-
-        Args:
-            prompt: Natural language description of the architecture
-
-        Returns:
-            Tuple of (components, groups, connections)
-        """
-        try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[LOGICAL_ARCHITECTURE] No Gemini API key found, using placeholder")
-                return self._generate_placeholder_architecture()
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
-            system_prompt = f"""You are a software architect. Generate a logical architecture diagram based on the user's description.
-
-User Request: {prompt}
-
-Generate a JSON response with:
-1. groups: Array of logical groups/boundaries with:
-   - id: unique string like "grp_1", "grp_2", etc.
-   - name: group name (max 30 chars)
-   - type: one of [boundary, subsystem, layer, domain, zone, cluster]
-   - x_position: 5-70 (percentage, left edge)
-   - y_position: 5-60 (percentage, top edge)
-   - width: 20-40 (percentage)
-   - height: 25-45 (percentage)
-
-2. components: Array of components with:
-   - id: unique string like "comp_1", "comp_2", etc.
-   - name: component name (max 25 chars)
-   - type: one of [service, module, interface, database, api, gateway, queue, cache, worker, external, client, auth, storage]
-   - group_id: id of parent group (or empty string if not in a group)
-   - x_position: 5-95 (percentage, center position)
-   - y_position: 5-95 (percentage, center position)
-   - stereotype: optional UML stereotype like "<<service>>", "<<controller>>"
-
-3. connections: Array of connections with:
-   - from_id: source component id
-   - to_id: target component id
-   - label: optional connection label (e.g., "HTTP", "SQL", "Event")
-   - style: one of [solid, dashed, dotted]
-   - direction: one of [forward, backward, bidirectional]
-
-Guidelines:
-- Create 2-4 logical groups
-- Place 6-10 components distributed across groups
-- Components inside a group should have positions within the group bounds
-- Create meaningful connections between components
-- Use appropriate stereotypes for component types
-
-Return ONLY valid JSON, no markdown or explanation."""
-
-            response = model.generate_content(system_prompt)
-            response_text = response.text.strip()
-
-            # Clean up response if wrapped in markdown
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-
-            data = json.loads(response_text)
-
-            groups = []
-            for grp_data in data.get("groups", []):
-                groups.append(LogicalGroup(
-                    id=grp_data.get("id", f"grp-{uuid.uuid4().hex[:8]}"),
-                    name=grp_data.get("name", "Group"),
-                    type=grp_data.get("type", "boundary"),
-                    x_position=float(grp_data.get("x_position", 10)),
-                    y_position=float(grp_data.get("y_position", 10)),
-                    width=float(grp_data.get("width", 30)),
-                    height=float(grp_data.get("height", 30))
-                ))
-
-            components = []
-            for comp_data in data.get("components", []):
-                components.append(LogicalComponent(
-                    id=comp_data.get("id", f"lcomp-{uuid.uuid4().hex[:8]}"),
-                    name=comp_data.get("name", "Component"),
-                    type=comp_data.get("type", "service"),
-                    group_id=comp_data.get("group_id"),
-                    x_position=float(comp_data.get("x_position", 50)),
-                    y_position=float(comp_data.get("y_position", 50)),
-                    stereotype=comp_data.get("stereotype")
-                ))
-
-            connections = []
-            for conn_data in data.get("connections", []):
-                connections.append(LogicalConnection(
-                    from_id=conn_data.get("from_id", ""),
-                    to_id=conn_data.get("to_id", ""),
-                    label=conn_data.get("label"),
-                    style=conn_data.get("style", "solid"),
-                    direction=conn_data.get("direction", "forward")
-                ))
-
-            logger.info(f"[LOGICAL_ARCHITECTURE] Generated {len(components)} components, {len(groups)} groups, {len(connections)} connections from prompt")
-            return components, groups, connections
-
-        except Exception as e:
-            logger.error(f"[LOGICAL_ARCHITECTURE] LLM generation failed: {e}", exc_info=True)
-            return self._generate_placeholder_architecture()
-
-    def _generate_placeholder_architecture(self) -> tuple:
-        """Generate placeholder architecture for testing."""
-        # Create groups
-        groups = [
-            LogicalGroup(
-                id=f"grp-{uuid.uuid4().hex[:8]}",
-                name="Frontend Layer",
-                type="boundary",
-                x_position=5,
-                y_position=5,
-                width=25,
-                height=35
-            ),
-            LogicalGroup(
-                id=f"grp-{uuid.uuid4().hex[:8]}",
-                name="Backend Services",
-                type="subsystem",
-                x_position=35,
-                y_position=5,
-                width=30,
-                height=55
-            ),
-            LogicalGroup(
-                id=f"grp-{uuid.uuid4().hex[:8]}",
-                name="Data Layer",
-                type="layer",
-                x_position=70,
-                y_position=5,
-                width=25,
-                height=55
-            )
-        ]
-
-        components = [
-            # Frontend
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Web App",
-                type="client",
-                group_id=groups[0].id,
-                x_position=17,
-                y_position=18,
-                stereotype="<<UI>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Mobile App",
-                type="client",
-                group_id=groups[0].id,
-                x_position=17,
-                y_position=32,
-                stereotype="<<UI>>"
-            ),
-            # Backend
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="API Gateway",
-                type="gateway",
-                group_id=groups[1].id,
-                x_position=50,
-                y_position=12,
-                stereotype="<<gateway>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="User Service",
-                type="service",
-                group_id=groups[1].id,
-                x_position=42,
-                y_position=32,
-                stereotype="<<service>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Order Service",
-                type="service",
-                group_id=groups[1].id,
-                x_position=58,
-                y_position=32,
-                stereotype="<<service>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Message Queue",
-                type="queue",
-                group_id=groups[1].id,
-                x_position=50,
-                y_position=50,
-                stereotype="<<queue>>"
-            ),
-            # Data Layer
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="User DB",
-                type="database",
-                group_id=groups[2].id,
-                x_position=82,
-                y_position=20,
-                stereotype="<<database>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Order DB",
-                type="database",
-                group_id=groups[2].id,
-                x_position=82,
-                y_position=40,
-                stereotype="<<database>>"
-            ),
-            # External
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Payment Gateway",
-                type="external",
-                x_position=50,
-                y_position=75,
-                stereotype="<<external>>"
-            )
-        ]
-
-        # Build connections
-        connections = [
-            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="HTTP", style="solid"),
-            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="HTTP", style="solid"),
-            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="REST", style="solid"),
-            LogicalConnection(from_id=components[2].id, to_id=components[4].id, label="REST", style="solid"),
-            LogicalConnection(from_id=components[3].id, to_id=components[6].id, label="SQL", style="solid"),
-            LogicalConnection(from_id=components[4].id, to_id=components[7].id, label="SQL", style="solid"),
-            LogicalConnection(from_id=components[4].id, to_id=components[5].id, label="Async", style="dashed"),
-            LogicalConnection(from_id=components[5].id, to_id=components[8].id, label="Event", style="dashed")
-        ]
-
-        return components, groups, connections
-
-    async def _infer_connections_from_components(
-        self, components: List[LogicalComponent], groups: List[LogicalGroup]
-    ) -> List[LogicalConnection]:
-        """
-        Use LLM to intelligently infer architecturally meaningful connections
-        between components based on their types, names, groups, and system patterns.
-
-        This is called when explicit components are provided but connections have
-        empty from_id/to_id values. The LLM reasons about what connections make
-        architectural sense.
-
-        Args:
-            components: List of components with assigned IDs
-            groups: List of groups/boundaries
-
-        Returns:
-            List of LLM-inferred LogicalConnection objects
-        """
-        if not components or len(components) < 2:
-            return []
-
-        try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[LOGICAL_ARCHITECTURE] No Gemini API key - cannot infer connections")
-                return []
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
-            # Build component context for LLM
-            component_list = []
-            for comp in components:
-                component_list.append({
-                    "id": comp.id,
-                    "name": comp.name,
-                    "type": comp.type,
-                    "group_id": comp.group_id or "none",
-                    "stereotype": comp.stereotype or ""
-                })
-
-            # Build group context
-            group_list = []
-            for grp in groups:
-                group_list.append({
-                    "id": grp.id,
-                    "name": grp.name,
-                    "type": grp.type
-                })
-
-            prompt = f"""You are a software architect analyzing a logical/system architecture diagram.
-
-Components:
-{json.dumps(component_list, indent=2)}
-
-Groups/Boundaries:
-{json.dumps(group_list, indent=2)}
-
-Determine the logical connections between these components based on:
-1. Component types and their typical relationships (e.g., client → gateway → service → database)
-2. Component names that suggest relationships (e.g., "User Service" might connect to "User DB")
-3. Group boundaries (components often connect across group boundaries)
-4. Stereotypes (e.g., <<controller>> connects to <<service>>)
-5. Standard software architecture patterns
-
-Return a JSON array of connections. Each connection should have:
-- from_id: source component id (MUST be an exact id from the list above)
-- to_id: target component id (MUST be an exact id from the list above)
-- label: brief label describing the connection (e.g., "HTTP", "SQL", "async", "events", "REST")
-- style: one of [solid, dashed, dotted] (use dashed for async, dotted for optional)
-- direction: one of [forward, backward, bidirectional]
-
-Guidelines:
-- Create only architecturally meaningful connections
-- Clients/UIs connect to gateways or APIs
-- Gateways route to services
-- Services connect to databases, caches, queues
-- Cross-group connections represent integration points
-- Don't create redundant or circular connections
-- Aim for 1-2 connections per component on average
-
-Return ONLY valid JSON array, no markdown or explanation."""
-
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
-
-            # Clean up response if wrapped in markdown
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-
-            conn_data = json.loads(response_text)
-
-            # Build set of valid component IDs for validation
-            valid_ids = {c.id for c in components}
-
-            connections = []
-            for conn in conn_data:
-                from_id = conn.get("from_id", "")
-                to_id = conn.get("to_id", "")
-
-                # Validate that both IDs exist in our components
-                if from_id in valid_ids and to_id in valid_ids:
-                    connections.append(LogicalConnection(
-                        from_id=from_id,
-                        to_id=to_id,
-                        label=conn.get("label", ""),
-                        style=conn.get("style", "solid"),
-                        direction=conn.get("direction", "forward")
-                    ))
-                else:
-                    logger.warning(f"[LOGICAL_ARCHITECTURE] LLM returned invalid connection: {from_id} -> {to_id}")
-
-            logger.info(f"[LOGICAL_ARCHITECTURE] LLM inferred {len(connections)} connections")
-            return connections
-
-        except Exception as e:
-            logger.error(f"[LOGICAL_ARCHITECTURE] Failed to infer connections via LLM: {e}", exc_info=True)
-            return []
+    # =========================================================================
+    # VISUALIZATION METHODS (Pure rendering, no LLM)
+    # =========================================================================
 
     def _generate_theme_css(self, theme_mode: str) -> str:
         """Generate CSS variables for theme support with light defaults and dark overrides."""

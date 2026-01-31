@@ -1,7 +1,13 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.2.2
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.0
 
 Generates self-contained HTML for cloud architecture diagrams.
+
+ARCHITECTURE SEPARATION (v1.3.0):
+- This service is now a PURE VISUALIZATION layer (no LLM calls here)
+- LLM-based planning moved to: cloud_architecture_planner.py
+- Auto-routing: if components provided → visualize, if only prompt → plan first
+
 Includes embedded CSS and JavaScript for:
 - Draggable cloud service components
 - SVG connection paths with bezier curves and arrow markers
@@ -11,7 +17,12 @@ Includes embedded CSS and JavaScript for:
 - Connection drawing between components
 - postMessage persistence protocol
 - Light/dark theme support with live switching
-- LLM-based diagram generation from prompts
+
+v1.3.0 Architecture Separation:
+- MOVED: LLM generation logic to cloud_architecture_planner.py
+- ADDED: Auto-routing between planning and visualization
+- ADDED: Support for translating from logical architecture
+- KEPT: Pure visualization (HTML/CSS/JS generation)
 
 v1.2.2 Fixes:
 - FIX: Auto-generate connections when from_id/to_id are empty (service-side)
@@ -31,7 +42,6 @@ v1.1.0 Enhancements:
 - Professional SVG icons for all component types (20+ icons)
 - Wider component cards (130px vs 100px) with 2-line text support
 - Dynamic layer management UI (add/edit/delete layers)
-- LLM-based generation via Gemini
 - Improved connection arrow rendering
 
 v1.0.0 Initial Release:
@@ -49,7 +59,6 @@ import logging
 import time
 import uuid
 import json
-import os
 from typing import List, Optional
 
 from models.cloud_architecture_atomic_models import (
@@ -62,6 +71,12 @@ from models.cloud_architecture_atomic_models import (
     PROVIDER_COLORS,
     LAYER_COLORS,
     COMPONENT_TYPE_COLORS
+)
+
+# Import planner for auto-routing
+from services.cloud_architecture_planner import (
+    CloudArchitecturePlanner,
+    CloudArchitecturePlanRequest,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,17 +173,26 @@ class CloudArchitectureGenerator:
     """
     Generate CLOUD_ARCHITECTURE HTML elements for frontend positioning.
 
+    ARCHITECTURE SEPARATION (v1.3.0):
+    - This class handles VISUALIZATION only (HTML/CSS/JS generation)
+    - LLM-based planning is delegated to CloudArchitecturePlanner
+    - Auto-routing: components provided → visualize, prompt only → plan first
+
     Each call produces a standalone HTML element that can be
     positioned anywhere on the slide by the frontend.
     """
 
     def __init__(self):
-        """Initialize the CLOUD_ARCHITECTURE generator."""
-        pass
+        """Initialize the CLOUD_ARCHITECTURE generator and planner."""
+        self._planner = CloudArchitecturePlanner()
 
     async def generate(self, request: CloudArchitectureAtomicRequest) -> CloudArchitectureAtomicResponse:
         """
         Generate CLOUD_ARCHITECTURE HTML from request.
+
+        AUTO-ROUTING (v1.3.0):
+        - If components provided → pure visualization (no LLM)
+        - If only prompt provided → planning (LLM) → visualization
 
         Args:
             request: CloudArchitectureAtomicRequest with components, connections, and styling
@@ -185,33 +209,56 @@ class CloudArchitectureGenerator:
             # Get theme colors
             theme_colors = CLOUD_ARCH_THEMES.get(request.theme_mode, CLOUD_ARCH_THEMES["light"])
 
-            # Generate components (or placeholders)
+            # Get components/connections from request
             components = list(request.components)
             connections = list(request.connections)
 
-            # Check for LLM prompt generation
-            if request.prompt and not components:
-                components, connections = await self._generate_architecture_from_prompt(
-                    request.prompt, request.provider, request.layers
+            # =================================================================
+            # AUTO-ROUTING (v1.3.0): Planning vs Visualization
+            # =================================================================
+            # If no components provided but prompt exists → use planner
+            if not components and request.prompt:
+                logger.info("[CLOUD_ARCHITECTURE] No components provided - routing to planner")
+                plan_result = await self._planner.plan(
+                    CloudArchitecturePlanRequest(
+                        prompt=request.prompt,
+                        provider=request.provider,
+                        layers=request.layers
+                    )
+                )
+                components = plan_result.components
+                connections = plan_result.connections
+                logger.info(
+                    f"[CLOUD_ARCHITECTURE] Planner returned: "
+                    f"{len(components)} components, {len(connections)} connections"
                 )
 
+            # If placeholder_mode and still no components, use planner's fallback
             if request.placeholder_mode and not components:
-                components, connections = self._generate_placeholder_architecture(request.provider)
+                logger.info("[CLOUD_ARCHITECTURE] Placeholder mode - using fallback architecture")
+                plan_result = self._planner._generate_fallback_architecture(
+                    request.provider, request.layers
+                )
+                components = plan_result.components
+                connections = plan_result.connections
+
+            # =================================================================
+            # VISUALIZATION PATH (pure rendering, no LLM)
+            # =================================================================
 
             # Ensure all components have unique IDs
             for comp in components:
                 if not comp.id:
                     comp.id = f"comp-{uuid.uuid4().hex[:8]}"
 
-            # v1.2.2: If connections have empty from_id/to_id, use LLM to infer
-            # architecturally meaningful connections based on component structure
+            # v1.2.2/v1.3.0: If connections have empty from_id/to_id, use planner to infer
             has_invalid_connections = any(
                 not conn.from_id or not conn.to_id
                 for conn in connections
             )
             if has_invalid_connections and len(components) >= 2:
-                logger.info("[CLOUD_ARCHITECTURE] Empty connection IDs detected - using LLM to infer connections")
-                connections = await self._infer_connections_from_components(
+                logger.info("[CLOUD_ARCHITECTURE] Empty connection IDs detected - using planner to infer connections")
+                connections = await self._planner.infer_connections(
                     components, request.layers, request.provider
                 )
 
@@ -276,323 +323,9 @@ class CloudArchitectureGenerator:
                 error=str(e)
             )
 
-    async def _generate_architecture_from_prompt(
-        self, prompt: str, provider: str, layers: List[str]
-    ) -> tuple:
-        """
-        Generate cloud architecture from natural language prompt using Gemini.
-
-        Args:
-            prompt: Natural language description of the architecture
-            provider: Cloud provider (aws, gcp, azure, generic)
-            layers: List of layers to use
-
-        Returns:
-            Tuple of (components, connections)
-        """
-        try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[CLOUD_ARCHITECTURE] No Gemini API key found, using placeholder")
-                return self._generate_placeholder_architecture(provider)
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
-            system_prompt = f"""You are a cloud architect. Generate a cloud architecture diagram based on the user's description.
-
-User Request: {prompt}
-
-Cloud Provider: {provider}
-Available Layers (top to bottom): {', '.join(layers)}
-
-Generate a JSON response with:
-1. components: Array of cloud components with:
-   - id: unique string like "comp_1", "comp_2", etc.
-   - name: component name (max 25 chars)
-   - type: one of [compute, lambda, container, storage, database, api_gateway, load_balancer, cdn, queue, cache, auth, analytics, service, external, user, client]
-   - layer: one of [{', '.join(layers)}]
-   - x_position: 5-95 (percentage, spread components horizontally)
-   - y_position: 5-95 (percentage, based on layer - presentation at top, infrastructure at bottom)
-
-2. connections: Array of connections with:
-   - from_id: source component id
-   - to_id: target component id
-   - label: optional connection label (e.g., "HTTP", "SQL", "Event")
-   - connection_type: one of [request, response, data, event, sync, async]
-
-Guidelines:
-- Place 6-12 components for a typical architecture
-- Distribute components across layers appropriately
-- Create logical connections between components
-- Use appropriate component types for the architecture
-- Spread components horizontally within each layer (x: 15, 35, 55, 75, etc.)
-- Vertical position should reflect layer (presentation: 10-25, application: 30-50, data: 55-70, infrastructure: 75-90)
-
-Return ONLY valid JSON, no markdown or explanation."""
-
-            response = model.generate_content(system_prompt)
-            response_text = response.text.strip()
-
-            # Clean up response if wrapped in markdown
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-
-            data = json.loads(response_text)
-
-            components = []
-            for comp_data in data.get("components", []):
-                components.append(CloudComponent(
-                    id=comp_data.get("id", f"comp-{uuid.uuid4().hex[:8]}"),
-                    name=comp_data.get("name", "Component"),
-                    type=comp_data.get("type", "service"),
-                    provider=provider,
-                    layer=comp_data.get("layer"),
-                    x_position=float(comp_data.get("x_position", 50)),
-                    y_position=float(comp_data.get("y_position", 50))
-                ))
-
-            connections = []
-            for conn_data in data.get("connections", []):
-                connections.append(CloudConnection(
-                    from_id=conn_data.get("from_id", ""),
-                    to_id=conn_data.get("to_id", ""),
-                    label=conn_data.get("label"),
-                    connection_type=conn_data.get("connection_type", "request")
-                ))
-
-            logger.info(f"[CLOUD_ARCHITECTURE] Generated {len(components)} components and {len(connections)} connections from prompt")
-            return components, connections
-
-        except Exception as e:
-            logger.error(f"[CLOUD_ARCHITECTURE] LLM generation failed: {e}", exc_info=True)
-            return self._generate_placeholder_architecture(provider)
-
-    def _generate_placeholder_architecture(self, provider: str) -> tuple:
-        """Generate placeholder architecture for testing."""
-        components = [
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Users",
-                type="user",
-                provider=provider,
-                layer="presentation",
-                x_position=10,
-                y_position=12
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="CDN",
-                type="cdn",
-                provider=provider,
-                layer="presentation",
-                x_position=30,
-                y_position=12
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="API Gateway",
-                type="api_gateway",
-                provider=provider,
-                layer="presentation",
-                x_position=50,
-                y_position=12
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Auth Service",
-                type="auth",
-                provider=provider,
-                layer="application",
-                x_position=25,
-                y_position=38
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="App Service",
-                type="compute",
-                provider=provider,
-                layer="application",
-                x_position=50,
-                y_position=38
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Worker",
-                type="lambda",
-                provider=provider,
-                layer="application",
-                x_position=75,
-                y_position=38
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Database",
-                type="database",
-                provider=provider,
-                layer="data",
-                x_position=35,
-                y_position=62
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Cache",
-                type="cache",
-                provider=provider,
-                layer="data",
-                x_position=65,
-                y_position=62
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Object Storage",
-                type="storage",
-                provider=provider,
-                layer="infrastructure",
-                x_position=35,
-                y_position=88
-            ),
-            CloudComponent(
-                id=f"comp-{uuid.uuid4().hex[:8]}",
-                name="Message Queue",
-                type="queue",
-                provider=provider,
-                layer="infrastructure",
-                x_position=65,
-                y_position=88
-            )
-        ]
-
-        # Build connections based on component IDs
-        connections = [
-            CloudConnection(from_id=components[0].id, to_id=components[1].id, label="HTTPS", connection_type="request"),
-            CloudConnection(from_id=components[1].id, to_id=components[2].id, connection_type="request"),
-            CloudConnection(from_id=components[2].id, to_id=components[3].id, label="Auth", connection_type="request"),
-            CloudConnection(from_id=components[2].id, to_id=components[4].id, label="API", connection_type="request"),
-            CloudConnection(from_id=components[4].id, to_id=components[5].id, label="Async", connection_type="async"),
-            CloudConnection(from_id=components[4].id, to_id=components[6].id, label="SQL", connection_type="data"),
-            CloudConnection(from_id=components[4].id, to_id=components[7].id, label="Cache", connection_type="data"),
-            CloudConnection(from_id=components[6].id, to_id=components[8].id, label="Backup", connection_type="data"),
-            CloudConnection(from_id=components[5].id, to_id=components[9].id, label="Events", connection_type="event")
-        ]
-
-        return components, connections
-
-    async def _infer_connections_from_components(
-        self, components: List[CloudComponent], layers: List[str], provider: str
-    ) -> List[CloudConnection]:
-        """
-        Use LLM to intelligently infer architecturally meaningful connections
-        between components based on their types, names, layers, and cloud patterns.
-
-        This is called when explicit components are provided but connections have
-        empty from_id/to_id values. The LLM reasons about what connections make
-        architectural sense.
-
-        Args:
-            components: List of components with assigned IDs
-            layers: Ordered list of layer names (top to bottom)
-            provider: Cloud provider (aws, gcp, azure, generic)
-
-        Returns:
-            List of LLM-inferred CloudConnection objects
-        """
-        if not components or len(components) < 2:
-            return []
-
-        try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[CLOUD_ARCHITECTURE] No Gemini API key - cannot infer connections")
-                return []
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
-            # Build component context for LLM
-            component_list = []
-            for comp in components:
-                component_list.append({
-                    "id": comp.id,
-                    "name": comp.name,
-                    "type": comp.type,
-                    "layer": comp.layer or "unassigned"
-                })
-
-            prompt = f"""You are a cloud architect analyzing a {provider.upper()} cloud architecture diagram.
-
-Given these components:
-{json.dumps(component_list, indent=2)}
-
-Layers (top to bottom): {', '.join(layers)}
-
-Determine the logical connections between these components based on:
-1. Component types and their typical relationships (e.g., load_balancer → compute → database)
-2. Component names that suggest relationships
-3. Layer hierarchy (presentation → application → data → infrastructure)
-4. Standard cloud architecture patterns for {provider.upper()}
-
-Return a JSON array of connections. Each connection should have:
-- from_id: source component id (MUST be an exact id from the list above)
-- to_id: target component id (MUST be an exact id from the list above)
-- label: brief label describing the connection (e.g., "HTTP", "SQL", "async", "events")
-- connection_type: one of [request, response, data, event, sync, async]
-
-Guidelines:
-- Create only architecturally meaningful connections
-- Connections typically flow from higher layers to lower layers
-- Users/clients connect to gateways/load balancers
-- Gateways connect to application services
-- Services connect to databases/caches/queues
-- Don't create redundant or circular connections
-- Aim for 1-2 connections per component on average
-
-Return ONLY valid JSON array, no markdown or explanation."""
-
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
-
-            # Clean up response if wrapped in markdown
-            if response_text.startswith("```"):
-                response_text = response_text.split("```")[1]
-                if response_text.startswith("json"):
-                    response_text = response_text[4:]
-                response_text = response_text.strip()
-
-            conn_data = json.loads(response_text)
-
-            # Build set of valid component IDs for validation
-            valid_ids = {c.id for c in components}
-
-            connections = []
-            for conn in conn_data:
-                from_id = conn.get("from_id", "")
-                to_id = conn.get("to_id", "")
-
-                # Validate that both IDs exist in our components
-                if from_id in valid_ids and to_id in valid_ids:
-                    connections.append(CloudConnection(
-                        from_id=from_id,
-                        to_id=to_id,
-                        label=conn.get("label", ""),
-                        connection_type=conn.get("connection_type", "request")
-                    ))
-                else:
-                    logger.warning(f"[CLOUD_ARCHITECTURE] LLM returned invalid connection: {from_id} -> {to_id}")
-
-            logger.info(f"[CLOUD_ARCHITECTURE] LLM inferred {len(connections)} connections")
-            return connections
-
-        except Exception as e:
-            logger.error(f"[CLOUD_ARCHITECTURE] Failed to infer connections via LLM: {e}", exc_info=True)
-            return []
+    # =========================================================================
+    # VISUALIZATION METHODS (Pure rendering, no LLM)
+    # =========================================================================
 
     def _generate_theme_css(self, theme_mode: str) -> str:
         """Generate CSS variables for theme support with light defaults and dark overrides."""
