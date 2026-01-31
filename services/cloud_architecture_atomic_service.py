@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.2.1
+CLOUD_ARCHITECTURE HTML Generation Service v1.2.2
 
 Generates self-contained HTML for cloud architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -12,6 +12,10 @@ Includes embedded CSS and JavaScript for:
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.2 Fixes:
+- FIX: Auto-generate connections when from_id/to_id are empty (service-side)
+- FIX: Layer color presets now properly apply to DOM elements
 
 v1.2.1 Fixes:
 - FIX: SVG marker arrows now render in iframes (CSS variable fallback colors)
@@ -198,6 +202,18 @@ class CloudArchitectureGenerator:
             for comp in components:
                 if not comp.id:
                     comp.id = f"comp-{uuid.uuid4().hex[:8]}"
+
+            # v1.2.2: If connections have empty from_id/to_id, use LLM to infer
+            # architecturally meaningful connections based on component structure
+            has_invalid_connections = any(
+                not conn.from_id or not conn.to_id
+                for conn in connections
+            )
+            if has_invalid_connections and len(components) >= 2:
+                logger.info("[CLOUD_ARCHITECTURE] Empty connection IDs detected - using LLM to infer connections")
+                connections = await self._infer_connections_from_components(
+                    components, request.layers, request.provider
+                )
 
             # Ensure all connections have unique IDs
             for conn in connections:
@@ -466,6 +482,117 @@ Return ONLY valid JSON, no markdown or explanation."""
         ]
 
         return components, connections
+
+    async def _infer_connections_from_components(
+        self, components: List[CloudComponent], layers: List[str], provider: str
+    ) -> List[CloudConnection]:
+        """
+        Use LLM to intelligently infer architecturally meaningful connections
+        between components based on their types, names, layers, and cloud patterns.
+
+        This is called when explicit components are provided but connections have
+        empty from_id/to_id values. The LLM reasons about what connections make
+        architectural sense.
+
+        Args:
+            components: List of components with assigned IDs
+            layers: Ordered list of layer names (top to bottom)
+            provider: Cloud provider (aws, gcp, azure, generic)
+
+        Returns:
+            List of LLM-inferred CloudConnection objects
+        """
+        if not components or len(components) < 2:
+            return []
+
+        try:
+            import google.generativeai as genai
+
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if not api_key:
+                logger.warning("[CLOUD_ARCHITECTURE] No Gemini API key - cannot infer connections")
+                return []
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
+            # Build component context for LLM
+            component_list = []
+            for comp in components:
+                component_list.append({
+                    "id": comp.id,
+                    "name": comp.name,
+                    "type": comp.type,
+                    "layer": comp.layer or "unassigned"
+                })
+
+            prompt = f"""You are a cloud architect analyzing a {provider.upper()} cloud architecture diagram.
+
+Given these components:
+{json.dumps(component_list, indent=2)}
+
+Layers (top to bottom): {', '.join(layers)}
+
+Determine the logical connections between these components based on:
+1. Component types and their typical relationships (e.g., load_balancer → compute → database)
+2. Component names that suggest relationships
+3. Layer hierarchy (presentation → application → data → infrastructure)
+4. Standard cloud architecture patterns for {provider.upper()}
+
+Return a JSON array of connections. Each connection should have:
+- from_id: source component id (MUST be an exact id from the list above)
+- to_id: target component id (MUST be an exact id from the list above)
+- label: brief label describing the connection (e.g., "HTTP", "SQL", "async", "events")
+- connection_type: one of [request, response, data, event, sync, async]
+
+Guidelines:
+- Create only architecturally meaningful connections
+- Connections typically flow from higher layers to lower layers
+- Users/clients connect to gateways/load balancers
+- Gateways connect to application services
+- Services connect to databases/caches/queues
+- Don't create redundant or circular connections
+- Aim for 1-2 connections per component on average
+
+Return ONLY valid JSON array, no markdown or explanation."""
+
+            response = model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Clean up response if wrapped in markdown
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            conn_data = json.loads(response_text)
+
+            # Build set of valid component IDs for validation
+            valid_ids = {c.id for c in components}
+
+            connections = []
+            for conn in conn_data:
+                from_id = conn.get("from_id", "")
+                to_id = conn.get("to_id", "")
+
+                # Validate that both IDs exist in our components
+                if from_id in valid_ids and to_id in valid_ids:
+                    connections.append(CloudConnection(
+                        from_id=from_id,
+                        to_id=to_id,
+                        label=conn.get("label", ""),
+                        connection_type=conn.get("connection_type", "request")
+                    ))
+                else:
+                    logger.warning(f"[CLOUD_ARCHITECTURE] LLM returned invalid connection: {from_id} -> {to_id}")
+
+            logger.info(f"[CLOUD_ARCHITECTURE] LLM inferred {len(connections)} connections")
+            return connections
+
+        except Exception as e:
+            logger.error(f"[CLOUD_ARCHITECTURE] Failed to infer connections via LLM: {e}", exc_info=True)
+            return []
 
     def _generate_theme_css(self, theme_mode: str) -> str:
         """Generate CSS variables for theme support with light defaults and dark overrides."""
@@ -1365,6 +1492,7 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             if (currentEditingLayer) {{
                 currentEditingLayer.name = layerName;
+                currentEditingLayer.color = color;  // v1.2.2: Update color on edit
                 updateLayerInDOM(currentEditingLayer);
             }} else {{
                 var newLayer = {{
@@ -1421,6 +1549,11 @@ Return ONLY valid JSON, no markdown or explanation."""
                 div.style.top = (i * layerHeight) + '%';
                 div.style.height = layerHeight + '%';
 
+                // v1.2.2: Apply layer color to DOM if set
+                if (layer.color) {{
+                    div.style.background = layer.color;
+                }}
+
                 var label = document.createElement('span');
                 label.className = 'layer-label';
                 label.textContent = layer.name.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) {{ return l.toUpperCase(); }});
@@ -1442,6 +1575,11 @@ Return ONLY valid JSON, no markdown or explanation."""
                 el.dataset.layerName = layer.name;
                 el.className = 'layer-band layer-' + layer.name;
                 el.querySelector('.layer-label').textContent = layer.name.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) {{ return l.toUpperCase(); }});
+
+                // v1.2.2: Apply layer color to DOM if set
+                if (layer.color) {{
+                    el.style.background = layer.color;
+                }}
             }}
         }}
 

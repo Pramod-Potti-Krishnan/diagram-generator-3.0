@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.2.1
+LOGICAL_ARCHITECTURE HTML Generation Service v1.2.2
 
 Generates self-contained HTML for logical/system architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -11,6 +11,9 @@ Includes embedded CSS and JavaScript for:
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.2 Fixes:
+- FIX: Auto-generate connections when from_id/to_id are empty (service-side)
 
 v1.2.1 Fixes:
 - FIX: SVG marker arrows now render in iframes (CSS variable fallback colors)
@@ -179,6 +182,16 @@ class LogicalArchitectureGenerator:
             for grp in groups:
                 if not grp.id:
                     grp.id = f"grp-{uuid.uuid4().hex[:8]}"
+
+            # v1.2.2: If connections have empty from_id/to_id, use LLM to infer
+            # architecturally meaningful connections based on component structure
+            has_invalid_connections = any(
+                not conn.from_id or not conn.to_id
+                for conn in connections
+            )
+            if has_invalid_connections and len(components) >= 2:
+                logger.info("[LOGICAL_ARCHITECTURE] Empty connection IDs detected - using LLM to infer connections")
+                connections = await self._infer_connections_from_components(components, groups)
 
             # Ensure all connections have unique IDs
             for conn in connections:
@@ -488,6 +501,130 @@ Return ONLY valid JSON, no markdown or explanation."""
         ]
 
         return components, groups, connections
+
+    async def _infer_connections_from_components(
+        self, components: List[LogicalComponent], groups: List[LogicalGroup]
+    ) -> List[LogicalConnection]:
+        """
+        Use LLM to intelligently infer architecturally meaningful connections
+        between components based on their types, names, groups, and system patterns.
+
+        This is called when explicit components are provided but connections have
+        empty from_id/to_id values. The LLM reasons about what connections make
+        architectural sense.
+
+        Args:
+            components: List of components with assigned IDs
+            groups: List of groups/boundaries
+
+        Returns:
+            List of LLM-inferred LogicalConnection objects
+        """
+        if not components or len(components) < 2:
+            return []
+
+        try:
+            import google.generativeai as genai
+
+            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+            if not api_key:
+                logger.warning("[LOGICAL_ARCHITECTURE] No Gemini API key - cannot infer connections")
+                return []
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-flash')
+
+            # Build component context for LLM
+            component_list = []
+            for comp in components:
+                component_list.append({
+                    "id": comp.id,
+                    "name": comp.name,
+                    "type": comp.type,
+                    "group_id": comp.group_id or "none",
+                    "stereotype": comp.stereotype or ""
+                })
+
+            # Build group context
+            group_list = []
+            for grp in groups:
+                group_list.append({
+                    "id": grp.id,
+                    "name": grp.name,
+                    "type": grp.type
+                })
+
+            prompt = f"""You are a software architect analyzing a logical/system architecture diagram.
+
+Components:
+{json.dumps(component_list, indent=2)}
+
+Groups/Boundaries:
+{json.dumps(group_list, indent=2)}
+
+Determine the logical connections between these components based on:
+1. Component types and their typical relationships (e.g., client → gateway → service → database)
+2. Component names that suggest relationships (e.g., "User Service" might connect to "User DB")
+3. Group boundaries (components often connect across group boundaries)
+4. Stereotypes (e.g., <<controller>> connects to <<service>>)
+5. Standard software architecture patterns
+
+Return a JSON array of connections. Each connection should have:
+- from_id: source component id (MUST be an exact id from the list above)
+- to_id: target component id (MUST be an exact id from the list above)
+- label: brief label describing the connection (e.g., "HTTP", "SQL", "async", "events", "REST")
+- style: one of [solid, dashed, dotted] (use dashed for async, dotted for optional)
+- direction: one of [forward, backward, bidirectional]
+
+Guidelines:
+- Create only architecturally meaningful connections
+- Clients/UIs connect to gateways or APIs
+- Gateways route to services
+- Services connect to databases, caches, queues
+- Cross-group connections represent integration points
+- Don't create redundant or circular connections
+- Aim for 1-2 connections per component on average
+
+Return ONLY valid JSON array, no markdown or explanation."""
+
+            response = model.generate_content(prompt)
+            response_text = response.text.strip()
+
+            # Clean up response if wrapped in markdown
+            if response_text.startswith("```"):
+                response_text = response_text.split("```")[1]
+                if response_text.startswith("json"):
+                    response_text = response_text[4:]
+                response_text = response_text.strip()
+
+            conn_data = json.loads(response_text)
+
+            # Build set of valid component IDs for validation
+            valid_ids = {c.id for c in components}
+
+            connections = []
+            for conn in conn_data:
+                from_id = conn.get("from_id", "")
+                to_id = conn.get("to_id", "")
+
+                # Validate that both IDs exist in our components
+                if from_id in valid_ids and to_id in valid_ids:
+                    connections.append(LogicalConnection(
+                        from_id=from_id,
+                        to_id=to_id,
+                        label=conn.get("label", ""),
+                        style=conn.get("style", "solid"),
+                        direction=conn.get("direction", "forward")
+                    ))
+                else:
+                    logger.warning(f"[LOGICAL_ARCHITECTURE] LLM returned invalid connection: {from_id} -> {to_id}")
+
+            logger.info(f"[LOGICAL_ARCHITECTURE] LLM inferred {len(connections)} connections")
+            return connections
+
+        except Exception as e:
+            logger.error(f"[LOGICAL_ARCHITECTURE] Failed to infer connections via LLM: {e}", exc_info=True)
+            return []
 
     def _generate_theme_css(self, theme_mode: str) -> str:
         """Generate CSS variables for theme support with light defaults and dark overrides."""
