@@ -1,16 +1,22 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.1.0
+LOGICAL_ARCHITECTURE HTML Generation Service v1.2.0
 
 Generates self-contained HTML for logical/system architecture diagrams.
 Includes embedded CSS and JavaScript for:
 - Draggable system components
-- Group/boundary containers with dashed borders
+- Group/boundary containers with dashed borders (draggable)
 - SVG connection paths with multiple line styles
 - Add/Edit/Delete modals for components and groups
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.0 Enhancements:
+- FIX: Connection arrows now render reliably with delayed initialization
+- Group dragging (drag group header to reposition entire group)
+- Improved state restoration with delayed connection rendering
+- Full persistence integration with Layout Service
 
 v1.1.0 Enhancements:
 - Professional SVG icons for all component types (15+ icons)
@@ -1199,16 +1205,23 @@ Return ONLY valid JSON, no markdown or explanation."""
             groupModal = container.querySelector('#group-modal-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[LogArch v1.1] Required elements not found');
+                console.error('[LogArch v1.2] Required elements not found');
                 return;
             }}
 
             initDragDrop();
             initGroupResize();
-            renderConnections();
+            initGroupDrag();
             listenForParentMessages();
 
-            console.log('[LogArch v1.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+            // v1.2.0: Delay initial connection rendering to ensure DOM is laid out
+            // Components need getBoundingClientRect() to have valid values
+            setTimeout(function() {{
+                renderConnections();
+                console.log('[LogArch v1.2] Initial connections rendered');
+            }}, 100);
+
+            console.log('[LogArch v1.2] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
         // ============================================
@@ -1277,6 +1290,97 @@ Return ONLY valid JSON, no markdown or explanation."""
             resizingGroup = null;
             document.removeEventListener('mousemove', onGroupResize);
             document.removeEventListener('mouseup', endGroupResize);
+        }}
+
+        // ============================================
+        // v1.2.0: GROUP DRAGGING
+        // ============================================
+
+        var isDraggingGroup = false;
+        var draggedGroup = null;
+        var groupDragStartX = 0;
+        var groupDragStartY = 0;
+        var groupStartPosX = 0;
+        var groupStartPosY = 0;
+
+        function initGroupDrag() {{
+            groupsLayer.querySelectorAll('.logical-group').forEach(function(groupEl) {{
+                var header = groupEl.querySelector('.group-header');
+                if (!header) return;
+
+                header.style.cursor = 'move';
+                header.addEventListener('mousedown', function(e) {{
+                    // Don't interfere with resize handle
+                    if (e.target.classList.contains('group-resize-handle')) return;
+                    // Don't start drag if clicking on header text (for edit modal)
+                    // But allow drag if holding for a bit - use pointerdown threshold instead
+                    startGroupDrag(e, groupEl);
+                }});
+            }});
+        }}
+
+        function startGroupDrag(e, groupEl) {{
+            // Ignore right clicks
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            isDraggingGroup = true;
+            draggedGroup = groupEl;
+
+            var groupId = groupEl.dataset.groupId;
+            var group = findGroup(groupId);
+            if (!group) return;
+
+            groupDragStartX = e.clientX;
+            groupDragStartY = e.clientY;
+            groupStartPosX = group.x_position;
+            groupStartPosY = group.y_position;
+
+            groupEl.style.opacity = '0.8';
+            groupEl.style.zIndex = '100';
+
+            document.addEventListener('mousemove', onGroupDrag);
+            document.addEventListener('mouseup', endGroupDrag);
+        }}
+
+        function onGroupDrag(e) {{
+            if (!isDraggingGroup || !draggedGroup) return;
+
+            var containerRect = container.getBoundingClientRect();
+            var dx = ((e.clientX - groupDragStartX) / containerRect.width) * 100;
+            var dy = ((e.clientY - groupDragStartY) / containerRect.height) * 100;
+
+            var newX = Math.max(0, Math.min(90, groupStartPosX + dx));
+            var newY = Math.max(0, Math.min(90, groupStartPosY + dy));
+
+            draggedGroup.style.left = newX + '%';
+            draggedGroup.style.top = newY + '%';
+        }}
+
+        function endGroupDrag(e) {{
+            if (!isDraggingGroup || !draggedGroup) return;
+
+            var groupId = draggedGroup.dataset.groupId;
+            var group = findGroup(groupId);
+
+            if (group) {{
+                // Update state with new position
+                group.x_position = parseFloat(draggedGroup.style.left);
+                group.y_position = parseFloat(draggedGroup.style.top);
+            }}
+
+            draggedGroup.style.opacity = '1';
+            draggedGroup.style.zIndex = '';
+
+            isDraggingGroup = false;
+            draggedGroup = null;
+            document.removeEventListener('mousemove', onGroupDrag);
+            document.removeEventListener('mouseup', endGroupDrag);
+
+            renderConnections();
+            notifyStateChange('group-move');
+            console.log('[LogArch v1.2] Group moved to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
         }}
 
         function openAddGroupModal() {{
@@ -1393,6 +1497,16 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             // Initialize resize on new handle
             div.querySelector('.group-resize-handle').addEventListener('mousedown', startGroupResize);
+
+            // v1.2.0: Initialize drag on group header
+            var header = div.querySelector('.group-header');
+            if (header) {{
+                header.style.cursor = 'move';
+                header.addEventListener('mousedown', function(e) {{
+                    if (e.target.classList.contains('group-resize-handle')) return;
+                    startGroupDrag(e, div);
+                }});
+            }}
         }}
 
         function updateGroupInDOM(grp) {{
@@ -1821,6 +1935,9 @@ Return ONLY valid JSON, no markdown or explanation."""
                 groupsState.forEach(function(grp) {{
                     addGroupToDOM(grp);
                 }});
+
+                // v1.2.0: Initialize drag on restored groups
+                initGroupDrag();
             }}
 
             if (state.components && state.components.length > 0) {{
@@ -1834,10 +1951,16 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             if (state.connections) {{
                 connectionsState = state.connections;
-                renderConnections();
             }}
 
-            console.log('[LogArch v1.1] Restored state');
+            // v1.2.0: Delay connection rendering after state restoration
+            // Components need time to be positioned before calculating connection paths
+            setTimeout(function() {{
+                renderConnections();
+                console.log('[LogArch v1.2] Connections rendered after state restoration');
+            }}, 50);
+
+            console.log('[LogArch v1.2] Restored state');
         }}
 
         // ============================================

@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.1.0
+CLOUD_ARCHITECTURE HTML Generation Service v1.2.0
 
 Generates self-contained HTML for cloud architecture diagrams.
 Includes embedded CSS and JavaScript for:
@@ -7,11 +7,17 @@ Includes embedded CSS and JavaScript for:
 - SVG connection paths with bezier curves and arrow markers
 - Layer visualization (horizontal bands)
 - Add/Edit/Delete modal for components
-- Dynamic layer management UI
+- Dynamic layer management UI with reordering
 - Connection drawing between components
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 - LLM-based diagram generation from prompts
+
+v1.2.0 Enhancements:
+- FIX: Connection arrows now render reliably with delayed initialization
+- Layer reordering (move up/down buttons in layer modal)
+- Improved state restoration with delayed connection rendering
+- Full persistence integration with Layout Service
 
 v1.1.0 Enhancements:
 - Professional SVG icons for all component types (20+ icons)
@@ -1100,6 +1106,13 @@ Return ONLY valid JSON, no markdown or explanation."""
                 <label for="layer-color-{element_id}">Color</label>
                 <input type="color" id="layer-color-{element_id}" value="#3B82F6">
             </div>
+            <div class="form-group" id="layer-reorder-{element_id}" style="display:none;">
+                <label>Reorder Layer</label>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerUp()" style="flex:1;">&#8593; Move Up</button>
+                    <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerDown()" style="flex:1;">&#8595; Move Down</button>
+                </div>
+            </div>
             <div class="modal-actions">
                 <button class="btn btn-danger" id="layer-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteLayer()" style="display:none;">Delete</button>
                 <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeLayerModal()">Cancel</button>
@@ -1150,16 +1163,22 @@ Return ONLY valid JSON, no markdown or explanation."""
             layerModal = container.querySelector('#layer-modal-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[CloudArch v1.1] Required elements not found');
+                console.error('[CloudArch v1.2] Required elements not found');
                 return;
             }}
 
             initDragDrop();
             initLayerClicks();
-            renderConnections();
             listenForParentMessages();
 
-            console.log('[CloudArch v1.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+            // v1.2.0: Delay initial connection rendering to ensure DOM is laid out
+            // Components need getBoundingClientRect() to have valid values
+            setTimeout(function() {{
+                renderConnections();
+                console.log('[CloudArch v1.2] Initial connections rendered');
+            }}, 100);
+
+            console.log('[CloudArch v1.2] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
         // ============================================
@@ -1178,10 +1197,15 @@ Return ONLY valid JSON, no markdown or explanation."""
             }});
         }}
 
+        // v1.2.0: Track current layer index for reordering
+        var currentEditingLayerIndex = -1;
+
         function openLayerModal() {{
             currentEditingLayer = null;
+            currentEditingLayerIndex = -1;
             container.querySelector('#layer-modal-title-' + containerId).textContent = 'Add Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'none';
+            container.querySelector('#layer-reorder-' + containerId).style.display = 'none';
             container.querySelector('#layer-name-' + containerId).value = '';
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
             container.querySelector('#layer-color-' + containerId).value = '#3B82F6';
@@ -1192,13 +1216,63 @@ Return ONLY valid JSON, no markdown or explanation."""
             var layer = findLayer(layerId);
             if (!layer) return;
 
+            // v1.2.0: Find index for reordering
+            currentEditingLayerIndex = -1;
+            for (var i = 0; i < layersState.length; i++) {{
+                if (layersState[i].id === layerId) {{
+                    currentEditingLayerIndex = i;
+                    break;
+                }}
+            }}
+
             currentEditingLayer = layer;
             container.querySelector('#layer-modal-title-' + containerId).textContent = 'Edit Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'block';
+            container.querySelector('#layer-reorder-' + containerId).style.display = 'block';
             container.querySelector('#layer-name-' + containerId).value = layer.name.replace(/_/g, ' ');
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
-            container.querySelector('#layer-color-' + containerId).value = '#3B82F6';
+            container.querySelector('#layer-color-' + containerId).value = layer.color || '#3B82F6';
             layerModal.classList.add('open');
+        }}
+
+        // v1.2.0: Move layer up in the stack (visually upward = earlier in array)
+        function moveLayerUp() {{
+            if (currentEditingLayerIndex <= 0) return; // Already at top
+
+            // Swap with previous layer
+            var temp = layersState[currentEditingLayerIndex];
+            layersState[currentEditingLayerIndex] = layersState[currentEditingLayerIndex - 1];
+            layersState[currentEditingLayerIndex - 1] = temp;
+
+            // Update order values
+            layersState.forEach(function(layer, idx) {{
+                layer.order = idx;
+            }});
+
+            currentEditingLayerIndex--;
+            renderLayers();
+            notifyStateChange('reorder_layer');
+            console.log('[CloudArch v1.2] Layer moved up');
+        }}
+
+        // v1.2.0: Move layer down in the stack (visually downward = later in array)
+        function moveLayerDown() {{
+            if (currentEditingLayerIndex >= layersState.length - 1) return; // Already at bottom
+
+            // Swap with next layer
+            var temp = layersState[currentEditingLayerIndex];
+            layersState[currentEditingLayerIndex] = layersState[currentEditingLayerIndex + 1];
+            layersState[currentEditingLayerIndex + 1] = temp;
+
+            // Update order values
+            layersState.forEach(function(layer, idx) {{
+                layer.order = idx;
+            }});
+
+            currentEditingLayerIndex++;
+            renderLayers();
+            notifyStateChange('reorder_layer');
+            console.log('[CloudArch v1.2] Layer moved down');
         }}
 
         function closeLayerModal() {{
@@ -1699,10 +1773,16 @@ Return ONLY valid JSON, no markdown or explanation."""
 
             if (state.connections) {{
                 connectionsState = state.connections;
-                renderConnections();
             }}
 
-            console.log('[CloudArch v1.1] Restored state');
+            // v1.2.0: Delay connection rendering after state restoration
+            // Components need time to be positioned before calculating connection paths
+            setTimeout(function() {{
+                renderConnections();
+                console.log('[CloudArch v1.2] Connections rendered after state restoration');
+            }}, 50);
+
+            console.log('[CloudArch v1.2] Restored state');
         }}
 
         // ============================================
@@ -1717,7 +1797,9 @@ Return ONLY valid JSON, no markdown or explanation."""
             openLayerModal: openLayerModal,
             closeLayerModal: closeLayerModal,
             saveLayer: saveLayer,
-            deleteLayer: deleteLayer
+            deleteLayer: deleteLayer,
+            moveLayerUp: moveLayerUp,
+            moveLayerDown: moveLayerDown
         }};
 
         // ============================================
