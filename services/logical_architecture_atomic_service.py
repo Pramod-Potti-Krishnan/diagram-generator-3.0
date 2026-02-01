@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.1
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.2
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -16,6 +16,10 @@ Includes embedded CSS and JavaScript for:
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.2 Fixes:
+- FIX: Group dragging/resizing not working - components-layer was blocking mouse events
+- FIX: Added pointer-events: none to .components-layer, pointer-events: auto to .logical-component
 
 v1.3.1 Fixes:
 - FIX: Direction-aware bezier path calculation for proper arrow routing
@@ -617,7 +621,7 @@ class LogicalArchitectureGenerator:
     font-weight: 500;
 }}
 
-/* Components Layer */
+/* Components Layer - v1.3.2 fix: allow click-through to groups layer */
 .components-layer {{
     position: absolute;
     top: 0;
@@ -625,9 +629,10 @@ class LogicalArchitectureGenerator:
     right: 0;
     bottom: 0;
     z-index: 10;
+    pointer-events: none;
 }}
 
-/* Logical Component - v1.1.0 wider cards with icons */
+/* Logical Component - v1.3.2 added pointer-events: auto for click-through fix */
 .logical-component {{
     position: absolute;
     min-width: 130px;
@@ -642,6 +647,7 @@ class LogicalArchitectureGenerator:
     text-align: center;
     z-index: 10;
     user-select: none;
+    pointer-events: auto;
 }}
 
 .logical-component:hover {{
