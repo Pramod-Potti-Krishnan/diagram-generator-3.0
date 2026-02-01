@@ -423,6 +423,7 @@ class DataArchitectureGenerator:
 }}
 
 /* SVG Relationships Layer */
+/* Issue 2: z-index 50 puts SVG ABOVE entities (z-index 10) so crow's foot markers are visible */
 .relationships-layer {{
     position: absolute;
     top: 0;
@@ -430,7 +431,7 @@ class DataArchitectureGenerator:
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: 1;
+    z-index: 50;
 }}
 
 /* Crow's Foot Markers */
@@ -633,23 +634,38 @@ class DataArchitectureGenerator:
 }}
 
 /* Edit Panel (slide-in from right) */
+/* Issue 3: Gray background, no shadow, proper box-sizing */
+/* Issue 4: Fixed position to prevent layout shift */
 .edit-panel {{
-    position: absolute;
+    position: fixed;
     top: 0;
     right: -320px;
     width: 300px;
-    height: 100%;
-    background: var(--dataarch-modal-bg);
+    height: 100vh;
+    background: #f5f5f7;  /* Light gray background */
     border-left: 1px solid var(--dataarch-modal-border);
-    box-shadow: -4px 0 16px rgba(0,0,0,0.15);
+    /* Issue 3: REMOVED box-shadow */
     z-index: 200;
     transition: right 0.3s ease;
     overflow-y: auto;
+    overflow-x: hidden;  /* Prevent horizontal overflow */
     padding: 20px;
+    box-sizing: border-box;  /* Include padding in width */
+}}
+
+/* Issue 3: Dark theme gray background */
+[data-theme="dark"] .edit-panel,
+.theme-dark .edit-panel {{
+    background: #2d2d30;
 }}
 
 .edit-panel.open {{
     right: 0;
+}}
+
+/* Issue 4: Prevent body scroll when panel is open */
+.data-architecture-container.panel-open {{
+    overflow: hidden;
 }}
 
 .edit-panel-header {{
@@ -703,6 +719,19 @@ class DataArchitectureGenerator:
     border-radius: 6px;
     background: var(--dataarch-input-bg);
     color: var(--dataarch-text-primary);
+    box-sizing: border-box;
+}}
+
+/* Issue 4: Style select dropdowns consistently to prevent layout shift */
+.edit-form-group select {{
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
 }}
 
 .edit-form-group input:focus,
@@ -743,29 +772,38 @@ class DataArchitectureGenerator:
     cursor: pointer;
 }}
 
+/* Issue 3: Fix field item overflow with proper sizing */
 .field-item {{
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     padding: 8px;
     background: var(--dataarch-input-bg);
     border-radius: 4px;
     margin-bottom: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    flex-wrap: wrap;
 }}
 
 .field-item input {{
     flex: 1;
+    min-width: 0;  /* Allow inputs to shrink */
     padding: 6px 8px;
     font-size: 12px;
     border: 1px solid var(--dataarch-input-border);
     border-radius: 4px;
     background: var(--dataarch-entity-bg);
+    box-sizing: border-box;
 }}
 
-.field-item select {{
-    width: 100px;
+.field-item select,
+.field-item .field-type-input {{
+    width: 70px;
+    flex-shrink: 0;
     padding: 6px;
     font-size: 11px;
+    box-sizing: border-box;
 }}
 
 .field-item-checkbox {{
@@ -918,6 +956,7 @@ window.dataArchs = window.dataArchs || {{}};
     let dragOffset = {{ x: 0, y: 0 }};
     let dragElement = null;
     let presentationId = '';
+    let pendingNewEntity = null;  // Issue 1: For "Add Entity" panel-first flow
 
     console.log('[DataArch] Initializing container:', containerId);
     console.log('[DataArch] Entities:', entities.length, 'Relationships:', relationships.length);
@@ -933,6 +972,43 @@ window.dataArchs = window.dataArchs || {{}};
             renderRelationships();
             console.log('[DataArch] Initial relationships rendered');
         }}, 200);
+    }}
+
+    // Issue 2: Calculate proper rectangular edge intersection point
+    // This replaces the circular approximation with proper rectangle edge calculation
+    function getEntityEdgePoint(entityRect, containerRect, targetX, targetY) {{
+        // Entity center relative to container
+        const cx = entityRect.left + entityRect.width / 2 - containerRect.left;
+        const cy = entityRect.top + entityRect.height / 2 - containerRect.top;
+
+        // Direction to target
+        const dx = targetX - cx;
+        const dy = targetY - cy;
+
+        if (dx === 0 && dy === 0) return {{ x: cx, y: cy }};
+
+        // Half dimensions with padding for marker visibility
+        const hw = entityRect.width / 2 + 12;  // 12px padding for crow's foot markers
+        const hh = entityRect.height / 2 + 12;
+
+        // Calculate intersection with rectangle edges
+        // Check which edge the line exits from based on aspect ratio
+        const ratioX = Math.abs(dx) / hw;
+        const ratioY = Math.abs(dy) / hh;
+
+        let edgeX, edgeY;
+
+        if (ratioX > ratioY) {{
+            // Exits through left or right edge
+            edgeX = cx + (dx > 0 ? hw : -hw);
+            edgeY = cy + dy * (hw / Math.abs(dx));
+        }} else {{
+            // Exits through top or bottom edge
+            edgeX = cx + dx * (hh / Math.abs(dy));
+            edgeY = cy + (dy > 0 ? hh : -hh);
+        }}
+
+        return {{ x: edgeX, y: edgeY }};
     }}
 
     // Render relationships as SVG paths
@@ -969,29 +1045,24 @@ window.dataArchs = window.dataArchs || {{}};
             const fromRect = fromEl.getBoundingClientRect();
             const toRect = toEl.getBoundingClientRect();
 
-            // Calculate connection points
-            const fromX = fromRect.left + fromRect.width / 2 - containerRect.left;
-            const fromY = fromRect.top + fromRect.height / 2 - containerRect.top;
-            const toX = toRect.left + toRect.width / 2 - containerRect.left;
-            const toY = toRect.top + toRect.height / 2 - containerRect.top;
+            // Calculate entity centers
+            const fromCenterX = fromRect.left + fromRect.width / 2 - containerRect.left;
+            const fromCenterY = fromRect.top + fromRect.height / 2 - containerRect.top;
+            const toCenterX = toRect.left + toRect.width / 2 - containerRect.left;
+            const toCenterY = toRect.top + toRect.height / 2 - containerRect.top;
 
-            // Determine connection direction and adjust points
-            const dx = toX - fromX;
-            const dy = toY - fromY;
-            const angle = Math.atan2(dy, dx);
+            // Issue 2: Use proper rectangular edge intersection
+            const fromEdge = getEntityEdgePoint(fromRect, containerRect, toCenterX, toCenterY);
+            const toEdge = getEntityEdgePoint(toRect, containerRect, fromCenterX, fromCenterY);
 
-            // Adjust start/end to edge of entity
-            const fromEndX = fromX + Math.cos(angle) * (fromRect.width / 2 + 5);
-            const fromEndY = fromY + Math.sin(angle) * (fromRect.height / 2 + 5);
-            const toEndX = toX - Math.cos(angle) * (toRect.width / 2 + 5);
-            const toEndY = toY - Math.sin(angle) * (toRect.height / 2 + 5);
-
-            // Create bezier path
-            const midX = (fromEndX + toEndX) / 2;
-            const midY = (fromEndY + toEndY) / 2;
+            // Create bezier path using edge points
+            const dx = toEdge.x - fromEdge.x;
+            const dy = toEdge.y - fromEdge.y;
+            const midX = (fromEdge.x + toEdge.x) / 2;
+            const midY = (fromEdge.y + toEdge.y) / 2;
             const ctrlOffset = Math.min(Math.abs(dx), Math.abs(dy)) * 0.3;
 
-            const pathD = `M ${{fromEndX}} ${{fromEndY}} Q ${{midX}} ${{midY - ctrlOffset}} ${{toEndX}} ${{toEndY}}`;
+            const pathD = `M ${{fromEdge.x}} ${{fromEdge.y}} Q ${{midX}} ${{midY - ctrlOffset}} ${{toEdge.x}} ${{toEdge.y}}`;
 
             // Get markers based on cardinality
             const markers = getCardinalityMarkers(rel.cardinality);
@@ -1123,9 +1194,15 @@ window.dataArchs = window.dataArchs || {{}};
     }}
 
     // Open entity edit panel
-    function openEntityPanel(entityId) {{
-        const entity = entities.find(e => e.id === entityId);
-        if (!entity) return;
+    // Issue 1: isNewEntity flag for "Add Entity" panel-first flow
+    function openEntityPanel(entityId, isNewEntity = false) {{
+        let entity;
+        if (isNewEntity && pendingNewEntity) {{
+            entity = pendingNewEntity;
+        }} else {{
+            entity = entities.find(e => e.id === entityId);
+            if (!entity) return;
+        }}
 
         selectedEntity = entity;
 
@@ -1176,8 +1253,10 @@ window.dataArchs = window.dataArchs || {{}};
             </div>
         `;
 
-        editPanel.querySelector('.edit-panel-title').textContent = "Edit Entity";
+        // Issue 1: Change title based on create vs edit mode
+        editPanel.querySelector('.edit-panel-title').textContent = isNewEntity ? "New Entity" : "Edit Entity";
         editPanel.classList.add('open');
+        container.classList.add('panel-open');  // Issue 4: Prevent scroll when panel open
 
         // Setup field add button
         document.getElementById(containerId + "-add-field").addEventListener('click', () => {{
@@ -1207,6 +1286,7 @@ window.dataArchs = window.dataArchs || {{}};
     }};
 
     // Save entity
+    // Issue 1: Handle create mode - add to array and render on save
     function saveEntity() {{
         if (!selectedEntity) return;
 
@@ -1223,14 +1303,72 @@ window.dataArchs = window.dataArchs || {{}};
             is_nullable: true
         }}));
 
-        // Re-render entity
-        const entityEl = entitiesLayer.querySelector(`[data-entity-id="${{selectedEntity.id}}"]`);
-        if (entityEl) {{
-            updateEntityElement(entityEl, selectedEntity);
+        // Issue 1: Check if this is a NEW entity (not yet in array)
+        const existingIdx = entities.findIndex(e => e.id === selectedEntity.id);
+        if (pendingNewEntity && existingIdx === -1) {{
+            // This is a NEW entity - add to array and render DOM element
+            entities.push(selectedEntity);
+            renderNewEntity(selectedEntity);
+            pendingNewEntity = null;
+        }} else {{
+            // Existing entity - just update the DOM element
+            const entityEl = entitiesLayer.querySelector(`[data-entity-id="${{selectedEntity.id}}"]`);
+            if (entityEl) {{
+                updateEntityElement(entityEl, selectedEntity);
+            }}
         }}
 
+        renderRelationships();
         closePanel();
         notifyStateChange();
+    }}
+
+    // Issue 1: Render a new entity DOM element after Save
+    function renderNewEntity(entity) {{
+        const typeColor = {{
+            'table': '#3B82F6',
+            'view': '#8B5CF6',
+            'enum': '#F59E0B',
+            'junction': '#10B981'
+        }}[entity.type] || '#3B82F6';
+
+        const typeBadge = entity.type !== 'table' ? '<span class="entity-type-badge">' + entity.type.toUpperCase() + '</span>' : '';
+
+        const fieldsHtml = entity.fields.map(function(f) {{
+            let cls = '';
+            let icon = '';
+            if (f.is_primary_key) {{
+                cls = 'pk';
+                icon = '<span class="field-icon pk-icon">🔑</span>';
+            }} else if (f.is_foreign_key) {{
+                cls = 'fk';
+                icon = '<span class="field-icon fk-icon">🔗</span>';
+            }}
+            return '<div class="field ' + cls + '">' +
+                icon +
+                '<span class="field-name">' + f.name + '</span>' +
+                '<span class="field-type">' + f.data_type + '</span>' +
+            '</div>';
+        }}).join('');
+
+        const el = document.createElement('div');
+        el.className = 'data-entity entity-' + entity.type;
+        el.dataset.entityId = entity.id;
+        el.dataset.entityType = entity.type;
+        el.style.left = entity.x_position + '%';
+        el.style.top = entity.y_position + '%';
+        el.style.setProperty('--entity-color', typeColor);
+        el.innerHTML = '<div class="entity-header">' +
+            '<span class="entity-name">' + entity.name + '</span>' +
+            typeBadge +
+        '</div>' +
+        '<div class="entity-fields">' + fieldsHtml + '</div>';
+
+        entitiesLayer.appendChild(el);
+        el.addEventListener('mousedown', startDrag);
+        el.addEventListener('click', function(e) {{
+            if (!isDragging) openEntityPanel(entity.id);
+        }});
     }}
 
     // Delete entity
@@ -1371,6 +1509,7 @@ window.dataArchs = window.dataArchs || {{}};
 
         editPanel.querySelector('.edit-panel-title').textContent = "Edit Relationship";
         editPanel.classList.add('open');
+        container.classList.add('panel-open');  // Issue 4: Prevent scroll when panel open
 
         document.getElementById(containerId + "-save-rel").addEventListener('click', saveRelationship);
         document.getElementById(containerId + "-delete-rel").addEventListener('click', deleteRelationship);
@@ -1406,51 +1545,26 @@ window.dataArchs = window.dataArchs || {{}};
     }}
 
     // Add new entity
+    // Issue 1: Open panel first, create entity only on Save
     function addEntity() {{
+        // Create temporary entity object (not added to entities array yet)
         const newEntity = {{
             id: 'ent-' + Math.random().toString(36).substr(2, 8),
             name: 'new_table',
             type: 'table',
             fields: [
                 {{ name: 'id', data_type: 'INT', is_primary_key: true, is_foreign_key: false, is_nullable: false }},
-                {{ name: 'created_at', data_type: 'TIMESTAMP', is_primary_key: false, is_foreign_key: false, is_nullable: false }}
+                {{ name: 'created_at', data_type: 'TIMESTAMP', is_primary_key: false, is_foreign_key: false, is_nullable: true }}
             ],
             x_position: 50,
             y_position: 50
         }};
 
-        entities.push(newEntity);
+        // Store as pending entity (not in main array yet)
+        pendingNewEntity = newEntity;
 
-        // Create element
-        const el = document.createElement('div');
-        el.className = 'data-entity entity-table';
-        el.dataset.entityId = newEntity.id;
-        el.dataset.entityType = 'table';
-        el.style.left = '50%';
-        el.style.top = '50%';
-        el.style.setProperty('--entity-color', '#3B82F6');
-        el.innerHTML = `
-            <div class="entity-header">
-                <span class="entity-name">${{newEntity.name}}</span>
-            </div>
-            <div class="entity-fields">
-                ${{newEntity.fields.map(f => `
-                    <div class="field ${{f.is_primary_key ? 'pk' : ''}}">
-                        ${{f.is_primary_key ? '<span class="field-icon pk-icon">🔑</span>' : ''}}
-                        <span class="field-name">${{f.name}}</span>
-                        <span class="field-type">${{f.data_type}}</span>
-                    </div>
-                `).join('')}}
-            </div>
-        `;
-
-        entitiesLayer.appendChild(el);
-        el.addEventListener('mousedown', startDrag);
-        el.addEventListener('click', (e) => {{
-            if (!isDragging) openEntityPanel(newEntity.id);
-        }});
-
-        notifyStateChange();
+        // Open panel in CREATE mode
+        openEntityPanel(newEntity.id, true);  // true = isNewEntity flag
     }}
 
     // Add new relationship
@@ -1494,8 +1608,10 @@ window.dataArchs = window.dataArchs || {{}};
 
     function closePanel() {{
         editPanel.classList.remove('open');
+        container.classList.remove('panel-open');  // Issue 4: Re-enable scroll
         selectedEntity = null;
         selectedRelationship = null;
+        pendingNewEntity = null;  // Issue 1: Discard unsaved new entity
     }}
 
     // Notify state change to parent
