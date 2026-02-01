@@ -1525,12 +1525,45 @@ class LogicalArchitectureGenerator:
         }}
 
         function calculateBezierPath(x1, y1, x2, y2) {{
+            // v1.3.1: Direction-aware bezier path calculation
+            // Detects connection direction and applies appropriate control point offsets
             var dx = x2 - x1;
             var dy = y2 - y1;
-            var cx1 = x1 + dx * 0.4;
-            var cy1 = y1;
-            var cx2 = x2 - dx * 0.4;
-            var cy2 = y2;
+            var absDx = Math.abs(dx);
+            var absDy = Math.abs(dy);
+
+            // Determine primary direction (with 20% threshold for diagonal detection)
+            var isHorizontal = absDx > absDy * 1.2;
+            var isVertical = absDy > absDx * 1.2;
+
+            // Calculate control point offset (30% of the dominant direction)
+            var offset = Math.max(absDx, absDy) * 0.3;
+            var minOffset = 30;  // Minimum curve offset for short connections
+            offset = Math.max(offset, minOffset);
+
+            var cx1, cy1, cx2, cy2;
+
+            if (isHorizontal) {{
+                // Horizontal flow: S-curve with horizontal control points
+                cx1 = x1 + (dx > 0 ? offset : -offset);
+                cy1 = y1;
+                cx2 = x2 - (dx > 0 ? offset : -offset);
+                cy2 = y2;
+            }} else if (isVertical) {{
+                // Vertical flow: S-curve with vertical control points
+                cx1 = x1;
+                cy1 = y1 + (dy > 0 ? offset : -offset);
+                cx2 = x2;
+                cy2 = y2 - (dy > 0 ? offset : -offset);
+            }} else {{
+                // Diagonal: Use orthogonal routing (step-like path)
+                // Control points create a smooth step at the midpoint
+                cx1 = x1 + dx * 0.5;
+                cy1 = y1;
+                cx2 = x1 + dx * 0.5;
+                cy2 = y2;
+            }}
+
             return 'M ' + x1 + ' ' + y1 + ' C ' + cx1 + ' ' + cy1 + ', ' + cx2 + ' ' + cy2 + ', ' + x2 + ' ' + y2;
         }}
 

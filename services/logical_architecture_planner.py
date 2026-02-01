@@ -361,23 +361,35 @@ Return ONLY valid JSON array, no markdown or explanation."""
         Generate a prompt-aware fallback architecture when LLM is unavailable.
 
         Uses keyword detection to select appropriate architecture template:
-        - Chat/messaging/websocket → Real-time chat architecture
+        - Analytics/dashboard/metrics → Analytics platform architecture (checked FIRST - most specific)
         - E-commerce/shopping/cart → E-commerce architecture
-        - Analytics/dashboard/data → Analytics platform architecture
+        - Chat/messaging/websocket → Real-time chat architecture
         - Default → Generic 3-tier architecture
+
+        IMPORTANT: Check more specific keywords first to avoid false matches.
+        E.g., "real-time analytics" should match analytics, not chat.
         """
         prompt_lower = prompt.lower() if prompt else ""
 
         # Keyword detection for architecture type selection
-        if any(kw in prompt_lower for kw in ["chat", "messaging", "websocket", "real-time", "realtime", "conversation"]):
-            logger.info("[LOGICAL_PLANNER] Fallback: Detected CHAT architecture keywords")
-            return self._create_chat_architecture()
-        elif any(kw in prompt_lower for kw in ["ecommerce", "e-commerce", "shopping", "cart", "checkout", "product", "order"]):
-            logger.info("[LOGICAL_PLANNER] Fallback: Detected E-COMMERCE architecture keywords")
-            return self._create_ecommerce_architecture()
-        elif any(kw in prompt_lower for kw in ["analytics", "dashboard", "metrics", "reporting", "data", "visualization", "insights"]):
+        # PRIORITY ORDER: Check most specific patterns first
+
+        # 1. Analytics - check FIRST (more specific terms, avoids "real-time analytics" matching chat)
+        if any(kw in prompt_lower for kw in ["analytics", "dashboard", "metrics", "reporting", "visualization", "insights", "bi ", "business intelligence", "data warehouse", "kpi"]):
             logger.info("[LOGICAL_PLANNER] Fallback: Detected ANALYTICS architecture keywords")
             return self._create_analytics_architecture()
+
+        # 2. E-commerce - specific commerce terms
+        elif any(kw in prompt_lower for kw in ["ecommerce", "e-commerce", "shopping", "cart", "checkout", "product catalog", "order management", "payment"]):
+            logger.info("[LOGICAL_PLANNER] Fallback: Detected E-COMMERCE architecture keywords")
+            return self._create_ecommerce_architecture()
+
+        # 3. Chat - only very specific chat terms (removed "real-time" - too ambiguous)
+        elif any(kw in prompt_lower for kw in ["chat", "messaging", "instant message", "websocket chat", "conversation", "chat room", "im system"]):
+            logger.info("[LOGICAL_PLANNER] Fallback: Detected CHAT architecture keywords")
+            return self._create_chat_architecture()
+
+        # 4. Generic fallback
         else:
             logger.info("[LOGICAL_PLANNER] Fallback: Using GENERIC 3-tier architecture")
             return self._create_generic_architecture()
