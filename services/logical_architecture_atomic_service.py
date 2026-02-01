@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.2
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.3
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -16,6 +16,11 @@ Includes embedded CSS and JavaScript for:
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.3 Fixes:
+- FIX: Group dragging not working due to components blocking group header
+- FIX: Added explicit .group-drag-handle icon positioned at top-left corner
+- FIX: Drag handle is always accessible even when components overlap the header
 
 v1.3.2 Fixes:
 - FIX: Group dragging/resizing not working - components-layer was blocking mouse events
@@ -388,6 +393,7 @@ class LogicalArchitectureGenerator:
      data-group-id="{grp.id}"
      data-group-type="{grp.type}"
      style="left: {grp.x_position}%; top: {grp.y_position}%; width: {grp.width}%; height: {grp.height}%; --group-border: {colors["border"]}; --group-bg: {colors["bg"]};">
+    <div class="group-drag-handle" title="Drag to move">⋮⋮</div>
     <div class="group-header" data-group-id="{grp.id}">
         <span class="group-name">{self._escape_html(grp.name)}</span>
         <span class="group-type">[{grp.type.upper()}]</span>
@@ -566,6 +572,36 @@ class LogicalArchitectureGenerator:
     font-weight: 500;
     color: var(--larch-text-secondary);
     text-transform: uppercase;
+}}
+
+/* Group Drag Handle - v1.3.3: Explicit drag affordance */
+.group-drag-handle {{
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 16px;
+    height: 16px;
+    cursor: move;
+    opacity: 0.4;
+    transition: opacity 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--group-border, var(--larch-border));
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 5;
+    pointer-events: auto;
+}}
+
+.logical-group:hover .group-drag-handle {{
+    opacity: 0.9;
+}}
+
+.group-drag-handle:hover {{
+    opacity: 1;
+    background: rgba(0,0,0,0.05);
+    border-radius: 3px;
 }}
 
 /* Group Resize Handle - v1.2.1: Made always visible */
@@ -1134,11 +1170,15 @@ class LogicalArchitectureGenerator:
 
         function initGroupDrag() {{
             groupsLayer.querySelectorAll('.logical-group').forEach(function(groupEl) {{
+                // v1.3.3: Use drag handle if available, fallback to header
+                var dragHandle = groupEl.querySelector('.group-drag-handle');
                 var header = groupEl.querySelector('.group-header');
-                if (!header) return;
+                var dragTrigger = dragHandle || header;
 
-                header.style.cursor = 'move';
-                header.addEventListener('mousedown', function(e) {{
+                if (!dragTrigger) return;
+
+                dragTrigger.style.cursor = 'move';
+                dragTrigger.addEventListener('mousedown', function(e) {{
                     // Don't interfere with resize handle
                     if (e.target.classList.contains('group-resize-handle')) return;
                     startGroupDrag(e, groupEl);
@@ -1335,8 +1375,9 @@ class LogicalArchitectureGenerator:
             div.style.setProperty('--group-border', colors.border);
             div.style.setProperty('--group-bg', colors.bg);
 
-            // v1.2.1: Removed inline onclick - click handling now done in startGroupDrag/endGroupDrag
-            div.innerHTML = '<div class="group-header" data-group-id="' + grp.id + '">' +
+            // v1.3.3: Added drag handle for explicit drag affordance
+            div.innerHTML = '<div class="group-drag-handle" title="Drag to move">⋮⋮</div>' +
+                '<div class="group-header" data-group-id="' + grp.id + '">' +
                 '<span class="group-name">' + escapeHtml(grp.name) + '</span>' +
                 '<span class="group-type">[' + grp.type.toUpperCase() + ']</span>' +
                 '</div>' +
@@ -1347,11 +1388,13 @@ class LogicalArchitectureGenerator:
             // Initialize resize on new handle
             div.querySelector('.group-resize-handle').addEventListener('mousedown', startGroupResize);
 
-            // v1.2.1: Initialize drag/click handling on group header
+            // v1.3.3: Initialize drag/click handling on drag handle (or fallback to header)
+            var dragHandle = div.querySelector('.group-drag-handle');
             var header = div.querySelector('.group-header');
-            if (header) {{
-                header.style.cursor = 'move';
-                header.addEventListener('mousedown', function(e) {{
+            var dragTrigger = dragHandle || header;
+            if (dragTrigger) {{
+                dragTrigger.style.cursor = 'move';
+                dragTrigger.addEventListener('mousedown', function(e) {{
                     if (e.target.classList.contains('group-resize-handle')) return;
                     startGroupDrag(e, div);
                 }});
