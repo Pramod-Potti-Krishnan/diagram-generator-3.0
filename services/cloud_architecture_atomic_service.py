@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.3.5
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.6
 
 Generates self-contained HTML for cloud architecture diagrams.
 
@@ -18,6 +18,13 @@ Includes embedded CSS and JavaScript for:
 - Connection editing/deletion (click to select)
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.6 Fixes:
+- FIX: Layer clicks now work (added pointer-events: auto to .layer-band)
+- FIX: Connection clicks now work (added pointer-events: none to .components-layer)
+- FIX: Components still draggable (added pointer-events: auto to .cloud-component)
+- ROOT CAUSE: .layers-background had pointer-events: none but children lacked auto
+- ROOT CAUSE: .components-layer (z-index: 10) blocked clicks to .connections-layer (z-index: 5)
 
 v1.3.5 Fixes:
 - FIX: Layer editing now works when clicking on layer label text
@@ -589,6 +596,7 @@ class CloudArchitectureGenerator:
     padding: 8px 12px;
     cursor: pointer;
     transition: background 0.2s ease;
+    pointer-events: auto;  /* v1.3.6: Enable clicks despite parent having pointer-events: none */
 }}
 
 .layer-band:hover {{
@@ -652,6 +660,7 @@ class CloudArchitectureGenerator:
     right: 0;
     bottom: 0;
     z-index: 10;
+    pointer-events: none;  /* v1.3.6: Allow clicks to pass through to connections-layer below */
 }}
 
 /* Cloud Component - v1.1.0 wider cards */
@@ -669,6 +678,7 @@ class CloudArchitectureGenerator:
     text-align: center;
     z-index: 10;
     user-select: none;
+    pointer-events: auto;  /* v1.3.6: Re-enable clicks for components (parent has pointer-events: none) */
 }}
 
 .cloud-component:hover {{
@@ -1231,7 +1241,7 @@ class CloudArchitectureGenerator:
             connectHint = container.querySelector('#connect-hint-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[CloudArch v1.3.5] Required elements not found');
+                console.error('[CloudArch v1.3.6] Required elements not found');
                 return;
             }}
 
@@ -1244,10 +1254,10 @@ class CloudArchitectureGenerator:
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.3.5] Initial connections rendered');
+                console.log('[CloudArch v1.3.6] Initial connections rendered');
             }}, 100);
 
-            console.log('[CloudArch v1.3.5] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[CloudArch v1.3.6] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
         // v1.3.3: Click outside panel to close + ESC key handling
@@ -1523,7 +1533,7 @@ class CloudArchitectureGenerator:
                 comp.classList.toggle('connect-selectable', isConnectMode);
             }});
 
-            console.log('[CloudArch v1.3.5] Connect mode:', isConnectMode);
+            console.log('[CloudArch v1.3.6] Connect mode:', isConnectMode);
         }}
 
         function clearConnectSource() {{
@@ -2061,7 +2071,7 @@ class CloudArchitectureGenerator:
                     cloudArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[CloudArch v1.3.5] State change notified:', action);
+                console.log('[CloudArch v1.3.6] State change notified:', action);
             }} catch (e) {{
                 console.warn('[CloudArch] Failed to notify parent:', e);
             }}
@@ -2077,7 +2087,7 @@ class CloudArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[CloudArch v1.3.5] Received init from parent');
+                console.log('[CloudArch v1.3.6] Received init from parent');
             }});
         }}
 
@@ -2106,10 +2116,10 @@ class CloudArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.3.5] Connections rendered after state restoration');
+                console.log('[CloudArch v1.3.6] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[CloudArch v1.3.5] Restored state');
+            console.log('[CloudArch v1.3.6] Restored state');
         }}
 
         // ============================================
@@ -2136,7 +2146,7 @@ class CloudArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[CloudArch v1.3.5] Registered namespace:', containerId);
+        console.log('[CloudArch v1.3.6] Registered namespace:', containerId);
 
     }})();
     </script>
