@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.6
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.7
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -18,6 +18,10 @@ Includes embedded CSS and JavaScript for:
 - Connection editing/deletion (click to select)
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.7 Fixes:
+- FIX: Group header click now opens edit panel (previously only drag handle worked)
+- FIX: Added separate click listener on .group-header for opening edit modal
 
 v1.3.6 UI Enhancements:
 - ADD: Group position fields (X%, Y%) in edit panel
@@ -1254,7 +1258,7 @@ class LogicalArchitectureGenerator:
             connectHint = container.querySelector('#connect-hint-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[LogArch v1.3.6] Required elements not found');
+                console.error('[LogArch v1.3.7] Required elements not found');
                 return;
             }}
 
@@ -1268,10 +1272,10 @@ class LogicalArchitectureGenerator:
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.3.6] Initial connections rendered');
+                console.log('[LogArch v1.3.7] Initial connections rendered');
             }}, 100);
 
-            console.log('[LogArch v1.3.6] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[LogArch v1.3.7] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
         // v1.3.6: Click outside panel to close + ESC key handling
@@ -1403,6 +1407,19 @@ class LogicalArchitectureGenerator:
                     if (e.target.classList.contains('group-resize-handle')) return;
                     startGroupDrag(e, groupEl);
                 }});
+
+                // v1.3.7: Add click listener on header for opening edit modal
+                // This is separate from the drag handle so clicking header text opens edit panel
+                if (header && dragHandle) {{
+                    header.style.cursor = 'pointer';
+                    header.addEventListener('click', function(e) {{
+                        // Only open modal if not currently dragging
+                        if (!groupWasDragged) {{
+                            var groupId = header.dataset.groupId;
+                            openEditGroupModal(groupId);
+                        }}
+                    }});
+                }}
             }});
         }}
 
@@ -1476,10 +1493,10 @@ class LogicalArchitectureGenerator:
                 draggedGroup.style.zIndex = '';
                 renderConnections();
                 notifyStateChange('group-move');
-                console.log('[LogArch v1.3.6] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
+                console.log('[LogArch v1.3.7] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
             }} else {{
                 // This was a click (no significant movement) - open edit modal
-                console.log('[LogArch v1.3.6] Group clicked, opening modal for:', headerGroupId);
+                console.log('[LogArch v1.3.7] Group clicked, opening modal for:', headerGroupId);
                 openEditGroupModal(headerGroupId);
             }}
 
@@ -1648,6 +1665,17 @@ class LogicalArchitectureGenerator:
                     startGroupDrag(e, div);
                 }});
             }}
+
+            // v1.3.7: Add click listener on header for opening edit modal
+            if (header && dragHandle) {{
+                header.style.cursor = 'pointer';
+                header.addEventListener('click', function(e) {{
+                    if (!groupWasDragged) {{
+                        var groupId = header.dataset.groupId;
+                        openEditGroupModal(groupId);
+                    }}
+                }});
+            }}
         }}
 
         function updateGroupInDOM(grp) {{
@@ -1688,7 +1716,7 @@ class LogicalArchitectureGenerator:
                 comp.classList.toggle('connect-selectable', isConnectMode);
             }});
 
-            console.log('[LogArch v1.3.6] Connect mode:', isConnectMode);
+            console.log('[LogArch v1.3.7] Connect mode:', isConnectMode);
         }}
 
         function clearConnectSource() {{
@@ -2266,7 +2294,7 @@ class LogicalArchitectureGenerator:
                     logArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[LogArch v1.3.6] State change notified:', action);
+                console.log('[LogArch v1.3.7] State change notified:', action);
             }} catch (e) {{
                 console.warn('[LogArch] Failed to notify parent:', e);
             }}
@@ -2282,7 +2310,7 @@ class LogicalArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[LogArch v1.3.6] Received init from parent');
+                console.log('[LogArch v1.3.7] Received init from parent');
             }});
         }}
 
@@ -2318,10 +2346,10 @@ class LogicalArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.3.6] Connections rendered after state restoration');
+                console.log('[LogArch v1.3.7] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[LogArch v1.3.6] Restored state');
+            console.log('[LogArch v1.3.7] Restored state');
         }}
 
         // ============================================
@@ -2349,7 +2377,7 @@ class LogicalArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[LogArch v1.3.6] Registered namespace:', containerId);
+        console.log('[LogArch v1.3.7] Registered namespace:', containerId);
 
     }})();
     </script>
