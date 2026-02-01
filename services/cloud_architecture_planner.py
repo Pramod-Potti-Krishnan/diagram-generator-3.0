@@ -37,6 +37,7 @@ from models.cloud_architecture_atomic_models import (
     LayerType,
     CloudProviderType,
 )
+from utils.gemini_service import get_gemini_service, optimized_generate
 
 logger = logging.getLogger(__name__)
 
@@ -142,8 +143,9 @@ class CloudArchitecturePlanner:
     }
 
     def __init__(self):
-        """Initialize the planner."""
-        pass
+        """Initialize the planner with GeminiService."""
+        self._gemini_service = get_gemini_service()
+        self._gemini_service.initialize()
 
     async def plan(self, request: CloudArchitecturePlanRequest) -> CloudArchitecturePlanResult:
         """
@@ -181,20 +183,15 @@ class CloudArchitecturePlanner:
     ) -> CloudArchitecturePlanResult:
         """Generate cloud architecture from natural language prompt using LLM."""
         try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[CLOUD_PLANNER] No Gemini API key found, using fallback")
-                return self._generate_fallback_architecture(provider, layers)
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
             system_prompt = self._build_planning_prompt(prompt, provider, layers)
 
-            response = model.generate_content(system_prompt)
-            response_text = response.text.strip()
+            # Use GeminiService (supports both Vertex AI and API key auth)
+            response_text = await optimized_generate(prompt=system_prompt, model_type='flash')
+            if not response_text:
+                logger.warning("[CLOUD_PLANNER] No response from Gemini, using fallback")
+                return self._generate_fallback_architecture(provider, layers)
+
+            response_text = response_text.strip()
 
             # Clean up response if wrapped in markdown
             if response_text.startswith("```"):
@@ -258,20 +255,15 @@ class CloudArchitecturePlanner:
         and translates groups to cloud layers.
         """
         try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[CLOUD_PLANNER] No Gemini API key, using simple translation")
-                return self._simple_translate(logical_arch, provider, layers)
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
             prompt = self._build_translation_prompt(logical_arch, provider, layers)
 
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Use GeminiService (supports both Vertex AI and API key auth)
+            response_text = await optimized_generate(prompt=prompt, model_type='flash')
+            if not response_text:
+                logger.warning("[CLOUD_PLANNER] No response from Gemini, using simple translation")
+                return self._simple_translate(logical_arch, provider, layers)
+
+            response_text = response_text.strip()
 
             # Clean up response
             if response_text.startswith("```"):
@@ -539,16 +531,6 @@ Return ONLY valid JSON, no markdown or explanation outside the JSON structure.""
             return []
 
         try:
-            import google.generativeai as genai
-
-            api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-            if not api_key:
-                logger.warning("[CLOUD_PLANNER] No Gemini API key - cannot infer connections")
-                return []
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-
             # Build component context for LLM
             component_list = []
             for comp in components:
@@ -589,8 +571,13 @@ Guidelines:
 
 Return ONLY valid JSON array, no markdown or explanation."""
 
-            response = model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Use GeminiService (supports both Vertex AI and API key auth)
+            response_text = await optimized_generate(prompt=prompt, model_type='flash')
+            if not response_text:
+                logger.warning("[CLOUD_PLANNER] No response from Gemini - cannot infer connections")
+                return []
+
+            response_text = response_text.strip()
 
             # Clean up response
             if response_text.startswith("```"):
