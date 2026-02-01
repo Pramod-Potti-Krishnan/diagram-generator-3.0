@@ -380,7 +380,7 @@ class LogicalArchitectureGenerator:
      data-group-id="{grp.id}"
      data-group-type="{grp.type}"
      style="left: {grp.x_position}%; top: {grp.y_position}%; width: {grp.width}%; height: {grp.height}%; --group-border: {colors["border"]}; --group-bg: {colors["bg"]};">
-    <div class="group-header" onclick="logArchs[this.closest('.logical-architecture-container').id].openEditGroupModal('{grp.id}')">
+    <div class="group-header" data-group-id="{grp.id}">
         <span class="group-name">{self._escape_html(grp.name)}</span>
         <span class="group-type">[{grp.type.upper()}]</span>
     </div>
@@ -560,7 +560,7 @@ class LogicalArchitectureGenerator:
     text-transform: uppercase;
 }}
 
-/* Group Resize Handle */
+/* Group Resize Handle - v1.2.1: Made always visible */
 .group-resize-handle {{
     position: absolute;
     width: 12px;
@@ -568,12 +568,12 @@ class LogicalArchitectureGenerator:
     background: var(--group-border, var(--larch-border));
     border-radius: 2px;
     cursor: se-resize;
-    opacity: 0;
+    opacity: 0.3;
     transition: opacity 0.2s ease;
 }}
 
 .logical-group:hover .group-resize-handle {{
-    opacity: 0.6;
+    opacity: 0.8;
 }}
 
 .group-resize-handle.resize-se {{
@@ -1110,7 +1110,7 @@ class LogicalArchitectureGenerator:
         }}
 
         // ============================================
-        // v1.2.0: GROUP DRAGGING
+        // v1.2.1: GROUP DRAGGING with click-vs-drag detection
         // ============================================
 
         var isDraggingGroup = false;
@@ -1119,6 +1119,8 @@ class LogicalArchitectureGenerator:
         var groupDragStartY = 0;
         var groupStartPosX = 0;
         var groupStartPosY = 0;
+        var GROUP_DRAG_THRESHOLD = 5;  // pixels - movement threshold to distinguish drag from click
+        var groupWasDragged = false;   // track if mouse moved beyond threshold
 
         function initGroupDrag() {{
             groupsLayer.querySelectorAll('.logical-group').forEach(function(groupEl) {{
@@ -1129,8 +1131,6 @@ class LogicalArchitectureGenerator:
                 header.addEventListener('mousedown', function(e) {{
                     // Don't interfere with resize handle
                     if (e.target.classList.contains('group-resize-handle')) return;
-                    // Don't start drag if clicking on header text (for edit modal)
-                    // But allow drag if holding for a bit - use pointerdown threshold instead
                     startGroupDrag(e, groupEl);
                 }});
             }});
@@ -1140,10 +1140,11 @@ class LogicalArchitectureGenerator:
             // Ignore right clicks
             if (e.button !== 0) return;
             e.preventDefault();
-            e.stopPropagation();
 
-            isDraggingGroup = true;
+            // Initialize drag state but don't set isDraggingGroup true yet
+            // We wait until threshold is exceeded to confirm it's a drag, not a click
             draggedGroup = groupEl;
+            groupWasDragged = false;
 
             var groupId = groupEl.dataset.groupId;
             var group = findGroup(groupId);
@@ -1154,50 +1155,70 @@ class LogicalArchitectureGenerator:
             groupStartPosX = group.x_position;
             groupStartPosY = group.y_position;
 
-            groupEl.style.opacity = '0.8';
-            groupEl.style.zIndex = '100';
-
             document.addEventListener('mousemove', onGroupDrag);
             document.addEventListener('mouseup', endGroupDrag);
         }}
 
         function onGroupDrag(e) {{
-            if (!isDraggingGroup || !draggedGroup) return;
+            if (!draggedGroup) return;
+
+            var dx = e.clientX - groupDragStartX;
+            var dy = e.clientY - groupDragStartY;
+            var distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Only start actual dragging if threshold exceeded
+            if (!isDraggingGroup && distance >= GROUP_DRAG_THRESHOLD) {{
+                isDraggingGroup = true;
+                groupWasDragged = true;
+                draggedGroup.style.opacity = '0.8';
+                draggedGroup.style.zIndex = '100';
+            }}
+
+            // Don't move until threshold exceeded
+            if (!isDraggingGroup) return;
 
             var containerRect = container.getBoundingClientRect();
-            var dx = ((e.clientX - groupDragStartX) / containerRect.width) * 100;
-            var dy = ((e.clientY - groupDragStartY) / containerRect.height) * 100;
+            var dxPercent = (dx / containerRect.width) * 100;
+            var dyPercent = (dy / containerRect.height) * 100;
 
-            var newX = Math.max(0, Math.min(90, groupStartPosX + dx));
-            var newY = Math.max(0, Math.min(90, groupStartPosY + dy));
+            var newX = Math.max(0, Math.min(90, groupStartPosX + dxPercent));
+            var newY = Math.max(0, Math.min(90, groupStartPosY + dyPercent));
 
             draggedGroup.style.left = newX + '%';
             draggedGroup.style.top = newY + '%';
         }}
 
         function endGroupDrag(e) {{
-            if (!isDraggingGroup || !draggedGroup) return;
+            if (!draggedGroup) return;
 
             var groupId = draggedGroup.dataset.groupId;
-            var group = findGroup(groupId);
+            var header = draggedGroup.querySelector('.group-header');
+            var headerGroupId = header ? header.dataset.groupId : groupId;
 
-            if (group) {{
-                // Update state with new position
-                group.x_position = parseFloat(draggedGroup.style.left);
-                group.y_position = parseFloat(draggedGroup.style.top);
+            // If this was a drag (not a click), update position
+            if (isDraggingGroup) {{
+                var group = findGroup(groupId);
+                if (group) {{
+                    group.x_position = parseFloat(draggedGroup.style.left);
+                    group.y_position = parseFloat(draggedGroup.style.top);
+                }}
+                draggedGroup.style.opacity = '1';
+                draggedGroup.style.zIndex = '';
+                renderConnections();
+                notifyStateChange('group-move');
+                console.log('[LogArch v1.2.1] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
+            }} else {{
+                // This was a click (no significant movement) - open edit modal
+                console.log('[LogArch v1.2.1] Group clicked, opening modal for:', headerGroupId);
+                openEditGroupModal(headerGroupId);
             }}
 
-            draggedGroup.style.opacity = '1';
-            draggedGroup.style.zIndex = '';
-
+            // Cleanup
             isDraggingGroup = false;
             draggedGroup = null;
+            groupWasDragged = false;
             document.removeEventListener('mousemove', onGroupDrag);
             document.removeEventListener('mouseup', endGroupDrag);
-
-            renderConnections();
-            notifyStateChange('group-move');
-            console.log('[LogArch v1.2] Group moved to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
         }}
 
         function openAddGroupModal() {{
@@ -1304,7 +1325,8 @@ class LogicalArchitectureGenerator:
             div.style.setProperty('--group-border', colors.border);
             div.style.setProperty('--group-bg', colors.bg);
 
-            div.innerHTML = '<div class="group-header" onclick="logArchs[\\\'' + containerId + '\\\'].openEditGroupModal(\\\'' + grp.id + '\\\')">' +
+            // v1.2.1: Removed inline onclick - click handling now done in startGroupDrag/endGroupDrag
+            div.innerHTML = '<div class="group-header" data-group-id="' + grp.id + '">' +
                 '<span class="group-name">' + escapeHtml(grp.name) + '</span>' +
                 '<span class="group-type">[' + grp.type.toUpperCase() + ']</span>' +
                 '</div>' +
@@ -1315,7 +1337,7 @@ class LogicalArchitectureGenerator:
             // Initialize resize on new handle
             div.querySelector('.group-resize-handle').addEventListener('mousedown', startGroupResize);
 
-            // v1.2.0: Initialize drag on group header
+            // v1.2.1: Initialize drag/click handling on group header
             var header = div.querySelector('.group-header');
             if (header) {{
                 header.style.cursor = 'move';

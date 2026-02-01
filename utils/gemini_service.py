@@ -279,31 +279,51 @@ async def optimized_generate(
 ) -> Optional[str]:
     """
     Convenience function for optimized generation.
-    
+
     Args:
         prompt: The prompt to send
         model_type: 'flash' for complex tasks, 'flash-lite' for simple routing
         cache_key: Optional cache key for response caching
-        
+
     Returns:
         Generated text or None on error
     """
-    
+
     service = get_gemini_service()
+
+    # Debug logging: Check current service state
+    logger.debug(f"[GEMINI] optimized_generate called - initialized={service._initialized}, "
+                f"use_vertex_ai={service._use_vertex_ai}, models_count={len(service._models)}")
 
     # Initialize if needed - check service's own _initialized flag
     # This works for both Vertex AI and API key auth modes
     if not service._initialized or (not service._use_vertex_ai and not service._models):
+        logger.info(f"[GEMINI] Service not fully initialized, attempting init...")
+        logger.info(f"[GEMINI] GCP_PROJECT_ID set: {bool(os.getenv('GCP_PROJECT_ID'))}, "
+                   f"GOOGLE_API_KEY set: {bool(os.getenv('GOOGLE_API_KEY'))}")
         if not service.initialize():
+            logger.error(f"[GEMINI] Initialization FAILED - returning None")
             return None
-    
+        logger.info(f"[GEMINI] Initialized successfully: vertex_ai={service._use_vertex_ai}")
+
     # Optimize prompt
+    original_length = len(prompt)
     optimized_prompt = service.optimize_prompt(prompt)
-    
+    if len(optimized_prompt) < original_length:
+        logger.debug(f"[GEMINI] Prompt optimized: {original_length} -> {len(optimized_prompt)} chars")
+
     # Generate
-    return await service.generate_content(
+    result = await service.generate_content(
         optimized_prompt,
         model_name=model_type,
         cache_key=cache_key,
         use_cache=True
     )
+
+    # Debug logging: Log result status
+    if result:
+        logger.debug(f"[GEMINI] generate_content returned {len(result)} chars")
+    else:
+        logger.error(f"[GEMINI] generate_content returned None/empty")
+
+    return result

@@ -80,22 +80,38 @@ class LogicalArchitecturePlanner:
             # Build the planning prompt
             system_prompt = self._build_planning_prompt(request)
 
+            # Debug logging: Log prompt info before LLM call
+            logger.info(f"[LOGICAL_PLANNER] Calling LLM with prompt length: {len(system_prompt)} chars")
+            logger.debug(f"[LOGICAL_PLANNER] User prompt: {request.prompt[:200]}...")
+
             # Use GeminiService (supports both Vertex AI and API key auth)
             response_text = await optimized_generate(prompt=system_prompt, model_type='flash')
+
+            # Debug logging: Log response status
             if not response_text:
-                logger.warning("[LOGICAL_PLANNER] No response from Gemini, using fallback")
+                logger.error(f"[LOGICAL_PLANNER] LLM returned EMPTY response - falling back to prompt-aware architecture")
+                logger.error(f"[LOGICAL_PLANNER] User prompt was: {request.prompt[:300]}")
                 return self._generate_fallback_architecture(request.prompt)
+
+            logger.info(f"[LOGICAL_PLANNER] LLM response length: {len(response_text)} chars")
+            logger.debug(f"[LOGICAL_PLANNER] LLM raw response (first 500 chars): {response_text[:500]}")
 
             response_text = response_text.strip()
 
             # Clean up response if wrapped in markdown
             if response_text.startswith("```"):
+                logger.debug("[LOGICAL_PLANNER] Stripping markdown wrapper from response")
                 response_text = response_text.split("```")[1]
                 if response_text.startswith("json"):
                     response_text = response_text[4:]
                 response_text = response_text.strip()
 
-            data = json.loads(response_text)
+            try:
+                data = json.loads(response_text)
+            except json.JSONDecodeError as e:
+                logger.error(f"[LOGICAL_PLANNER] JSON parse FAILED: {e}")
+                logger.error(f"[LOGICAL_PLANNER] Raw response causing parse failure: {response_text[:1000]}")
+                return self._generate_fallback_architecture(request.prompt)
 
             # Parse groups
             groups = []
@@ -341,9 +357,246 @@ Return ONLY valid JSON array, no markdown or explanation."""
             return []
 
     def _generate_fallback_architecture(self, prompt: str) -> LogicalArchitecturePlanResult:
-        """Generate a reasonable fallback architecture when LLM is unavailable."""
+        """
+        Generate a prompt-aware fallback architecture when LLM is unavailable.
 
-        # Create a basic 3-tier architecture
+        Uses keyword detection to select appropriate architecture template:
+        - Chat/messaging/websocket → Real-time chat architecture
+        - E-commerce/shopping/cart → E-commerce architecture
+        - Analytics/dashboard/data → Analytics platform architecture
+        - Default → Generic 3-tier architecture
+        """
+        prompt_lower = prompt.lower() if prompt else ""
+
+        # Keyword detection for architecture type selection
+        if any(kw in prompt_lower for kw in ["chat", "messaging", "websocket", "real-time", "realtime", "conversation"]):
+            logger.info("[LOGICAL_PLANNER] Fallback: Detected CHAT architecture keywords")
+            return self._create_chat_architecture()
+        elif any(kw in prompt_lower for kw in ["ecommerce", "e-commerce", "shopping", "cart", "checkout", "product", "order"]):
+            logger.info("[LOGICAL_PLANNER] Fallback: Detected E-COMMERCE architecture keywords")
+            return self._create_ecommerce_architecture()
+        elif any(kw in prompt_lower for kw in ["analytics", "dashboard", "metrics", "reporting", "data", "visualization", "insights"]):
+            logger.info("[LOGICAL_PLANNER] Fallback: Detected ANALYTICS architecture keywords")
+            return self._create_analytics_architecture()
+        else:
+            logger.info("[LOGICAL_PLANNER] Fallback: Using GENERIC 3-tier architecture")
+            return self._create_generic_architecture()
+
+    def _create_chat_architecture(self) -> LogicalArchitecturePlanResult:
+        """Create a real-time chat/messaging architecture."""
+        groups = [
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Client Layer",
+                type="boundary",
+                x_position=5,
+                y_position=5,
+                width=22,
+                height=35
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Real-time Services",
+                type="subsystem",
+                x_position=32,
+                y_position=5,
+                width=33,
+                height=55
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Data & Storage",
+                type="layer",
+                x_position=70,
+                y_position=5,
+                width=25,
+                height=55
+            )
+        ]
+
+        components = [
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Web Client", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=18, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Mobile Client", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=32, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="WebSocket Gateway", type="gateway",
+                           group_id=groups[1].id, x_position=48, y_position=12, stereotype="<<gateway>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Chat Service", type="service",
+                           group_id=groups[1].id, x_position=40, y_position=30, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Presence Service", type="service",
+                           group_id=groups[1].id, x_position=56, y_position=30, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Message Broker", type="queue",
+                           group_id=groups[1].id, x_position=48, y_position=48, stereotype="<<broker>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Message DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=20, stereotype="<<NoSQL>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="User DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=40, stereotype="<<SQL>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Redis Cache", type="cache",
+                           group_id=groups[2].id, x_position=82, y_position=55, stereotype="<<cache>>"),
+        ]
+
+        connections = [
+            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="WS", style="solid"),
+            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="WS", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="Events", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[4].id, label="Status", style="solid"),
+            LogicalConnection(from_id=components[3].id, to_id=components[5].id, label="Pub/Sub", style="dashed"),
+            LogicalConnection(from_id=components[3].id, to_id=components[6].id, label="Store", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[8].id, label="Cache", style="dotted"),
+            LogicalConnection(from_id=components[3].id, to_id=components[7].id, label="SQL", style="solid"),
+        ]
+
+        return LogicalArchitecturePlanResult(
+            components=components, groups=groups, connections=connections,
+            reasoning="Prompt-aware fallback: Real-time chat architecture with WebSocket gateway, message broker, and presence tracking."
+        )
+
+    def _create_ecommerce_architecture(self) -> LogicalArchitecturePlanResult:
+        """Create an e-commerce platform architecture."""
+        groups = [
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Storefront",
+                type="boundary",
+                x_position=5,
+                y_position=5,
+                width=22,
+                height=35
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Commerce Services",
+                type="subsystem",
+                x_position=32,
+                y_position=5,
+                width=33,
+                height=55
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Data & External",
+                type="layer",
+                x_position=70,
+                y_position=5,
+                width=25,
+                height=55
+            )
+        ]
+
+        components = [
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Web Store", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=18, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Mobile App", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=32, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="API Gateway", type="gateway",
+                           group_id=groups[1].id, x_position=48, y_position=12, stereotype="<<gateway>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Product Service", type="service",
+                           group_id=groups[1].id, x_position=40, y_position=28, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Cart Service", type="service",
+                           group_id=groups[1].id, x_position=56, y_position=28, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Order Service", type="service",
+                           group_id=groups[1].id, x_position=40, y_position=45, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Payment Service", type="service",
+                           group_id=groups[1].id, x_position=56, y_position=45, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Product DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=18, stereotype="<<SQL>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Order DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=35, stereotype="<<SQL>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Payment Gateway", type="external",
+                           x_position=82, y_position=55, stereotype="<<external>>"),
+        ]
+
+        connections = [
+            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="REST", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[4].id, label="REST", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[5].id, label="Event", style="dashed"),
+            LogicalConnection(from_id=components[5].id, to_id=components[6].id, label="REST", style="solid"),
+            LogicalConnection(from_id=components[3].id, to_id=components[7].id, label="SQL", style="solid"),
+            LogicalConnection(from_id=components[5].id, to_id=components[8].id, label="SQL", style="solid"),
+            LogicalConnection(from_id=components[6].id, to_id=components[9].id, label="API", style="solid"),
+        ]
+
+        return LogicalArchitecturePlanResult(
+            components=components, groups=groups, connections=connections,
+            reasoning="Prompt-aware fallback: E-commerce architecture with product catalog, shopping cart, order processing, and payment integration."
+        )
+
+    def _create_analytics_architecture(self) -> LogicalArchitecturePlanResult:
+        """Create an analytics/dashboard platform architecture."""
+        groups = [
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Presentation",
+                type="boundary",
+                x_position=5,
+                y_position=5,
+                width=22,
+                height=35
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Analytics Engine",
+                type="subsystem",
+                x_position=32,
+                y_position=5,
+                width=33,
+                height=55
+            ),
+            LogicalGroup(
+                id=f"grp-{uuid.uuid4().hex[:8]}",
+                name="Data Infrastructure",
+                type="layer",
+                x_position=70,
+                y_position=5,
+                width=25,
+                height=55
+            )
+        ]
+
+        components = [
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Dashboard UI", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=18, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Report Builder", type="client",
+                           group_id=groups[0].id, x_position=16, y_position=32, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="API Gateway", type="gateway",
+                           group_id=groups[1].id, x_position=48, y_position=12, stereotype="<<gateway>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Query Service", type="service",
+                           group_id=groups[1].id, x_position=40, y_position=28, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Aggregation Engine", type="worker",
+                           group_id=groups[1].id, x_position=56, y_position=28, stereotype="<<worker>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Scheduler", type="scheduler",
+                           group_id=groups[1].id, x_position=40, y_position=45, stereotype="<<scheduler>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Alert Service", type="service",
+                           group_id=groups[1].id, x_position=56, y_position=45, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Data Warehouse", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=18, stereotype="<<DW>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Time Series DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=35, stereotype="<<TSDB>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Data Lake", type="storage",
+                           group_id=groups[2].id, x_position=82, y_position=52, stereotype="<<storage>>"),
+        ]
+
+        connections = [
+            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="REST", style="solid"),
+            LogicalConnection(from_id=components[3].id, to_id=components[4].id, label="Query", style="solid"),
+            LogicalConnection(from_id=components[5].id, to_id=components[4].id, label="Trigger", style="dashed"),
+            LogicalConnection(from_id=components[4].id, to_id=components[6].id, label="Alert", style="dotted"),
+            LogicalConnection(from_id=components[3].id, to_id=components[7].id, label="SQL", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[8].id, label="Query", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[9].id, label="Read", style="dashed"),
+        ]
+
+        return LogicalArchitecturePlanResult(
+            components=components, groups=groups, connections=connections,
+            reasoning="Prompt-aware fallback: Analytics platform with dashboard, query engine, aggregation workers, and multi-tier data storage."
+        )
+
+    def _create_generic_architecture(self) -> LogicalArchitecturePlanResult:
+        """Create a generic 3-tier architecture (original fallback)."""
         groups = [
             LogicalGroup(
                 id=f"grp-{uuid.uuid4().hex[:8]}",
@@ -375,107 +628,38 @@ Return ONLY valid JSON array, no markdown or explanation."""
         ]
 
         components = [
-            # Frontend
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Web App",
-                type="client",
-                group_id=groups[0].id,
-                x_position=17,
-                y_position=18,
-                stereotype="<<UI>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Mobile App",
-                type="client",
-                group_id=groups[0].id,
-                x_position=17,
-                y_position=32,
-                stereotype="<<UI>>"
-            ),
-            # Backend
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="API Gateway",
-                type="gateway",
-                group_id=groups[1].id,
-                x_position=50,
-                y_position=12,
-                stereotype="<<gateway>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="User Service",
-                type="service",
-                group_id=groups[1].id,
-                x_position=42,
-                y_position=32,
-                stereotype="<<service>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Order Service",
-                type="service",
-                group_id=groups[1].id,
-                x_position=58,
-                y_position=32,
-                stereotype="<<service>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Message Queue",
-                type="queue",
-                group_id=groups[1].id,
-                x_position=50,
-                y_position=50,
-                stereotype="<<queue>>"
-            ),
-            # Data Layer
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="User DB",
-                type="database",
-                group_id=groups[2].id,
-                x_position=82,
-                y_position=20,
-                stereotype="<<database>>"
-            ),
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Order DB",
-                type="database",
-                group_id=groups[2].id,
-                x_position=82,
-                y_position=40,
-                stereotype="<<database>>"
-            ),
-            # External
-            LogicalComponent(
-                id=f"lcomp-{uuid.uuid4().hex[:8]}",
-                name="Payment Gateway",
-                type="external",
-                x_position=50,
-                y_position=75,
-                stereotype="<<external>>"
-            )
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Web App", type="client",
+                           group_id=groups[0].id, x_position=17, y_position=18, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Mobile App", type="client",
+                           group_id=groups[0].id, x_position=17, y_position=32, stereotype="<<UI>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="API Gateway", type="gateway",
+                           group_id=groups[1].id, x_position=50, y_position=12, stereotype="<<gateway>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Auth Service", type="auth",
+                           group_id=groups[1].id, x_position=42, y_position=32, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Core Service", type="service",
+                           group_id=groups[1].id, x_position=58, y_position=32, stereotype="<<service>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Message Queue", type="queue",
+                           group_id=groups[1].id, x_position=50, y_position=50, stereotype="<<queue>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Primary DB", type="database",
+                           group_id=groups[2].id, x_position=82, y_position=20, stereotype="<<SQL>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="Cache", type="cache",
+                           group_id=groups[2].id, x_position=82, y_position=40, stereotype="<<cache>>"),
+            LogicalComponent(id=f"lcomp-{uuid.uuid4().hex[:8]}", name="External API", type="external",
+                           x_position=50, y_position=75, stereotype="<<external>>"),
         ]
 
-        # Build connections
         connections = [
-            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="HTTP", style="solid"),
-            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="HTTP", style="solid"),
-            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="REST", style="solid"),
+            LogicalConnection(from_id=components[0].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[1].id, to_id=components[2].id, label="HTTPS", style="solid"),
+            LogicalConnection(from_id=components[2].id, to_id=components[3].id, label="Auth", style="solid"),
             LogicalConnection(from_id=components[2].id, to_id=components[4].id, label="REST", style="solid"),
-            LogicalConnection(from_id=components[3].id, to_id=components[6].id, label="SQL", style="solid"),
-            LogicalConnection(from_id=components[4].id, to_id=components[7].id, label="SQL", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[6].id, label="SQL", style="solid"),
+            LogicalConnection(from_id=components[4].id, to_id=components[7].id, label="Cache", style="dotted"),
             LogicalConnection(from_id=components[4].id, to_id=components[5].id, label="Async", style="dashed"),
-            LogicalConnection(from_id=components[5].id, to_id=components[8].id, label="Event", style="dashed")
+            LogicalConnection(from_id=components[5].id, to_id=components[8].id, label="Event", style="dashed"),
         ]
 
         return LogicalArchitecturePlanResult(
-            components=components,
-            groups=groups,
-            connections=connections,
-            reasoning="Fallback architecture: 3-tier design with frontend, backend services, and data layer."
+            components=components, groups=groups, connections=connections,
+            reasoning="Prompt-aware fallback: Generic 3-tier architecture with authentication, caching, and async processing."
         )
