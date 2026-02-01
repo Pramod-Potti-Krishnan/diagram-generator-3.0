@@ -896,6 +896,10 @@ class DataArchitectureGenerator:
 </div>
 
 <script>
+// v1.0.0: CRITICAL - Initialize namespace BEFORE IIFE so onclick handlers can find it
+// This MUST be outside the IIFE, at global scope, for button onclick="dataArchs[...].method()" to work
+window.dataArchs = window.dataArchs || {{}};
+
 (function() {{
     const containerId = "{element_id}";
     const container = document.getElementById(containerId);
@@ -1581,8 +1585,9 @@ class DataArchitectureGenerator:
         }}
     }});
 
-    // v1.0.0: Register namespace for external access (CRITICAL for button onclick handlers)
-    window.dataArchs = window.dataArchs || {{}};
+    // v1.0.0: Populate the pre-initialized namespace with this container's methods
+    // Note: window.dataArchs is initialized OUTSIDE the IIFE (before this script block)
+    // This just adds this specific container's methods to the already-existing global object
     window.dataArchs[containerId] = {{
         addEntity: addEntity,
         addRelationship: addRelationship,
