@@ -1134,8 +1134,8 @@ window.dataArchs = window.dataArchs || {{}};
         if (dx === 0 && dy === 0) return {{ x: cx, y: cy }};
 
         // Half dimensions with padding for marker visibility
-        // Accommodate largest marker (20px marker-zero-many) + 2px visual gap
-        const MARKER_PADDING = 22;
+        // Small visual gap - markers extend outward from path endpoint, not toward entity
+        const MARKER_PADDING = 4;
         const hw = entityRect.width / 2 + MARKER_PADDING;
         const hh = entityRect.height / 2 + MARKER_PADDING;
 
