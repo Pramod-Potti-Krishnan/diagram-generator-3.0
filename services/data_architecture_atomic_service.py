@@ -635,13 +635,13 @@ class DataArchitectureGenerator:
 
 /* Edit Panel (slide-in from right) */
 /* Issue 3: Gray background, no shadow, proper box-sizing */
-/* Issue 4: Fixed position to prevent layout shift */
+/* Issue 4: REVERTED to absolute (fixed doesn't work in iframe context) */
 .edit-panel {{
-    position: fixed;
+    position: absolute;
     top: 0;
     right: -320px;
     width: 300px;
-    height: 100vh;
+    height: 100%;
     background: #f5f5f7;  /* Light gray background */
     border-left: 1px solid var(--dataarch-modal-border);
     /* Issue 3: REMOVED box-shadow */
@@ -722,16 +722,74 @@ class DataArchitectureGenerator:
     box-sizing: border-box;
 }}
 
-/* Issue 4: Style select dropdowns consistently to prevent layout shift */
-.edit-form-group select {{
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236B7280' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 12px center;
+/* Issue 4: Custom dropdown to replace native select (prevents iframe layout shift) */
+.custom-select {{
+    position: relative;
+    width: 100%;
+}}
+
+.custom-select-trigger {{
+    width: 100%;
+    padding: 10px 12px;
     padding-right: 36px;
+    font-size: 14px;
+    border: 1px solid var(--dataarch-input-border);
+    border-radius: 6px;
+    background: var(--dataarch-input-bg);
+    color: var(--dataarch-text-primary);
     cursor: pointer;
+    text-align: left;
+    box-sizing: border-box;
+    position: relative;
+}}
+
+.custom-select-trigger::after {{
+    content: '';
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid var(--dataarch-text-secondary);
+    pointer-events: none;
+}}
+
+.custom-select-options {{
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--dataarch-modal-bg);
+    border: 1px solid var(--dataarch-input-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    z-index: 300;
+    max-height: 200px;
+    overflow-y: auto;
+    display: none;
+}}
+
+.custom-select.open .custom-select-options {{
+    display: block;
+}}
+
+.custom-select-option {{
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--dataarch-text-primary);
+}}
+
+.custom-select-option:hover {{
+    background: rgba(59, 130, 246, 0.1);
+}}
+
+.custom-select-option.selected {{
+    background: var(--dataarch-button-primary);
+    color: white;
 }}
 
 .edit-form-group input:focus,
@@ -960,6 +1018,60 @@ window.dataArchs = window.dataArchs || {{}};
 
     console.log('[DataArch] Initializing container:', containerId);
     console.log('[DataArch] Entities:', entities.length, 'Relationships:', relationships.length);
+
+    // Issue 4: Helper to create custom dropdown (replaces native select to prevent iframe layout shift)
+    function createCustomSelect(selectId, options, selectedValue) {{
+        const selectedOption = options.find(o => o.value === selectedValue) || options[0];
+        const optionsHtml = options.map(opt =>
+            '<div class="custom-select-option' + (opt.value === selectedValue ? ' selected' : '') + '" data-value="' + opt.value + '">' + opt.label + '</div>'
+        ).join('');
+
+        return '<div class="custom-select" data-select-id="' + selectId + '">' +
+            '<button type="button" class="custom-select-trigger" data-value="' + selectedValue + '">' + selectedOption.label + '</button>' +
+            '<div class="custom-select-options">' + optionsHtml + '</div>' +
+        '</div>';
+    }}
+
+    // Issue 4: Setup custom select event handlers
+    function setupCustomSelects() {{
+        const customSelects = editPanel.querySelectorAll('.custom-select');
+
+        customSelects.forEach(function(select) {{
+            const trigger = select.querySelector('.custom-select-trigger');
+            const options = select.querySelectorAll('.custom-select-option');
+
+            // Toggle dropdown on trigger click
+            trigger.addEventListener('click', function(e) {{
+                e.stopPropagation();
+                // Close other open selects
+                customSelects.forEach(function(s) {{
+                    if (s !== select) s.classList.remove('open');
+                }});
+                select.classList.toggle('open');
+            }});
+
+            // Handle option selection
+            options.forEach(function(option) {{
+                option.addEventListener('click', function(e) {{
+                    e.stopPropagation();
+                    const value = option.dataset.value;
+                    trigger.dataset.value = value;
+                    trigger.textContent = option.textContent;
+
+                    // Update selected state
+                    options.forEach(function(o) {{ o.classList.remove('selected'); }});
+                    option.classList.add('selected');
+
+                    select.classList.remove('open');
+                }});
+            }});
+        }});
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function() {{
+            customSelects.forEach(function(s) {{ s.classList.remove('open'); }});
+        }});
+    }}
 
     // Initialize
     function init() {{
@@ -1224,6 +1336,14 @@ window.dataArchs = window.dataArchs || {{}};
             `;
         }});
 
+        // Issue 4: Use custom dropdown for entity type
+        const entityTypeOptions = [
+            {{ value: 'table', label: 'Table' }},
+            {{ value: 'view', label: 'View' }},
+            {{ value: 'enum', label: 'Enum' }},
+            {{ value: 'junction', label: 'Junction' }}
+        ];
+
         panelContent.innerHTML = `
             <div class="edit-form-group">
                 <label>Entity Name</label>
@@ -1231,12 +1351,7 @@ window.dataArchs = window.dataArchs || {{}};
             </div>
             <div class="edit-form-group">
                 <label>Type</label>
-                <select id="${{containerId}}-entity-type">
-                    <option value="table" ${{entity.type === 'table' ? 'selected' : ''}}>Table</option>
-                    <option value="view" ${{entity.type === 'view' ? 'selected' : ''}}>View</option>
-                    <option value="enum" ${{entity.type === 'enum' ? 'selected' : ''}}>Enum</option>
-                    <option value="junction" ${{entity.type === 'junction' ? 'selected' : ''}}>Junction</option>
-                </select>
+                ${{createCustomSelect(containerId + '-entity-type', entityTypeOptions, entity.type)}}
             </div>
             <div class="fields-editor">
                 <div class="fields-editor-header">
@@ -1257,6 +1372,9 @@ window.dataArchs = window.dataArchs || {{}};
         editPanel.querySelector('.edit-panel-title').textContent = isNewEntity ? "New Entity" : "Edit Entity";
         editPanel.classList.add('open');
         container.classList.add('panel-open');  // Issue 4: Prevent scroll when panel open
+
+        // Issue 4: Setup custom select event handlers
+        setupCustomSelects();
 
         // Setup field add button
         document.getElementById(containerId + "-add-field").addEventListener('click', () => {{
@@ -1287,11 +1405,15 @@ window.dataArchs = window.dataArchs || {{}};
 
     // Save entity
     // Issue 1: Handle create mode - add to array and render on save
+    // Issue 4: Read entity type from custom dropdown
     function saveEntity() {{
         if (!selectedEntity) return;
 
         selectedEntity.name = document.getElementById(containerId + "-entity-name").value || 'entity';
-        selectedEntity.type = document.getElementById(containerId + "-entity-type").value || 'table';
+
+        // Issue 4: Read from custom dropdown instead of native select
+        const entityTypeSelect = editPanel.querySelector('[data-select-id="' + containerId + '-entity-type"] .custom-select-trigger');
+        selectedEntity.type = entityTypeSelect ? entityTypeSelect.dataset.value : 'table';
 
         // Update fields
         const fieldItems = document.querySelectorAll(`#${{containerId}}-fields-list .field-item`);
@@ -1443,33 +1565,32 @@ window.dataArchs = window.dataArchs || {{}};
     }}
 
     // Open relationship panel
+    // Issue 4: Use custom dropdowns to prevent iframe layout shift
     function openRelationshipPanel(relId) {{
         const rel = relationships.find(r => r.id === relId);
         if (!rel) return;
 
         selectedRelationship = rel;
 
-        const entityOptions = entities.map(e =>
-            `<option value="${{e.id}}">${{e.name}}</option>`
-        ).join('');
+        // Issue 4: Build entity options for custom dropdown
+        const entityOptions = entities.map(function(e) {{
+            return {{ value: e.id, label: e.name }};
+        }});
 
+        // Issue 4: Cardinality options for custom dropdown
         const cardinalityOptions = [
-            ['one_to_one', '1:1 (One to One)'],
-            ['one_to_many', '1:N (One to Many)'],
-            ['many_to_one', 'N:1 (Many to One)'],
-            ['many_to_many', 'N:N (Many to Many)'],
-            ['zero_or_one', '0..1 (Zero or One)'],
-            ['zero_or_many', '0..N (Zero or Many)']
-        ].map(([val, label]) =>
-            `<option value="${{val}}" ${{rel.cardinality === val ? 'selected' : ''}}>${{label}}</option>`
-        ).join('');
+            {{ value: 'one_to_one', label: '1:1 (One to One)' }},
+            {{ value: 'one_to_many', label: '1:N (One to Many)' }},
+            {{ value: 'many_to_one', label: 'N:1 (Many to One)' }},
+            {{ value: 'many_to_many', label: 'N:N (Many to Many)' }},
+            {{ value: 'zero_or_one', label: '0..1 (Zero or One)' }},
+            {{ value: 'zero_or_many', label: '0..N (Zero or Many)' }}
+        ];
 
         panelContent.innerHTML = `
             <div class="edit-form-group">
                 <label>From Entity</label>
-                <select id="${{containerId}}-rel-from">
-                    ${{entityOptions.replace(`value="${{rel.from_entity}}"`, `value="${{rel.from_entity}}" selected`)}}
-                </select>
+                ${{createCustomSelect(containerId + '-rel-from', entityOptions, rel.from_entity)}}
             </div>
             <div class="edit-form-group">
                 <label>From Field</label>
@@ -1477,9 +1598,7 @@ window.dataArchs = window.dataArchs || {{}};
             </div>
             <div class="edit-form-group">
                 <label>To Entity</label>
-                <select id="${{containerId}}-rel-to">
-                    ${{entityOptions.replace(`value="${{rel.to_entity}}"`, `value="${{rel.to_entity}}" selected`)}}
-                </select>
+                ${{createCustomSelect(containerId + '-rel-to', entityOptions, rel.to_entity)}}
             </div>
             <div class="edit-form-group">
                 <label>To Field</label>
@@ -1487,9 +1606,7 @@ window.dataArchs = window.dataArchs || {{}};
             </div>
             <div class="edit-form-group">
                 <label>Cardinality</label>
-                <select id="${{containerId}}-rel-cardinality">
-                    ${{cardinalityOptions}}
-                </select>
+                ${{createCustomSelect(containerId + '-rel-cardinality', cardinalityOptions, rel.cardinality)}}
             </div>
             <div class="edit-form-group">
                 <label>Label (optional)</label>
@@ -1511,19 +1628,28 @@ window.dataArchs = window.dataArchs || {{}};
         editPanel.classList.add('open');
         container.classList.add('panel-open');  // Issue 4: Prevent scroll when panel open
 
+        // Issue 4: Setup custom select event handlers
+        setupCustomSelects();
+
         document.getElementById(containerId + "-save-rel").addEventListener('click', saveRelationship);
         document.getElementById(containerId + "-delete-rel").addEventListener('click', deleteRelationship);
     }}
 
     // Save relationship
+    // Issue 4: Read from custom dropdowns instead of native selects
     function saveRelationship() {{
         if (!selectedRelationship) return;
 
-        selectedRelationship.from_entity = document.getElementById(containerId + "-rel-from").value;
+        // Issue 4: Read from custom dropdowns using data-value attribute
+        const fromSelect = editPanel.querySelector('[data-select-id="' + containerId + '-rel-from"] .custom-select-trigger');
+        const toSelect = editPanel.querySelector('[data-select-id="' + containerId + '-rel-to"] .custom-select-trigger');
+        const cardinalitySelect = editPanel.querySelector('[data-select-id="' + containerId + '-rel-cardinality"] .custom-select-trigger');
+
+        selectedRelationship.from_entity = fromSelect ? fromSelect.dataset.value : selectedRelationship.from_entity;
         selectedRelationship.from_field = document.getElementById(containerId + "-rel-from-field").value;
-        selectedRelationship.to_entity = document.getElementById(containerId + "-rel-to").value;
+        selectedRelationship.to_entity = toSelect ? toSelect.dataset.value : selectedRelationship.to_entity;
         selectedRelationship.to_field = document.getElementById(containerId + "-rel-to-field").value;
-        selectedRelationship.cardinality = document.getElementById(containerId + "-rel-cardinality").value;
+        selectedRelationship.cardinality = cardinalitySelect ? cardinalitySelect.dataset.value : selectedRelationship.cardinality;
         selectedRelationship.label = document.getElementById(containerId + "-rel-label").value;
         selectedRelationship.is_optional = document.getElementById(containerId + "-rel-optional").checked;
 
