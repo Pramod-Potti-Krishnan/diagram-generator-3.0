@@ -144,16 +144,17 @@ add_positioned_element() {
 # ============================================
 
 # --- VISUALIZATION PATH: Complete E-commerce Microservices ---
+# EXPLICIT IDs for components so connections can reference them
 LOGICAL_VIZ_COMPONENTS='[
-    {"name": "Web Frontend", "type": "client", "stereotype": "<<UI>>", "x_position": 50, "y_position": 8},
-    {"name": "API Gateway", "type": "gateway", "stereotype": "<<gateway>>", "x_position": 50, "y_position": 22},
-    {"name": "User Service", "type": "service", "stereotype": "<<service>>", "x_position": 20, "y_position": 42},
-    {"name": "Product Service", "type": "service", "stereotype": "<<service>>", "x_position": 50, "y_position": 42},
-    {"name": "Order Service", "type": "service", "stereotype": "<<service>>", "x_position": 80, "y_position": 42},
-    {"name": "User DB", "type": "database", "stereotype": "<<repository>>", "x_position": 20, "y_position": 70},
-    {"name": "Product DB", "type": "database", "stereotype": "<<repository>>", "x_position": 50, "y_position": 70},
-    {"name": "Order DB", "type": "database", "stereotype": "<<repository>>", "x_position": 80, "y_position": 70},
-    {"name": "Message Queue", "type": "queue", "stereotype": "<<async>>", "x_position": 50, "y_position": 88}
+    {"id": "lv-frontend", "name": "Web Frontend", "type": "client", "stereotype": "<<UI>>", "x_position": 50, "y_position": 8},
+    {"id": "lv-gateway", "name": "API Gateway", "type": "gateway", "stereotype": "<<gateway>>", "x_position": 50, "y_position": 22},
+    {"id": "lv-user-svc", "name": "User Service", "type": "service", "stereotype": "<<service>>", "x_position": 20, "y_position": 42},
+    {"id": "lv-product-svc", "name": "Product Service", "type": "service", "stereotype": "<<service>>", "x_position": 50, "y_position": 42},
+    {"id": "lv-order-svc", "name": "Order Service", "type": "service", "stereotype": "<<service>>", "x_position": 80, "y_position": 42},
+    {"id": "lv-user-db", "name": "User DB", "type": "database", "stereotype": "<<repository>>", "x_position": 20, "y_position": 70},
+    {"id": "lv-product-db", "name": "Product DB", "type": "database", "stereotype": "<<repository>>", "x_position": 50, "y_position": 70},
+    {"id": "lv-order-db", "name": "Order DB", "type": "database", "stereotype": "<<repository>>", "x_position": 80, "y_position": 70},
+    {"id": "lv-queue", "name": "Message Queue", "type": "queue", "stereotype": "<<async>>", "x_position": 50, "y_position": 88}
 ]'
 LOGICAL_VIZ_GROUPS='[
     {"name": "Presentation Layer", "type": "layer", "x_position": 35, "y_position": 2, "width": 30, "height": 15},
@@ -161,12 +162,17 @@ LOGICAL_VIZ_GROUPS='[
     {"name": "Service Layer", "type": "subsystem", "x_position": 10, "y_position": 32, "width": 80, "height": 22},
     {"name": "Data Layer", "type": "layer", "x_position": 10, "y_position": 58, "width": 80, "height": 22}
 ]'
+# EXPLICIT connection references using component IDs
 LOGICAL_VIZ_CONNECTIONS='[
-    {"from_id": "", "to_id": "", "label": "HTTP", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "route", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "REST", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "SQL", "style": "dashed"},
-    {"from_id": "", "to_id": "", "label": "events", "style": "dotted"}
+    {"from_id": "lv-frontend", "to_id": "lv-gateway", "label": "HTTP", "style": "solid"},
+    {"from_id": "lv-gateway", "to_id": "lv-user-svc", "label": "route", "style": "solid"},
+    {"from_id": "lv-gateway", "to_id": "lv-product-svc", "label": "route", "style": "solid"},
+    {"from_id": "lv-gateway", "to_id": "lv-order-svc", "label": "route", "style": "solid"},
+    {"from_id": "lv-user-svc", "to_id": "lv-user-db", "label": "SQL", "style": "dashed"},
+    {"from_id": "lv-product-svc", "to_id": "lv-product-db", "label": "SQL", "style": "dashed"},
+    {"from_id": "lv-order-svc", "to_id": "lv-order-db", "label": "SQL", "style": "dashed"},
+    {"from_id": "lv-order-svc", "to_id": "lv-queue", "label": "events", "style": "dotted"},
+    {"from_id": "lv-queue", "to_id": "lv-product-svc", "label": "async", "style": "dotted"}
 ]'
 
 # --- PLANNING PATH: Prompt-only requests ---
@@ -179,23 +185,29 @@ LOGICAL_PLAN_PROMPT_2="Create a real-time chat application architecture with Web
 # ============================================
 
 # --- VISUALIZATION PATH: AWS Serverless ---
+# EXPLICIT IDs for components so connections can reference them
 CLOUD_VIZ_AWS_COMPONENTS='[
-    {"name": "CloudFront", "type": "cdn", "layer": "presentation", "x_position": 50, "y_position": 8},
-    {"name": "API Gateway", "type": "api_gateway", "layer": "presentation", "x_position": 50, "y_position": 22},
-    {"name": "Lambda Auth", "type": "lambda", "layer": "application", "x_position": 25, "y_position": 40},
-    {"name": "Lambda API", "type": "lambda", "layer": "application", "x_position": 50, "y_position": 40},
-    {"name": "Lambda Worker", "type": "lambda", "layer": "application", "x_position": 75, "y_position": 40},
-    {"name": "DynamoDB", "type": "dynamodb", "layer": "data", "x_position": 35, "y_position": 62},
-    {"name": "S3 Bucket", "type": "s3", "layer": "data", "x_position": 65, "y_position": 62},
-    {"name": "SQS Queue", "type": "queue", "layer": "infrastructure", "x_position": 35, "y_position": 85},
-    {"name": "CloudWatch", "type": "analytics", "layer": "infrastructure", "x_position": 65, "y_position": 85}
+    {"id": "aws-cdn", "name": "CloudFront", "type": "cdn", "layer": "presentation", "x_position": 50, "y_position": 8},
+    {"id": "aws-apigw", "name": "API Gateway", "type": "api_gateway", "layer": "presentation", "x_position": 50, "y_position": 22},
+    {"id": "aws-lambda-auth", "name": "Lambda Auth", "type": "lambda", "layer": "application", "x_position": 25, "y_position": 40},
+    {"id": "aws-lambda-api", "name": "Lambda API", "type": "lambda", "layer": "application", "x_position": 50, "y_position": 40},
+    {"id": "aws-lambda-worker", "name": "Lambda Worker", "type": "lambda", "layer": "application", "x_position": 75, "y_position": 40},
+    {"id": "aws-dynamodb", "name": "DynamoDB", "type": "dynamodb", "layer": "data", "x_position": 35, "y_position": 62},
+    {"id": "aws-s3", "name": "S3 Bucket", "type": "s3", "layer": "data", "x_position": 65, "y_position": 62},
+    {"id": "aws-sqs", "name": "SQS Queue", "type": "queue", "layer": "infrastructure", "x_position": 35, "y_position": 85},
+    {"id": "aws-cloudwatch", "name": "CloudWatch", "type": "analytics", "layer": "infrastructure", "x_position": 65, "y_position": 85}
 ]'
+# EXPLICIT connection references using component IDs
 CLOUD_VIZ_AWS_CONNECTIONS='[
-    {"from_id": "", "to_id": "", "label": "cache", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "REST", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "invoke", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "query", "style": "dashed"},
-    {"from_id": "", "to_id": "", "label": "store", "style": "dashed"}
+    {"from_id": "aws-cdn", "to_id": "aws-apigw", "label": "cache", "connection_type": "request"},
+    {"from_id": "aws-apigw", "to_id": "aws-lambda-auth", "label": "auth", "connection_type": "request"},
+    {"from_id": "aws-apigw", "to_id": "aws-lambda-api", "label": "REST", "connection_type": "request"},
+    {"from_id": "aws-lambda-api", "to_id": "aws-dynamodb", "label": "query", "connection_type": "data"},
+    {"from_id": "aws-lambda-api", "to_id": "aws-s3", "label": "store", "connection_type": "data"},
+    {"from_id": "aws-lambda-api", "to_id": "aws-sqs", "label": "enqueue", "connection_type": "async"},
+    {"from_id": "aws-sqs", "to_id": "aws-lambda-worker", "label": "trigger", "connection_type": "event"},
+    {"from_id": "aws-lambda-worker", "to_id": "aws-dynamodb", "label": "write", "connection_type": "data"},
+    {"from_id": "aws-lambda-api", "to_id": "aws-cloudwatch", "label": "logs", "connection_type": "async"}
 ]'
 
 # --- PLANNING PATH: Prompt-only cloud requests ---
@@ -206,25 +218,31 @@ CLOUD_PLAN_PROMPT_GCP="Build a GCP machine learning platform with Vertex AI for 
 CLOUD_PLAN_PROMPT_AZURE="Create an Azure enterprise web application with App Service for hosting, Azure SQL for database, Blob Storage for assets, Azure Functions for background jobs, and Application Insights for monitoring."
 
 # --- VISUALIZATION PATH: Multi-cloud with Custom Layers ---
+# EXPLICIT IDs for components so connections can reference them
 CLOUD_VIZ_MULTI_COMPONENTS='[
-    {"name": "Global CDN", "type": "cdn", "layer": "presentation", "x_position": 50, "y_position": 8},
-    {"name": "Load Balancer", "type": "load_balancer", "layer": "presentation", "x_position": 50, "y_position": 22},
-    {"name": "Auth Service", "type": "compute", "layer": "application", "x_position": 25, "y_position": 40},
-    {"name": "Core API", "type": "compute", "layer": "application", "x_position": 50, "y_position": 40},
-    {"name": "Worker Fleet", "type": "compute", "layer": "application", "x_position": 75, "y_position": 40},
-    {"name": "Redis Cache", "type": "cache", "layer": "data", "x_position": 25, "y_position": 62},
-    {"name": "PostgreSQL", "type": "database", "layer": "data", "x_position": 50, "y_position": 62},
-    {"name": "Object Storage", "type": "storage", "layer": "data", "x_position": 75, "y_position": 62},
-    {"name": "Kafka", "type": "queue", "layer": "infrastructure", "x_position": 35, "y_position": 85},
-    {"name": "Prometheus", "type": "analytics", "layer": "infrastructure", "x_position": 65, "y_position": 85}
+    {"id": "mc-cdn", "name": "Global CDN", "type": "cdn", "layer": "presentation", "x_position": 50, "y_position": 8},
+    {"id": "mc-lb", "name": "Load Balancer", "type": "load_balancer", "layer": "presentation", "x_position": 50, "y_position": 22},
+    {"id": "mc-auth", "name": "Auth Service", "type": "compute", "layer": "application", "x_position": 25, "y_position": 40},
+    {"id": "mc-api", "name": "Core API", "type": "compute", "layer": "application", "x_position": 50, "y_position": 40},
+    {"id": "mc-worker", "name": "Worker Fleet", "type": "compute", "layer": "application", "x_position": 75, "y_position": 40},
+    {"id": "mc-redis", "name": "Redis Cache", "type": "cache", "layer": "data", "x_position": 25, "y_position": 62},
+    {"id": "mc-postgres", "name": "PostgreSQL", "type": "database", "layer": "data", "x_position": 50, "y_position": 62},
+    {"id": "mc-storage", "name": "Object Storage", "type": "storage", "layer": "data", "x_position": 75, "y_position": 62},
+    {"id": "mc-kafka", "name": "Kafka", "type": "queue", "layer": "infrastructure", "x_position": 35, "y_position": 85},
+    {"id": "mc-prometheus", "name": "Prometheus", "type": "analytics", "layer": "infrastructure", "x_position": 65, "y_position": 85}
 ]'
+# EXPLICIT connection references using component IDs
 CLOUD_VIZ_MULTI_CONNECTIONS='[
-    {"from_id": "", "to_id": "", "label": "distribute", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "route", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "validate", "style": "solid"},
-    {"from_id": "", "to_id": "", "label": "cache", "style": "dashed"},
-    {"from_id": "", "to_id": "", "label": "persist", "style": "dashed"},
-    {"from_id": "", "to_id": "", "label": "stream", "style": "dotted"}
+    {"from_id": "mc-cdn", "to_id": "mc-lb", "label": "distribute", "connection_type": "request"},
+    {"from_id": "mc-lb", "to_id": "mc-auth", "label": "auth", "connection_type": "request"},
+    {"from_id": "mc-lb", "to_id": "mc-api", "label": "route", "connection_type": "request"},
+    {"from_id": "mc-api", "to_id": "mc-redis", "label": "cache", "connection_type": "data"},
+    {"from_id": "mc-api", "to_id": "mc-postgres", "label": "persist", "connection_type": "data"},
+    {"from_id": "mc-api", "to_id": "mc-storage", "label": "store", "connection_type": "data"},
+    {"from_id": "mc-api", "to_id": "mc-kafka", "label": "publish", "connection_type": "event"},
+    {"from_id": "mc-kafka", "to_id": "mc-worker", "label": "consume", "connection_type": "event"},
+    {"from_id": "mc-worker", "to_id": "mc-postgres", "label": "write", "connection_type": "data"},
+    {"from_id": "mc-api", "to_id": "mc-prometheus", "label": "metrics", "connection_type": "async"}
 ]'
 
 # ============================================
