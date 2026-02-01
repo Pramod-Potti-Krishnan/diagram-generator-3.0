@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.3.2
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.3
 
 Generates self-contained HTML for cloud architecture diagrams.
 
@@ -14,11 +14,20 @@ Includes embedded CSS and JavaScript for:
 - Layer visualization (horizontal bands)
 - Add/Edit/Delete modal for components
 - Dynamic layer management UI with reordering
-- Connection drawing between components
+- Connection drawing between components (Connect mode)
+- Connection editing/deletion (click to select)
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 
-v1.3.1 UI Enhancements:
+v1.3.3 UI Enhancements:
+- ADD: Layer type dropdown replaces color picker (theme-aware colors)
+- ADD: Layer position dropdown for direct position selection
+- ADD: Connect mode to draw connections between components
+- ADD: Connection panel to edit/delete existing connections
+- ADD: Clickable connection paths with selection state
+- FIX: Layer colors now adapt correctly to light/dark theme
+
+v1.3.2 UI Enhancements:
 - CHANGE: Container background now transparent (no grey box)
 - CHANGE: Centered modal replaced with slide-in panel from right
 - ADD: Panel slides in with 300ms ease animation
@@ -901,30 +910,65 @@ class CloudArchitectureGenerator:
     background: #DC2626;
 }}
 
-/* Color Presets - v1.2.1 */
-.color-presets {{
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}}
-
-.color-btn {{
-    width: 36px;
-    height: 36px;
-    border: 2px solid var(--arch-border);
-    border-radius: 6px;
+/* Connect Button - v1.3.3 */
+.connect-btn {{
+    padding: 8px 16px;
+    background: var(--arch-text-secondary);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
     cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}}
-
-.color-btn:hover {{
-    transform: scale(1.1);
     box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }}
 
-.color-btn.selected {{
-    border-color: var(--arch-button-primary);
-    box-shadow: 0 0 0 2px var(--arch-button-primary);
+.connect-btn:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    background: var(--arch-text-primary);
+}}
+
+.connect-btn.active {{
+    background: var(--arch-button-primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+}}
+
+.connect-mode-hint {{
+    position: absolute;
+    bottom: 55px;
+    right: 15px;
+    background: var(--arch-modal-bg);
+    border: 1px solid var(--arch-modal-border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--arch-text-secondary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 50;
+}}
+
+/* Component Connect Mode Styling - v1.3.3 */
+.cloud-component.connect-source {{
+    box-shadow: 0 0 0 3px var(--arch-button-primary);
+}}
+
+.cloud-component.connect-selectable {{
+    cursor: crosshair;
+}}
+
+/* Connection Path Clickable - v1.3.3 */
+.connection-path.clickable {{
+    pointer-events: stroke;
+    cursor: pointer;
+    stroke-width: 8;
+    stroke-opacity: 0;
+}}
+
+.connection-path.selected {{
+    stroke: var(--arch-button-primary) !important;
+    stroke-width: 3;
 }}
 
 /* Provider accent */
@@ -960,6 +1004,10 @@ class CloudArchitectureGenerator:
     <div class="action-buttons">
         <button class="add-layer-btn" onclick="cloudArchs['{element_id}'].openLayerModal()">+ Layer</button>
         <button class="add-component-btn" onclick="cloudArchs['{element_id}'].openAddModal()">+ Component</button>
+        <button class="connect-btn" id="connect-btn-{element_id}" onclick="cloudArchs['{element_id}'].toggleConnectMode()">&#128279; Connect</button>
+    </div>
+    <div class="connect-mode-hint" id="connect-hint-{element_id}" style="display:none;">
+        Click a source component, then click a target component
     </div>
 
     <!-- v1.3.1: Component Panel (slide-in from right) -->
@@ -1013,7 +1061,7 @@ class CloudArchitectureGenerator:
         </div>
     </div>
 
-    <!-- v1.3.1: Layer Panel (slide-in from right) -->
+    <!-- v1.3.3: Layer Panel (slide-in from right) -->
     <div class="detail-panel" id="layer-panel-{element_id}">
         <button class="panel-close" onclick="cloudArchs['{element_id}'].closeLayerModal()">&times;</button>
         <div class="panel-header">
@@ -1024,35 +1072,69 @@ class CloudArchitectureGenerator:
             <input type="text" id="layer-name-{element_id}" class="panel-input" maxlength="30" placeholder="e.g., Security, Network...">
         </div>
         <div class="panel-section">
-            <label class="panel-label" for="layer-position-{element_id}">Position</label>
+            <label class="panel-label" for="layer-type-{element_id}">Layer Type</label>
+            <select id="layer-type-{element_id}" class="panel-input">
+                <option value="presentation">Presentation (Blue)</option>
+                <option value="application">Application (Purple)</option>
+                <option value="data">Data (Green)</option>
+                <option value="infrastructure">Infrastructure (Amber)</option>
+                <option value="network">Network (Cyan)</option>
+                <option value="security">Security (Red)</option>
+                <option value="custom">Custom (Gray)</option>
+            </select>
+        </div>
+        <div class="panel-section" id="layer-add-position-{element_id}">
+            <label class="panel-label" for="layer-position-{element_id}">Add Position</label>
             <select id="layer-position-{element_id}" class="panel-input">
                 <option value="top">Add at Top</option>
                 <option value="bottom">Add at Bottom</option>
             </select>
         </div>
-        <div class="panel-section">
-            <label class="panel-label">Layer Color</label>
-            <div class="color-presets" id="layer-color-presets-{element_id}">
-                <button type="button" class="color-btn" data-color="#DBEAFE" style="background:#DBEAFE;" title="Blue"></button>
-                <button type="button" class="color-btn" data-color="#DCFCE7" style="background:#DCFCE7;" title="Green"></button>
-                <button type="button" class="color-btn" data-color="#FED7AA" style="background:#FED7AA;" title="Orange"></button>
-                <button type="button" class="color-btn" data-color="#E9D5FF" style="background:#E9D5FF;" title="Purple"></button>
-                <button type="button" class="color-btn" data-color="#E5E7EB" style="background:#E5E7EB;" title="Gray"></button>
-                <button type="button" class="color-btn" data-color="#CFFAFE" style="background:#CFFAFE;" title="Cyan"></button>
-            </div>
-            <input type="hidden" id="layer-color-{element_id}" value="#DBEAFE">
-        </div>
-        <div class="panel-section" id="layer-reorder-{element_id}" style="display:none;">
-            <label class="panel-label">Reorder Layer</label>
-            <div style="display:flex;gap:8px;">
-                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerUp()" style="flex:1;">&#8593; Move Up</button>
-                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerDown()" style="flex:1;">&#8595; Move Down</button>
-            </div>
+        <div class="panel-section" id="layer-edit-position-{element_id}" style="display:none;">
+            <label class="panel-label" for="layer-index-{element_id}">Position (1 = top)</label>
+            <select id="layer-index-{element_id}" class="panel-input">
+            </select>
         </div>
         <div class="panel-actions">
             <button class="btn btn-danger" id="layer-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteLayer()" style="display:none;">Delete</button>
             <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeLayerModal()">Cancel</button>
             <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveLayer()">Save</button>
+        </div>
+    </div>
+
+    <!-- v1.3.3: Connection Panel (slide-in from right) -->
+    <div class="detail-panel" id="connection-panel-{element_id}">
+        <button class="panel-close" onclick="cloudArchs['{element_id}'].closeConnectionPanel()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="connection-panel-title-{element_id}">Edit Connection</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label">From</label>
+            <input type="text" id="connection-from-{element_id}" class="panel-input" readonly disabled>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label">To</label>
+            <input type="text" id="connection-to-{element_id}" class="panel-input" readonly disabled>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-label-{element_id}">Label (optional)</label>
+            <input type="text" id="connection-label-{element_id}" class="panel-input" maxlength="30" placeholder="e.g., HTTP, REST, gRPC...">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-type-{element_id}">Connection Type</label>
+            <select id="connection-type-{element_id}" class="panel-input">
+                <option value="sync">Sync (solid line)</option>
+                <option value="async">Async (dashed line)</option>
+                <option value="event">Event (dashed line)</option>
+                <option value="request">Request (solid line)</option>
+                <option value="response">Response (solid line)</option>
+                <option value="data">Data (solid line)</option>
+            </select>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" onclick="cloudArchs['{element_id}'].deleteConnection()">Delete</button>
+            <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeConnectionPanel()">Cancel</button>
+            <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveConnection()">Save</button>
         </div>
     </div>
 
@@ -1071,9 +1153,14 @@ class CloudArchitectureGenerator:
         var presentationId = '';
         var currentEditingComponent = null;
         var currentEditingLayer = null;
+        var currentEditingConnection = null;
+
+        // v1.3.3: Connect mode state
+        var isConnectMode = false;
+        var connectSourceId = null;
 
         // DOM elements
-        var componentsLayer, connectionsLayer, componentPanel, layerPanel, layersBackground;
+        var componentsLayer, connectionsLayer, componentPanel, layerPanel, connectionPanel, layersBackground, connectBtn, connectHint;
 
         // State
         var componentsState = {components_json};
@@ -1082,6 +1169,9 @@ class CloudArchitectureGenerator:
 
         // Component type colors
         var typeColors = {json.dumps(COMPONENT_TYPE_COLORS)};
+
+        // Layer type colors for theme support - v1.3.3
+        var layerColors = {json.dumps(LAYER_COLORS)};
 
         // SVG Icons
         var svgIcons = {svg_icons_json};
@@ -1096,15 +1186,17 @@ class CloudArchitectureGenerator:
             layersBackground = container.querySelector('.layers-background');
             componentPanel = container.querySelector('#component-panel-' + containerId);
             layerPanel = container.querySelector('#layer-panel-' + containerId);
+            connectionPanel = container.querySelector('#connection-panel-' + containerId);
+            connectBtn = container.querySelector('#connect-btn-' + containerId);
+            connectHint = container.querySelector('#connect-hint-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[CloudArch v1.3.1] Required elements not found');
+                console.error('[CloudArch v1.3.3] Required elements not found');
                 return;
             }}
 
             initDragDrop();
             initLayerClicks();
-            initColorPresets();
             initClickOutsideClose();
             listenForParentMessages();
 
@@ -1112,13 +1204,13 @@ class CloudArchitectureGenerator:
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.3.1] Initial connections rendered');
+                console.log('[CloudArch v1.3.3] Initial connections rendered');
             }}, 100);
 
-            console.log('[CloudArch v1.3.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[CloudArch v1.3.3] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
-        // v1.3.1: Click outside panel to close
+        // v1.3.3: Click outside panel to close + ESC key handling
         function initClickOutsideClose() {{
             document.addEventListener('click', function(e) {{
                 // Check if component panel is open and click is outside
@@ -1131,6 +1223,21 @@ class CloudArchitectureGenerator:
                 if (layerPanel && layerPanel.classList.contains('open')) {{
                     if (!layerPanel.contains(e.target) && !e.target.closest('.add-layer-btn') && !e.target.closest('.layer-band')) {{
                         closeLayerModal();
+                    }}
+                }}
+                // Check if connection panel is open and click is outside
+                if (connectionPanel && connectionPanel.classList.contains('open')) {{
+                    if (!connectionPanel.contains(e.target) && !e.target.closest('.connection-path')) {{
+                        closeConnectionPanel();
+                    }}
+                }}
+            }});
+
+            // v1.3.3: ESC key to cancel connect mode
+            document.addEventListener('keydown', function(e) {{
+                if (e.key === 'Escape') {{
+                    if (isConnectMode) {{
+                        toggleConnectMode();
                     }}
                 }}
             }});
@@ -1152,30 +1259,32 @@ class CloudArchitectureGenerator:
             }});
         }}
 
-        // v1.2.1: Initialize color preset buttons
-        function initColorPresets() {{
-            var presetsContainer = container.querySelector('#layer-color-presets-' + containerId);
-            if (!presetsContainer) return;
-
-            presetsContainer.querySelectorAll('.color-btn').forEach(function(btn) {{
-                btn.addEventListener('click', function() {{
-                    selectColorPreset(btn.dataset.color);
-                }});
-            }});
+        // v1.3.3: Get current theme mode
+        function getCurrentTheme() {{
+            return document.documentElement.classList.contains('theme-dark') ? 'dark' : 'light';
         }}
 
-        // v1.2.1: Select a color preset
-        function selectColorPreset(color) {{
-            var presetsContainer = container.querySelector('#layer-color-presets-' + containerId);
-            var hiddenInput = container.querySelector('#layer-color-' + containerId);
+        // v1.3.3: Get layer color based on type and current theme
+        function getLayerColor(layerType) {{
+            var theme = getCurrentTheme();
+            var colors = layerColors[layerType] || layerColors['custom'] || {{
+                light: 'rgba(156, 163, 175, 0.08)',
+                dark: 'rgba(156, 163, 175, 0.15)'
+            }};
+            return colors[theme] || colors['light'];
+        }}
 
-            // Update hidden input
-            hiddenInput.value = color;
-
-            // Update button selection state
-            presetsContainer.querySelectorAll('.color-btn').forEach(function(btn) {{
-                btn.classList.toggle('selected', btn.dataset.color === color);
-            }});
+        // v1.3.3: Populate position dropdown
+        function populatePositionDropdown(currentIndex) {{
+            var dropdown = container.querySelector('#layer-index-' + containerId);
+            dropdown.innerHTML = '';
+            for (var i = 0; i < layersState.length; i++) {{
+                var opt = document.createElement('option');
+                opt.value = i;
+                opt.textContent = 'Position ' + (i + 1);
+                if (i === currentIndex) opt.selected = true;
+                dropdown.appendChild(opt);
+            }}
         }}
 
         // v1.2.0: Track current layer index for reordering
@@ -1186,10 +1295,11 @@ class CloudArchitectureGenerator:
             currentEditingLayerIndex = -1;
             container.querySelector('#layer-panel-title-' + containerId).textContent = 'Add Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'none';
-            container.querySelector('#layer-reorder-' + containerId).style.display = 'none';
+            container.querySelector('#layer-add-position-' + containerId).style.display = 'block';
+            container.querySelector('#layer-edit-position-' + containerId).style.display = 'none';
             container.querySelector('#layer-name-' + containerId).value = '';
+            container.querySelector('#layer-type-' + containerId).value = 'infrastructure';
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
-            selectColorPreset('#DBEAFE'); // v1.2.1: Default to blue preset
             layerPanel.classList.add('open');
         }}
 
@@ -1197,7 +1307,7 @@ class CloudArchitectureGenerator:
             var layer = findLayer(layerId);
             if (!layer) return;
 
-            // v1.2.0: Find index for reordering
+            // v1.3.3: Find index for position dropdown
             currentEditingLayerIndex = -1;
             for (var i = 0; i < layersState.length; i++) {{
                 if (layersState[i].id === layerId) {{
@@ -1209,51 +1319,12 @@ class CloudArchitectureGenerator:
             currentEditingLayer = layer;
             container.querySelector('#layer-panel-title-' + containerId).textContent = 'Edit Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'block';
-            container.querySelector('#layer-reorder-' + containerId).style.display = 'block';
+            container.querySelector('#layer-add-position-' + containerId).style.display = 'none';
+            container.querySelector('#layer-edit-position-' + containerId).style.display = 'block';
             container.querySelector('#layer-name-' + containerId).value = layer.name.replace(/_/g, ' ');
-            container.querySelector('#layer-position-' + containerId).value = 'bottom';
-            selectColorPreset(layer.color || '#DBEAFE'); // v1.2.1: Select current or default color preset
+            container.querySelector('#layer-type-' + containerId).value = layer.type || 'custom';
+            populatePositionDropdown(currentEditingLayerIndex);
             layerPanel.classList.add('open');
-        }}
-
-        // v1.2.0: Move layer up in the stack (visually upward = earlier in array)
-        function moveLayerUp() {{
-            if (currentEditingLayerIndex <= 0) return; // Already at top
-
-            // Swap with previous layer
-            var temp = layersState[currentEditingLayerIndex];
-            layersState[currentEditingLayerIndex] = layersState[currentEditingLayerIndex - 1];
-            layersState[currentEditingLayerIndex - 1] = temp;
-
-            // Update order values
-            layersState.forEach(function(layer, idx) {{
-                layer.order = idx;
-            }});
-
-            currentEditingLayerIndex--;
-            renderLayers();
-            notifyStateChange('reorder_layer');
-            console.log('[CloudArch v1.3.1] Layer moved up');
-        }}
-
-        // v1.2.0: Move layer down in the stack (visually downward = later in array)
-        function moveLayerDown() {{
-            if (currentEditingLayerIndex >= layersState.length - 1) return; // Already at bottom
-
-            // Swap with next layer
-            var temp = layersState[currentEditingLayerIndex];
-            layersState[currentEditingLayerIndex] = layersState[currentEditingLayerIndex + 1];
-            layersState[currentEditingLayerIndex + 1] = temp;
-
-            // Update order values
-            layersState.forEach(function(layer, idx) {{
-                layer.order = idx;
-            }});
-
-            currentEditingLayerIndex++;
-            renderLayers();
-            notifyStateChange('reorder_layer');
-            console.log('[CloudArch v1.3.1] Layer moved down');
         }}
 
         function closeLayerModal() {{
@@ -1276,19 +1347,35 @@ class CloudArchitectureGenerator:
             }}
 
             var layerName = name.toLowerCase().replace(/\\s+/g, '_');
-            var position = container.querySelector('#layer-position-' + containerId).value;
-            var color = container.querySelector('#layer-color-' + containerId).value;
+            var layerType = container.querySelector('#layer-type-' + containerId).value;
 
             if (currentEditingLayer) {{
+                // v1.3.3: Update layer properties
                 currentEditingLayer.name = layerName;
-                currentEditingLayer.color = color;  // v1.2.2: Update color on edit
-                updateLayerInDOM(currentEditingLayer);
+                currentEditingLayer.type = layerType;
+
+                // v1.3.3: Handle position change via dropdown
+                var newIndex = parseInt(container.querySelector('#layer-index-' + containerId).value);
+                if (newIndex !== currentEditingLayerIndex && newIndex >= 0 && newIndex < layersState.length) {{
+                    // Remove from current position
+                    layersState.splice(currentEditingLayerIndex, 1);
+                    // Insert at new position
+                    layersState.splice(newIndex, 0, currentEditingLayer);
+                    // Update order values
+                    layersState.forEach(function(layer, idx) {{
+                        layer.order = idx;
+                    }});
+                    currentEditingLayerIndex = newIndex;
+                }}
+
+                renderLayers();
             }} else {{
+                var position = container.querySelector('#layer-position-' + containerId).value;
                 var newLayer = {{
-                    id: 'layer-' + layersState.length,
+                    id: 'layer-' + Date.now(),
                     name: layerName,
-                    order: position === 'top' ? 0 : layersState.length,
-                    color: color
+                    type: layerType,
+                    order: position === 'top' ? 0 : layersState.length
                 }};
 
                 if (position === 'top') {{
@@ -1335,13 +1422,13 @@ class CloudArchitectureGenerator:
                 div.className = 'layer-band layer-' + layer.name;
                 div.dataset.layerId = layer.id;
                 div.dataset.layerName = layer.name;
+                div.dataset.layerType = layer.type || 'custom';
                 div.style.top = (i * layerHeight) + '%';
                 div.style.height = layerHeight + '%';
 
-                // v1.2.2: Apply layer color to DOM if set
-                if (layer.color) {{
-                    div.style.background = layer.color;
-                }}
+                // v1.3.3: Apply layer color based on type and current theme
+                var bgColor = getLayerColor(layer.type || layer.name);
+                div.style.background = bgColor;
 
                 var label = document.createElement('span');
                 label.className = 'layer-label';
@@ -1362,14 +1449,176 @@ class CloudArchitectureGenerator:
             var el = layersBackground.querySelector('[data-layer-id="' + layer.id + '"]');
             if (el) {{
                 el.dataset.layerName = layer.name;
+                el.dataset.layerType = layer.type || 'custom';
                 el.className = 'layer-band layer-' + layer.name;
                 el.querySelector('.layer-label').textContent = layer.name.replace(/_/g, ' ').replace(/\\b\\w/g, function(l) {{ return l.toUpperCase(); }});
 
-                // v1.2.2: Apply layer color to DOM if set
-                if (layer.color) {{
-                    el.style.background = layer.color;
-                }}
+                // v1.3.3: Apply layer color based on type and current theme
+                var bgColor = getLayerColor(layer.type || layer.name);
+                el.style.background = bgColor;
             }}
+        }}
+
+        // ============================================
+        // v1.3.3: CONNECTION MANAGEMENT
+        // ============================================
+
+        function toggleConnectMode() {{
+            isConnectMode = !isConnectMode;
+            connectBtn.classList.toggle('active', isConnectMode);
+            connectHint.style.display = isConnectMode ? 'block' : 'none';
+
+            if (!isConnectMode) {{
+                // Exiting connect mode - clear source selection
+                clearConnectSource();
+            }} else {{
+                // Entering connect mode - update hint
+                connectHint.textContent = 'Click a source component, then click a target component';
+            }}
+
+            // Update component styling for connect mode
+            componentsLayer.querySelectorAll('.cloud-component').forEach(function(comp) {{
+                comp.classList.toggle('connect-selectable', isConnectMode);
+            }});
+
+            console.log('[CloudArch v1.3.3] Connect mode:', isConnectMode);
+        }}
+
+        function clearConnectSource() {{
+            if (connectSourceId) {{
+                var sourceEl = componentsLayer.querySelector('[data-component-id="' + connectSourceId + '"]');
+                if (sourceEl) sourceEl.classList.remove('connect-source');
+            }}
+            connectSourceId = null;
+        }}
+
+        function handleConnectClick(compId) {{
+            if (!isConnectMode) return false;
+
+            if (!connectSourceId) {{
+                // First click - select source
+                connectSourceId = compId;
+                var sourceEl = componentsLayer.querySelector('[data-component-id="' + compId + '"]');
+                if (sourceEl) sourceEl.classList.add('connect-source');
+                connectHint.textContent = 'Now click target component (ESC to cancel)';
+                return true;
+            }} else if (connectSourceId === compId) {{
+                // Clicked same component - cancel
+                clearConnectSource();
+                connectHint.textContent = 'Click a source component, then click a target component';
+                return true;
+            }} else {{
+                // Second click - create connection
+                openCreateConnectionPanel(connectSourceId, compId);
+                clearConnectSource();
+                toggleConnectMode(); // Exit connect mode
+                return true;
+            }}
+        }}
+
+        function openCreateConnectionPanel(fromId, toId) {{
+            currentEditingConnection = null;
+            var fromComp = findComponent(fromId);
+            var toComp = findComponent(toId);
+
+            container.querySelector('#connection-panel-title-' + containerId).textContent = 'Create Connection';
+            container.querySelector('#connection-from-' + containerId).value = fromComp ? fromComp.name : fromId;
+            container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : toId;
+            container.querySelector('#connection-label-' + containerId).value = '';
+            container.querySelector('#connection-type-' + containerId).value = 'sync';
+
+            // Store pending connection data
+            connectionPanel.dataset.fromId = fromId;
+            connectionPanel.dataset.toId = toId;
+            connectionPanel.classList.add('open');
+        }}
+
+        function openConnectionPanel(connId) {{
+            var conn = findConnection(connId);
+            if (!conn) return;
+
+            currentEditingConnection = conn;
+            var fromComp = findComponent(conn.from_id);
+            var toComp = findComponent(conn.to_id);
+
+            container.querySelector('#connection-panel-title-' + containerId).textContent = 'Edit Connection';
+            container.querySelector('#connection-from-' + containerId).value = fromComp ? fromComp.name : conn.from_id;
+            container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : conn.to_id;
+            container.querySelector('#connection-label-' + containerId).value = conn.label || '';
+            container.querySelector('#connection-type-' + containerId).value = conn.connection_type || 'sync';
+
+            // Clear pending connection data (we're editing existing)
+            connectionPanel.dataset.fromId = '';
+            connectionPanel.dataset.toId = '';
+            connectionPanel.classList.add('open');
+
+            // Highlight selected connection
+            deselectAllConnections();
+            var pathEl = connectionsLayer.querySelector('[data-connection-id="' + connId + '"]');
+            if (pathEl) pathEl.classList.add('selected');
+        }}
+
+        function closeConnectionPanel() {{
+            connectionPanel.classList.remove('open');
+            currentEditingConnection = null;
+            deselectAllConnections();
+        }}
+
+        function findConnection(connId) {{
+            for (var i = 0; i < connectionsState.length; i++) {{
+                if (connectionsState[i].id === connId) return connectionsState[i];
+            }}
+            return null;
+        }}
+
+        function deselectAllConnections() {{
+            connectionsLayer.querySelectorAll('.connection-path.selected').forEach(function(p) {{
+                p.classList.remove('selected');
+            }});
+        }}
+
+        function saveConnection() {{
+            var label = container.querySelector('#connection-label-' + containerId).value.trim();
+            var connType = container.querySelector('#connection-type-' + containerId).value;
+
+            if (currentEditingConnection) {{
+                // Editing existing connection
+                currentEditingConnection.label = label;
+                currentEditingConnection.connection_type = connType;
+            }} else {{
+                // Creating new connection
+                var fromId = connectionPanel.dataset.fromId;
+                var toId = connectionPanel.dataset.toId;
+                if (!fromId || !toId) {{
+                    alert('Invalid connection');
+                    return;
+                }}
+
+                var newConn = {{
+                    id: 'conn-' + Math.random().toString(36).substr(2, 8),
+                    from_id: fromId,
+                    to_id: toId,
+                    label: label,
+                    connection_type: connType
+                }};
+                connectionsState.push(newConn);
+            }}
+
+            closeConnectionPanel();
+            renderConnections();
+            notifyStateChange('connection-update');
+        }}
+
+        function deleteConnection() {{
+            if (!currentEditingConnection) return;
+            if (!confirm('Delete this connection?')) return;
+
+            var connId = currentEditingConnection.id;
+            connectionsState = connectionsState.filter(function(c) {{ return c.id !== connId; }});
+
+            closeConnectionPanel();
+            renderConnections();
+            notifyStateChange('connection-delete');
         }}
 
         // ============================================
@@ -1469,6 +1718,14 @@ class CloudArchitectureGenerator:
             var comp = e.target.closest('.cloud-component');
             if (!comp) return;
 
+            // v1.3.3: Handle connect mode
+            if (isConnectMode) {{
+                if (handleConnectClick(comp.dataset.componentId)) {{
+                    e.stopPropagation();
+                    return;
+                }}
+            }}
+
             openEditModal(comp.dataset.componentId);
         }}
 
@@ -1502,11 +1759,23 @@ class CloudArchitectureGenerator:
                 // Calculate bezier path
                 var pathD = calculateBezierPath(x1, y1, x2, y2);
 
+                // v1.3.3: Create visible path
                 var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', pathD);
                 path.setAttribute('class', 'connection-path type-' + conn.connection_type);
+                path.setAttribute('data-connection-id', conn.id);
                 path.setAttribute('marker-end', 'url(#arrowhead-' + containerId + ')');
                 svg.appendChild(path);
+
+                // v1.3.3: Create invisible hit area for clicking
+                var hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                hitPath.setAttribute('d', pathD);
+                hitPath.setAttribute('class', 'connection-path clickable');
+                hitPath.setAttribute('data-connection-id', conn.id);
+                hitPath.addEventListener('click', function() {{
+                    openConnectionPanel(conn.id);
+                }});
+                svg.appendChild(hitPath);
 
                 // Add label if present
                 if (conn.label) {{
@@ -1726,7 +1995,7 @@ class CloudArchitectureGenerator:
                     cloudArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[CloudArch v1.3.1] State change notified:', action);
+                console.log('[CloudArch v1.3.3] State change notified:', action);
             }} catch (e) {{
                 console.warn('[CloudArch] Failed to notify parent:', e);
             }}
@@ -1742,7 +2011,7 @@ class CloudArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[CloudArch v1.3.1] Received init from parent');
+                console.log('[CloudArch v1.3.3] Received init from parent');
             }});
         }}
 
@@ -1771,10 +2040,10 @@ class CloudArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.3.1] Connections rendered after state restoration');
+                console.log('[CloudArch v1.3.3] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[CloudArch v1.3.1] Restored state');
+            console.log('[CloudArch v1.3.3] Restored state');
         }}
 
         // ============================================
@@ -1790,8 +2059,10 @@ class CloudArchitectureGenerator:
             closeLayerModal: closeLayerModal,
             saveLayer: saveLayer,
             deleteLayer: deleteLayer,
-            moveLayerUp: moveLayerUp,
-            moveLayerDown: moveLayerDown
+            toggleConnectMode: toggleConnectMode,
+            closeConnectionPanel: closeConnectionPanel,
+            saveConnection: saveConnection,
+            deleteConnection: deleteConnection
         }};
 
         // ============================================
@@ -1799,7 +2070,7 @@ class CloudArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[CloudArch v1.3.1] Registered namespace:', containerId);
+        console.log('[CloudArch v1.3.3] Registered namespace:', containerId);
 
     }})();
     </script>

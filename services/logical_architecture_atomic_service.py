@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.5
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.6
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -13,11 +13,20 @@ Includes embedded CSS and JavaScript for:
 - Group/boundary containers with dashed borders (draggable)
 - SVG connection paths with multiple line styles
 - Add/Edit/Delete modals for components and groups
-- Dynamic group management UI
+- Dynamic group management UI with position/size editing
+- Connection drawing between components (Connect mode)
+- Connection editing/deletion (click to select)
 - postMessage persistence protocol
 - Light/dark theme support with live switching
 
-v1.3.4 UI Enhancements:
+v1.3.6 UI Enhancements:
+- ADD: Group position fields (X%, Y%) in edit panel
+- ADD: Group size fields (Width%, Height%) in edit panel
+- ADD: Connect mode to draw connections between components
+- ADD: Connection panel to edit/delete existing connections
+- ADD: Clickable connection paths with selection state
+
+v1.3.5 UI Enhancements:
 - CHANGE: Container background now transparent (no grey box)
 - CHANGE: Centered modal replaced with slide-in panel from right
 - ADD: Panel slides in with 300ms ease animation
@@ -958,6 +967,67 @@ class LogicalArchitectureGenerator:
 .btn-danger:hover {{
     background: #DC2626;
 }}
+
+/* Connect Button - v1.3.6 */
+.connect-btn {{
+    padding: 8px 16px;
+    background: var(--larch-text-secondary);
+    color: white;
+    border: none;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}}
+
+.connect-btn:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    background: var(--larch-text-primary);
+}}
+
+.connect-btn.active {{
+    background: var(--larch-button-primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.3);
+}}
+
+.connect-mode-hint {{
+    position: absolute;
+    bottom: 55px;
+    right: 15px;
+    background: var(--larch-modal-bg);
+    border: 1px solid var(--larch-modal-border);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--larch-text-secondary);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 50;
+}}
+
+/* Component Connect Mode Styling - v1.3.6 */
+.logical-component.connect-source {{
+    box-shadow: 0 0 0 3px var(--larch-button-primary);
+}}
+
+.logical-component.connect-selectable {{
+    cursor: crosshair;
+}}
+
+/* Connection Path Clickable - v1.3.6 */
+.connection-path.clickable {{
+    pointer-events: stroke;
+    cursor: pointer;
+    stroke-width: 8;
+    stroke-opacity: 0;
+}}
+
+.connection-path.selected {{
+    stroke: var(--larch-button-primary) !important;
+    stroke-width: 3;
+}}
 </style>
 <div class="logical-architecture-container" id="{element_id}" data-logarch-container="true">
     <div class="groups-layer">
@@ -982,6 +1052,10 @@ class LogicalArchitectureGenerator:
     <div class="action-buttons">
         <button class="add-group-btn" onclick="logArchs['{element_id}'].openAddGroupModal()">+ Group</button>
         <button class="add-component-btn" onclick="logArchs['{element_id}'].openAddModal()">+ Component</button>
+        <button class="connect-btn" id="connect-btn-{element_id}" onclick="logArchs['{element_id}'].toggleConnectMode()">&#128279; Connect</button>
+    </div>
+    <div class="connect-mode-hint" id="connect-hint-{element_id}" style="display:none;">
+        Click a source component, then click a target component
     </div>
 
     <!-- v1.3.4: Component Panel (slide-in from right) -->
@@ -1028,7 +1102,7 @@ class LogicalArchitectureGenerator:
         </div>
     </div>
 
-    <!-- v1.3.4: Group Panel (slide-in from right) -->
+    <!-- v1.3.6: Group Panel (slide-in from right) -->
     <div class="detail-panel" id="group-panel-{element_id}">
         <button class="panel-close" onclick="logArchs['{element_id}'].closeGroupModal()">&times;</button>
         <div class="panel-header">
@@ -1049,6 +1123,32 @@ class LogicalArchitectureGenerator:
                 <option value="cluster">Cluster</option>
             </select>
         </div>
+        <div class="panel-section" id="group-position-section-{element_id}" style="display:none;">
+            <label class="panel-label">Position (%)</label>
+            <div style="display:flex;gap:8px;">
+                <div style="flex:1;">
+                    <label class="panel-label" style="font-size:10px;">X</label>
+                    <input type="number" id="group-x-{element_id}" class="panel-input" min="0" max="100" step="1" placeholder="X %">
+                </div>
+                <div style="flex:1;">
+                    <label class="panel-label" style="font-size:10px;">Y</label>
+                    <input type="number" id="group-y-{element_id}" class="panel-input" min="0" max="100" step="1" placeholder="Y %">
+                </div>
+            </div>
+        </div>
+        <div class="panel-section" id="group-size-section-{element_id}" style="display:none;">
+            <label class="panel-label">Size (%)</label>
+            <div style="display:flex;gap:8px;">
+                <div style="flex:1;">
+                    <label class="panel-label" style="font-size:10px;">Width</label>
+                    <input type="number" id="group-width-{element_id}" class="panel-input" min="5" max="100" step="1" placeholder="Width %">
+                </div>
+                <div style="flex:1;">
+                    <label class="panel-label" style="font-size:10px;">Height</label>
+                    <input type="number" id="group-height-{element_id}" class="panel-input" min="5" max="100" step="1" placeholder="Height %">
+                </div>
+            </div>
+        </div>
         <div class="panel-section">
             <label class="panel-label" for="group-desc-{element_id}">Description (optional)</label>
             <textarea id="group-desc-{element_id}" class="panel-input textarea" rows="2" placeholder="Brief description..."></textarea>
@@ -1057,6 +1157,47 @@ class LogicalArchitectureGenerator:
             <button class="btn btn-danger" id="group-delete-{element_id}" onclick="logArchs['{element_id}'].deleteGroup()" style="display:none;">Delete</button>
             <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeGroupModal()">Cancel</button>
             <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveGroup()">Save</button>
+        </div>
+    </div>
+
+    <!-- v1.3.6: Connection Panel (slide-in from right) -->
+    <div class="detail-panel" id="connection-panel-{element_id}">
+        <button class="panel-close" onclick="logArchs['{element_id}'].closeConnectionPanel()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="connection-panel-title-{element_id}">Edit Connection</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label">From</label>
+            <input type="text" id="connection-from-{element_id}" class="panel-input" readonly disabled>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label">To</label>
+            <input type="text" id="connection-to-{element_id}" class="panel-input" readonly disabled>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-label-{element_id}">Label (optional)</label>
+            <input type="text" id="connection-label-{element_id}" class="panel-input" maxlength="30" placeholder="e.g., API, Events...">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-style-{element_id}">Line Style</label>
+            <select id="connection-style-{element_id}" class="panel-input">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-direction-{element_id}">Direction</label>
+            <select id="connection-direction-{element_id}" class="panel-input">
+                <option value="forward">Forward (→)</option>
+                <option value="backward">Backward (←)</option>
+                <option value="bidirectional">Bidirectional (↔)</option>
+            </select>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" onclick="logArchs['{element_id}'].deleteConnection()">Delete</button>
+            <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeConnectionPanel()">Cancel</button>
+            <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveConnection()">Save</button>
         </div>
     </div>
 
@@ -1075,9 +1216,14 @@ class LogicalArchitectureGenerator:
         var presentationId = '';
         var currentEditingComponent = null;
         var currentEditingGroup = null;
+        var currentEditingConnection = null;
+
+        // v1.3.6: Connect mode state
+        var isConnectMode = false;
+        var connectSourceId = null;
 
         // DOM elements
-        var componentsLayer, groupsLayer, connectionsLayer, componentPanel, groupPanel;
+        var componentsLayer, groupsLayer, connectionsLayer, componentPanel, groupPanel, connectionPanel, connectBtn, connectHint;
 
         // State
         var componentsState = {components_json};
@@ -1103,9 +1249,12 @@ class LogicalArchitectureGenerator:
             connectionsLayer = container.querySelector('.connections-layer');
             componentPanel = container.querySelector('#component-panel-' + containerId);
             groupPanel = container.querySelector('#group-panel-' + containerId);
+            connectionPanel = container.querySelector('#connection-panel-' + containerId);
+            connectBtn = container.querySelector('#connect-btn-' + containerId);
+            connectHint = container.querySelector('#connect-hint-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[LogArch v1.3.4] Required elements not found');
+                console.error('[LogArch v1.3.6] Required elements not found');
                 return;
             }}
 
@@ -1119,13 +1268,13 @@ class LogicalArchitectureGenerator:
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.3.4] Initial connections rendered');
+                console.log('[LogArch v1.3.6] Initial connections rendered');
             }}, 100);
 
-            console.log('[LogArch v1.3.4] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[LogArch v1.3.6] Initialized:', containerId, 'with', componentsState.length, 'components');
         }}
 
-        // v1.3.4: Click outside panel to close
+        // v1.3.6: Click outside panel to close + ESC key handling
         function initClickOutsideClose() {{
             document.addEventListener('click', function(e) {{
                 // Check if component panel is open and click is outside
@@ -1138,6 +1287,21 @@ class LogicalArchitectureGenerator:
                 if (groupPanel && groupPanel.classList.contains('open')) {{
                     if (!groupPanel.contains(e.target) && !e.target.closest('.add-group-btn') && !e.target.closest('.logical-group')) {{
                         closeGroupModal();
+                    }}
+                }}
+                // Check if connection panel is open and click is outside
+                if (connectionPanel && connectionPanel.classList.contains('open')) {{
+                    if (!connectionPanel.contains(e.target) && !e.target.closest('.connection-path')) {{
+                        closeConnectionPanel();
+                    }}
+                }}
+            }});
+
+            // v1.3.6: ESC key to cancel connect mode
+            document.addEventListener('keydown', function(e) {{
+                if (e.key === 'Escape') {{
+                    if (isConnectMode) {{
+                        toggleConnectMode();
                     }}
                 }}
             }});
@@ -1312,10 +1476,10 @@ class LogicalArchitectureGenerator:
                 draggedGroup.style.zIndex = '';
                 renderConnections();
                 notifyStateChange('group-move');
-                console.log('[LogArch v1.3.4] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
+                console.log('[LogArch v1.3.6] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
             }} else {{
                 // This was a click (no significant movement) - open edit modal
-                console.log('[LogArch v1.3.4] Group clicked, opening modal for:', headerGroupId);
+                console.log('[LogArch v1.3.6] Group clicked, opening modal for:', headerGroupId);
                 openEditGroupModal(headerGroupId);
             }}
 
@@ -1331,6 +1495,8 @@ class LogicalArchitectureGenerator:
             currentEditingGroup = null;
             container.querySelector('#group-panel-title-' + containerId).textContent = 'Add Group';
             container.querySelector('#group-delete-' + containerId).style.display = 'none';
+            container.querySelector('#group-position-section-' + containerId).style.display = 'none';
+            container.querySelector('#group-size-section-' + containerId).style.display = 'none';
             container.querySelector('#group-name-' + containerId).value = '';
             container.querySelector('#group-type-' + containerId).value = 'boundary';
             container.querySelector('#group-desc-' + containerId).value = '';
@@ -1344,9 +1510,15 @@ class LogicalArchitectureGenerator:
             currentEditingGroup = grp;
             container.querySelector('#group-panel-title-' + containerId).textContent = 'Edit Group';
             container.querySelector('#group-delete-' + containerId).style.display = 'block';
+            container.querySelector('#group-position-section-' + containerId).style.display = 'block';
+            container.querySelector('#group-size-section-' + containerId).style.display = 'block';
             container.querySelector('#group-name-' + containerId).value = grp.name;
             container.querySelector('#group-type-' + containerId).value = grp.type;
             container.querySelector('#group-desc-' + containerId).value = grp.description || '';
+            container.querySelector('#group-x-' + containerId).value = Math.round(grp.x_position);
+            container.querySelector('#group-y-' + containerId).value = Math.round(grp.y_position);
+            container.querySelector('#group-width-' + containerId).value = Math.round(grp.width);
+            container.querySelector('#group-height-' + containerId).value = Math.round(grp.height);
             groupPanel.classList.add('open');
         }}
 
@@ -1376,8 +1548,29 @@ class LogicalArchitectureGenerator:
             }};
 
             if (currentEditingGroup) {{
+                // v1.3.6: Update position and size from input fields
+                var xVal = parseFloat(container.querySelector('#group-x-' + containerId).value);
+                var yVal = parseFloat(container.querySelector('#group-y-' + containerId).value);
+                var wVal = parseFloat(container.querySelector('#group-width-' + containerId).value);
+                var hVal = parseFloat(container.querySelector('#group-height-' + containerId).value);
+
+                if (!isNaN(xVal)) groupData.x_position = Math.max(0, Math.min(100, xVal));
+                if (!isNaN(yVal)) groupData.y_position = Math.max(0, Math.min(100, yVal));
+                if (!isNaN(wVal)) groupData.width = Math.max(5, Math.min(100, wVal));
+                if (!isNaN(hVal)) groupData.height = Math.max(5, Math.min(100, hVal));
+
                 Object.assign(currentEditingGroup, groupData);
                 updateGroupInDOM(currentEditingGroup);
+
+                // v1.3.6: Also update DOM position/size directly
+                var el = groupsLayer.querySelector('[data-group-id="' + currentEditingGroup.id + '"]');
+                if (el) {{
+                    if (groupData.x_position !== undefined) el.style.left = groupData.x_position + '%';
+                    if (groupData.y_position !== undefined) el.style.top = groupData.y_position + '%';
+                    if (groupData.width !== undefined) el.style.width = groupData.width + '%';
+                    if (groupData.height !== undefined) el.style.height = groupData.height + '%';
+                }}
+
                 notifyStateChange('group-edit');
             }} else {{
                 groupData.id = 'grp-' + Math.random().toString(36).substr(2, 8);
@@ -1471,6 +1664,173 @@ class LogicalArchitectureGenerator:
             el.style.setProperty('--group-bg', colors.bg);
             el.querySelector('.group-name').textContent = grp.name;
             el.querySelector('.group-type').textContent = '[' + grp.type.toUpperCase() + ']';
+        }}
+
+        // ============================================
+        // v1.3.6: CONNECTION MANAGEMENT
+        // ============================================
+
+        function toggleConnectMode() {{
+            isConnectMode = !isConnectMode;
+            connectBtn.classList.toggle('active', isConnectMode);
+            connectHint.style.display = isConnectMode ? 'block' : 'none';
+
+            if (!isConnectMode) {{
+                // Exiting connect mode - clear source selection
+                clearConnectSource();
+            }} else {{
+                // Entering connect mode - update hint
+                connectHint.textContent = 'Click a source component, then click a target component';
+            }}
+
+            // Update component styling for connect mode
+            componentsLayer.querySelectorAll('.logical-component').forEach(function(comp) {{
+                comp.classList.toggle('connect-selectable', isConnectMode);
+            }});
+
+            console.log('[LogArch v1.3.6] Connect mode:', isConnectMode);
+        }}
+
+        function clearConnectSource() {{
+            if (connectSourceId) {{
+                var sourceEl = componentsLayer.querySelector('[data-component-id="' + connectSourceId + '"]');
+                if (sourceEl) sourceEl.classList.remove('connect-source');
+            }}
+            connectSourceId = null;
+        }}
+
+        function handleConnectClick(compId) {{
+            if (!isConnectMode) return false;
+
+            if (!connectSourceId) {{
+                // First click - select source
+                connectSourceId = compId;
+                var sourceEl = componentsLayer.querySelector('[data-component-id="' + compId + '"]');
+                if (sourceEl) sourceEl.classList.add('connect-source');
+                connectHint.textContent = 'Now click target component (ESC to cancel)';
+                return true;
+            }} else if (connectSourceId === compId) {{
+                // Clicked same component - cancel
+                clearConnectSource();
+                connectHint.textContent = 'Click a source component, then click a target component';
+                return true;
+            }} else {{
+                // Second click - create connection
+                openCreateConnectionPanel(connectSourceId, compId);
+                clearConnectSource();
+                toggleConnectMode(); // Exit connect mode
+                return true;
+            }}
+        }}
+
+        function openCreateConnectionPanel(fromId, toId) {{
+            currentEditingConnection = null;
+            var fromComp = findComponent(fromId);
+            var toComp = findComponent(toId);
+
+            container.querySelector('#connection-panel-title-' + containerId).textContent = 'Create Connection';
+            container.querySelector('#connection-from-' + containerId).value = fromComp ? fromComp.name : fromId;
+            container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : toId;
+            container.querySelector('#connection-label-' + containerId).value = '';
+            container.querySelector('#connection-style-' + containerId).value = 'solid';
+            container.querySelector('#connection-direction-' + containerId).value = 'forward';
+
+            // Store pending connection data
+            connectionPanel.dataset.fromId = fromId;
+            connectionPanel.dataset.toId = toId;
+            connectionPanel.classList.add('open');
+        }}
+
+        function openConnectionPanel(connId) {{
+            var conn = findConnection(connId);
+            if (!conn) return;
+
+            currentEditingConnection = conn;
+            var fromComp = findComponent(conn.from_id);
+            var toComp = findComponent(conn.to_id);
+
+            container.querySelector('#connection-panel-title-' + containerId).textContent = 'Edit Connection';
+            container.querySelector('#connection-from-' + containerId).value = fromComp ? fromComp.name : conn.from_id;
+            container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : conn.to_id;
+            container.querySelector('#connection-label-' + containerId).value = conn.label || '';
+            container.querySelector('#connection-style-' + containerId).value = conn.style || 'solid';
+            container.querySelector('#connection-direction-' + containerId).value = conn.direction || 'forward';
+
+            // Clear pending connection data (we're editing existing)
+            connectionPanel.dataset.fromId = '';
+            connectionPanel.dataset.toId = '';
+            connectionPanel.classList.add('open');
+
+            // Highlight selected connection
+            deselectAllConnections();
+            var pathEl = connectionsLayer.querySelector('[data-connection-id="' + connId + '"]');
+            if (pathEl) pathEl.classList.add('selected');
+        }}
+
+        function closeConnectionPanel() {{
+            connectionPanel.classList.remove('open');
+            currentEditingConnection = null;
+            deselectAllConnections();
+        }}
+
+        function findConnection(connId) {{
+            for (var i = 0; i < connectionsState.length; i++) {{
+                if (connectionsState[i].id === connId) return connectionsState[i];
+            }}
+            return null;
+        }}
+
+        function deselectAllConnections() {{
+            connectionsLayer.querySelectorAll('.connection-path.selected').forEach(function(p) {{
+                p.classList.remove('selected');
+            }});
+        }}
+
+        function saveConnection() {{
+            var label = container.querySelector('#connection-label-' + containerId).value.trim();
+            var connStyle = container.querySelector('#connection-style-' + containerId).value;
+            var connDirection = container.querySelector('#connection-direction-' + containerId).value;
+
+            if (currentEditingConnection) {{
+                // Editing existing connection
+                currentEditingConnection.label = label;
+                currentEditingConnection.style = connStyle;
+                currentEditingConnection.direction = connDirection;
+            }} else {{
+                // Creating new connection
+                var fromId = connectionPanel.dataset.fromId;
+                var toId = connectionPanel.dataset.toId;
+                if (!fromId || !toId) {{
+                    alert('Invalid connection');
+                    return;
+                }}
+
+                var newConn = {{
+                    id: 'lconn-' + Math.random().toString(36).substr(2, 8),
+                    from_id: fromId,
+                    to_id: toId,
+                    label: label,
+                    style: connStyle,
+                    direction: connDirection
+                }};
+                connectionsState.push(newConn);
+            }}
+
+            closeConnectionPanel();
+            renderConnections();
+            notifyStateChange('connection-update');
+        }}
+
+        function deleteConnection() {{
+            if (!currentEditingConnection) return;
+            if (!confirm('Delete this connection?')) return;
+
+            var connId = currentEditingConnection.id;
+            connectionsState = connectionsState.filter(function(c) {{ return c.id !== connId; }});
+
+            closeConnectionPanel();
+            renderConnections();
+            notifyStateChange('connection-delete');
         }}
 
         // ============================================
@@ -1570,6 +1930,14 @@ class LogicalArchitectureGenerator:
             var comp = e.target.closest('.logical-component');
             if (!comp) return;
 
+            // v1.3.6: Handle connect mode
+            if (isConnectMode) {{
+                if (handleConnectClick(comp.dataset.componentId)) {{
+                    e.stopPropagation();
+                    return;
+                }}
+            }}
+
             openEditModal(comp.dataset.componentId);
         }}
 
@@ -1603,9 +1971,11 @@ class LogicalArchitectureGenerator:
                 // Calculate bezier path
                 var pathD = calculateBezierPath(x1, y1, x2, y2);
 
+                // v1.3.6: Create visible path
                 var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', pathD);
                 path.setAttribute('class', 'connection-path style-' + conn.style);
+                path.setAttribute('data-connection-id', conn.id);
 
                 // Add arrow markers based on direction
                 if (conn.direction === 'forward' || conn.direction === 'bidirectional') {{
@@ -1616,6 +1986,16 @@ class LogicalArchitectureGenerator:
                 }}
 
                 svg.appendChild(path);
+
+                // v1.3.6: Create invisible hit area for clicking
+                var hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                hitPath.setAttribute('d', pathD);
+                hitPath.setAttribute('class', 'connection-path clickable');
+                hitPath.setAttribute('data-connection-id', conn.id);
+                hitPath.addEventListener('click', function() {{
+                    openConnectionPanel(conn.id);
+                }});
+                svg.appendChild(hitPath);
 
                 // Add label if present
                 if (conn.label) {{
@@ -1886,7 +2266,7 @@ class LogicalArchitectureGenerator:
                     logArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[LogArch v1.3.4] State change notified:', action);
+                console.log('[LogArch v1.3.6] State change notified:', action);
             }} catch (e) {{
                 console.warn('[LogArch] Failed to notify parent:', e);
             }}
@@ -1902,7 +2282,7 @@ class LogicalArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[LogArch v1.3.4] Received init from parent');
+                console.log('[LogArch v1.3.6] Received init from parent');
             }});
         }}
 
@@ -1938,10 +2318,10 @@ class LogicalArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.3.4] Connections rendered after state restoration');
+                console.log('[LogArch v1.3.6] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[LogArch v1.3.4] Restored state');
+            console.log('[LogArch v1.3.6] Restored state');
         }}
 
         // ============================================
@@ -1957,7 +2337,11 @@ class LogicalArchitectureGenerator:
             openEditGroupModal: openEditGroupModal,
             closeGroupModal: closeGroupModal,
             saveGroup: saveGroup,
-            deleteGroup: deleteGroup
+            deleteGroup: deleteGroup,
+            toggleConnectMode: toggleConnectMode,
+            closeConnectionPanel: closeConnectionPanel,
+            saveConnection: saveConnection,
+            deleteConnection: deleteConnection
         }};
 
         // ============================================
@@ -1965,7 +2349,7 @@ class LogicalArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[LogArch v1.3.4] Registered namespace:', containerId);
+        console.log('[LogArch v1.3.6] Registered namespace:', containerId);
 
     }})();
     </script>
