@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.0
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.1
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -16,6 +16,10 @@ Includes embedded CSS and JavaScript for:
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.1 Fixes:
+- FIX: Direction-aware bezier path calculation for proper arrow routing
+- FIX: Keyword priority in fallback (analytics checked before chat)
 
 v1.3.0 Architecture Separation:
 - MOVED: LLM generation logic to logical_architecture_planner.py
