@@ -967,6 +967,40 @@ class DataArchitectureGenerator:
                 <path d="M 10 5 L 24 0 M 10 5 L 24 10 M 10 5 L 24 5"
                       stroke="var(--dataarch-rel-color, #6B7280)" stroke-width="1.5" fill="none"/>
             </marker>
+
+            <!-- ============================================
+                 MARKER-START VARIANTS (refX=0, mirrored content)
+                 These ensure markers extend ALONG the path away from source entity
+                 instead of INTO the source entity
+                 ============================================ -->
+
+            <!-- marker-one-start: vertical line for marker-start -->
+            <marker id="{element_id}-marker-one-start" viewBox="0 0 10 10" refX="0" refY="5"
+                    markerWidth="8" markerHeight="8" orient="auto">
+                <line x1="0" y1="0" x2="0" y2="10" stroke="var(--dataarch-rel-color, #6B7280)" stroke-width="2"/>
+            </marker>
+
+            <!-- marker-many-start: Crow's Foot for marker-start (mirrored) -->
+            <marker id="{element_id}-marker-many-start" viewBox="0 0 14 10" refX="0" refY="5"
+                    markerWidth="12" markerHeight="10" orient="auto">
+                <path d="M 14 5 L 0 0 M 14 5 L 0 10 M 14 5 L 0 5"
+                      stroke="var(--dataarch-rel-color, #6B7280)" stroke-width="1.5" fill="none"/>
+            </marker>
+
+            <!-- marker-zero-one-start: (|o) for marker-start (mirrored) -->
+            <marker id="{element_id}-marker-zero-one-start" viewBox="0 0 20 10" refX="0" refY="5"
+                    markerWidth="16" markerHeight="10" orient="auto">
+                <line x1="6" y1="0" x2="6" y2="10" stroke="var(--dataarch-rel-color, #6B7280)" stroke-width="2"/>
+                <circle cx="15" cy="5" r="4" stroke="var(--dataarch-rel-color, #6B7280)" fill="var(--dataarch-entity-bg, #fff)" stroke-width="1.5"/>
+            </marker>
+
+            <!-- marker-zero-many-start: (>o) for marker-start (mirrored) -->
+            <marker id="{element_id}-marker-zero-many-start" viewBox="0 0 24 10" refX="0" refY="5"
+                    markerWidth="20" markerHeight="10" orient="auto">
+                <path d="M 14 5 L 0 0 M 14 5 L 0 10 M 14 5 L 0 5"
+                      stroke="var(--dataarch-rel-color, #6B7280)" stroke-width="1.5" fill="none"/>
+                <circle cx="19" cy="5" r="4" stroke="var(--dataarch-rel-color, #6B7280)" fill="var(--dataarch-entity-bg, #fff)" stroke-width="1.5"/>
+            </marker>
         </defs>
     </svg>
 
@@ -1100,8 +1134,10 @@ window.dataArchs = window.dataArchs || {{}};
         if (dx === 0 && dy === 0) return {{ x: cx, y: cy }};
 
         // Half dimensions with padding for marker visibility
-        const hw = entityRect.width / 2 + 12;  // 12px padding for crow's foot markers
-        const hh = entityRect.height / 2 + 12;
+        // Accommodate largest marker (20px marker-zero-many) + 2px visual gap
+        const MARKER_PADDING = 22;
+        const hw = entityRect.width / 2 + MARKER_PADDING;
+        const hh = entityRect.height / 2 + MARKER_PADDING;
 
         // Calculate intersection with rectangle edges
         // Check which edge the line exits from based on aspect ratio
@@ -1209,22 +1245,24 @@ window.dataArchs = window.dataArchs || {{}};
     }}
 
     // Get crow's foot markers based on cardinality
+    // marker-start uses "-start" suffix variants (refX=0, mirrored) so markers
+    // extend ALONG the path away from source entity, not INTO it
     function getCardinalityMarkers(cardinality) {{
         switch (cardinality) {{
             case "one_to_one":
-                return {{ start: "marker-one", end: "marker-one" }};
+                return {{ start: "marker-one-start", end: "marker-one" }};
             case "one_to_many":
-                return {{ start: "marker-one", end: "marker-many" }};
+                return {{ start: "marker-one-start", end: "marker-many" }};
             case "many_to_one":
-                return {{ start: "marker-many", end: "marker-one" }};
+                return {{ start: "marker-many-start", end: "marker-one" }};
             case "many_to_many":
-                return {{ start: "marker-many", end: "marker-many" }};
+                return {{ start: "marker-many-start", end: "marker-many" }};
             case "zero_or_one":
-                return {{ start: "marker-zero-one", end: "marker-one" }};
+                return {{ start: "marker-zero-one-start", end: "marker-one" }};
             case "zero_or_many":
-                return {{ start: "marker-zero-many", end: "marker-many" }};
+                return {{ start: "marker-zero-many-start", end: "marker-many" }};
             default:
-                return {{ start: "marker-one", end: "marker-many" }};
+                return {{ start: "marker-one-start", end: "marker-many" }};
         }}
     }}
 
