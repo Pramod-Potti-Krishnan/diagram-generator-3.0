@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.3.3
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.4
 
 Generates self-contained HTML for cloud architecture diagrams.
 
@@ -18,6 +18,12 @@ Includes embedded CSS and JavaScript for:
 - Connection editing/deletion (click to select)
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.4 UI Enhancements:
+- ADD: Line Style dropdown (solid/dashed/dotted) to connection panel
+- ADD: Direction dropdown (forward/backward/bidirectional) to connection panel
+- ADD: Backward arrowhead marker for bidirectional connections
+- MATCH: Connection editing now matches LOGICAL_ARCHITECTURE capabilities
 
 v1.3.3 UI Enhancements:
 - ADD: Layer type dropdown replaces color picker (theme-aware colors)
@@ -458,7 +464,9 @@ class CloudArchitectureGenerator:
             "from_id": conn.from_id,
             "to_id": conn.to_id,
             "label": conn.label or "",
-            "connection_type": conn.connection_type
+            "connection_type": conn.connection_type,
+            "style": getattr(conn, 'style', 'solid') or 'solid',
+            "direction": getattr(conn, 'direction', 'forward') or 'forward'
         } for conn in connections])
 
     def _generate_components_json(self, components: List[CloudComponent]) -> str:
@@ -615,6 +623,15 @@ class CloudArchitectureGenerator:
 .connection-path.type-async,
 .connection-path.type-event {{
     stroke-dasharray: 8, 4;
+}}
+
+/* v1.3.4: Line style classes (takes priority over type) */
+.connection-path.style-dashed {{
+    stroke-dasharray: 8, 4;
+}}
+
+.connection-path.style-dotted {{
+    stroke-dasharray: 2, 4;
 }}
 
 .connection-label {{
@@ -993,6 +1010,9 @@ class CloudArchitectureGenerator:
             <marker id="arrowhead-{element_id}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
                 <polygon points="0 0, 10 3.5, 0 7" fill="var(--arch-connection-arrow, #64748b)" />
             </marker>
+            <marker id="arrowhead-back-{element_id}" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+                <polygon points="10 0, 0 3.5, 10 7" fill="var(--arch-connection-arrow, #64748b)" />
+            </marker>
         </defs>
         <!-- Connections rendered by JavaScript -->
     </svg>
@@ -1123,12 +1143,28 @@ class CloudArchitectureGenerator:
         <div class="panel-section">
             <label class="panel-label" for="connection-type-{element_id}">Connection Type</label>
             <select id="connection-type-{element_id}" class="panel-input">
-                <option value="sync">Sync (solid line)</option>
-                <option value="async">Async (dashed line)</option>
-                <option value="event">Event (dashed line)</option>
-                <option value="request">Request (solid line)</option>
-                <option value="response">Response (solid line)</option>
-                <option value="data">Data (solid line)</option>
+                <option value="sync">Sync</option>
+                <option value="async">Async</option>
+                <option value="event">Event</option>
+                <option value="request">Request</option>
+                <option value="response">Response</option>
+                <option value="data">Data</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-style-{element_id}">Line Style</label>
+            <select id="connection-style-{element_id}" class="panel-input">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="connection-direction-{element_id}">Direction</label>
+            <select id="connection-direction-{element_id}" class="panel-input">
+                <option value="forward">Forward (→)</option>
+                <option value="backward">Backward (←)</option>
+                <option value="bidirectional">Bidirectional (↔)</option>
             </select>
         </div>
         <div class="panel-actions">
@@ -1526,6 +1562,8 @@ class CloudArchitectureGenerator:
             container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : toId;
             container.querySelector('#connection-label-' + containerId).value = '';
             container.querySelector('#connection-type-' + containerId).value = 'sync';
+            container.querySelector('#connection-style-' + containerId).value = 'solid';
+            container.querySelector('#connection-direction-' + containerId).value = 'forward';
 
             // Store pending connection data
             connectionPanel.dataset.fromId = fromId;
@@ -1546,6 +1584,8 @@ class CloudArchitectureGenerator:
             container.querySelector('#connection-to-' + containerId).value = toComp ? toComp.name : conn.to_id;
             container.querySelector('#connection-label-' + containerId).value = conn.label || '';
             container.querySelector('#connection-type-' + containerId).value = conn.connection_type || 'sync';
+            container.querySelector('#connection-style-' + containerId).value = conn.style || 'solid';
+            container.querySelector('#connection-direction-' + containerId).value = conn.direction || 'forward';
 
             // Clear pending connection data (we're editing existing)
             connectionPanel.dataset.fromId = '';
@@ -1580,11 +1620,15 @@ class CloudArchitectureGenerator:
         function saveConnection() {{
             var label = container.querySelector('#connection-label-' + containerId).value.trim();
             var connType = container.querySelector('#connection-type-' + containerId).value;
+            var connStyle = container.querySelector('#connection-style-' + containerId).value;
+            var connDirection = container.querySelector('#connection-direction-' + containerId).value;
 
             if (currentEditingConnection) {{
                 // Editing existing connection
                 currentEditingConnection.label = label;
                 currentEditingConnection.connection_type = connType;
+                currentEditingConnection.style = connStyle;
+                currentEditingConnection.direction = connDirection;
             }} else {{
                 // Creating new connection
                 var fromId = connectionPanel.dataset.fromId;
@@ -1599,7 +1643,9 @@ class CloudArchitectureGenerator:
                     from_id: fromId,
                     to_id: toId,
                     label: label,
-                    connection_type: connType
+                    connection_type: connType,
+                    style: connStyle,
+                    direction: connDirection
                 }};
                 connectionsState.push(newConn);
             }}
@@ -1759,12 +1805,26 @@ class CloudArchitectureGenerator:
                 // Calculate bezier path
                 var pathD = calculateBezierPath(x1, y1, x2, y2);
 
-                // v1.3.3: Create visible path
+                // v1.3.4: Create visible path with style and direction
                 var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 path.setAttribute('d', pathD);
-                path.setAttribute('class', 'connection-path type-' + conn.connection_type);
+
+                // Apply both type and style classes (style takes priority in CSS)
+                var pathClass = 'connection-path type-' + conn.connection_type;
+                if (conn.style && conn.style !== 'solid') {{
+                    pathClass += ' style-' + conn.style;
+                }}
+                path.setAttribute('class', pathClass);
                 path.setAttribute('data-connection-id', conn.id);
-                path.setAttribute('marker-end', 'url(#arrowhead-' + containerId + ')');
+
+                // v1.3.4: Apply arrow markers based on direction
+                var direction = conn.direction || 'forward';
+                if (direction === 'forward' || direction === 'bidirectional') {{
+                    path.setAttribute('marker-end', 'url(#arrowhead-' + containerId + ')');
+                }}
+                if (direction === 'backward' || direction === 'bidirectional') {{
+                    path.setAttribute('marker-start', 'url(#arrowhead-back-' + containerId + ')');
+                }}
                 svg.appendChild(path);
 
                 // v1.3.3: Create invisible hit area for clicking
