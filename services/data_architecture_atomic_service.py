@@ -881,8 +881,8 @@ class DataArchitectureGenerator:
 
     <!-- Action Buttons -->
     <div class="action-buttons">
-        <button class="add-relationship-btn" id="{element_id}-add-rel">+ Relationship</button>
-        <button class="add-entity-btn" id="{element_id}-add-entity">+ Entity</button>
+        <button class="add-relationship-btn" onclick="dataArchs['{element_id}'].addRelationship()">+ Relationship</button>
+        <button class="add-entity-btn" onclick="dataArchs['{element_id}'].addEntity()">+ Entity</button>
     </div>
 
     <!-- Edit Panel -->
@@ -904,8 +904,6 @@ class DataArchitectureGenerator:
     const editPanel = document.getElementById(containerId + "-panel");
     const panelContent = document.getElementById(containerId + "-panel-content");
     const panelClose = document.getElementById(containerId + "-panel-close");
-    const addEntityBtn = document.getElementById(containerId + "-add-entity");
-    const addRelBtn = document.getElementById(containerId + "-add-rel");
 
     // State
     let entities = {entities_json};
@@ -915,6 +913,10 @@ class DataArchitectureGenerator:
     let isDragging = false;
     let dragOffset = {{ x: 0, y: 0 }};
     let dragElement = null;
+    let presentationId = '';
+
+    console.log('[DataArch] Initializing container:', containerId);
+    console.log('[DataArch] Entities:', entities.length, 'Relationships:', relationships.length);
 
     // Initialize
     function init() {{
@@ -922,26 +924,42 @@ class DataArchitectureGenerator:
         setupEntityDragging();
         setupEntityClick();
         setupPanelClose();
-        setupAddButtons();
+        // Delay relationship rendering to ensure DOM is ready (increased for iframe context)
+        setTimeout(function() {{
+            renderRelationships();
+            console.log('[DataArch] Initial relationships rendered');
+        }}, 200);
     }}
 
     // Render relationships as SVG paths
     function renderRelationships() {{
-        // Clear existing paths
-        const existingPaths = svgLayer.querySelectorAll('.relationship-path, .relationship-label');
-        existingPaths.forEach(p => p.remove());
+        if (!svgLayer) {{
+            console.warn('[DataArch] SVG layer not found');
+            return;
+        }}
+
+        // Clear existing paths (except defs)
+        svgLayer.querySelectorAll('path.relationship-path, path.relationship-hit-area, text.relationship-label').forEach(p => p.remove());
+
+        console.log('[DataArch] Rendering', relationships.length, 'relationships');
 
         relationships.forEach(rel => {{
             const fromEntity = entities.find(e => e.id === rel.from_entity);
             const toEntity = entities.find(e => e.id === rel.to_entity);
 
-            if (!fromEntity || !toEntity) return;
+            if (!fromEntity || !toEntity) {{
+                console.warn('[DataArch] Entity not found for relationship:', rel.id);
+                return;
+            }}
 
             // Get entity positions
-            const fromEl = entitiesLayer.querySelector(`[data-entity-id="${{rel.from_entity}}"]`);
-            const toEl = entitiesLayer.querySelector(`[data-entity-id="${{rel.to_entity}}"]`);
+            const fromEl = entitiesLayer.querySelector('[data-entity-id="' + rel.from_entity + '"]');
+            const toEl = entitiesLayer.querySelector('[data-entity-id="' + rel.to_entity + '"]');
 
-            if (!fromEl || !toEl) return;
+            if (!fromEl || !toEl) {{
+                console.warn('[DataArch] Entity element not found for relationship:', rel.id);
+                return;
+            }}
 
             const containerRect = container.getBoundingClientRect();
             const fromRect = fromEl.getBoundingClientRect();
@@ -1477,12 +1495,6 @@ class DataArchitectureGenerator:
         selectedRelationship = null;
     }}
 
-    // Setup add buttons
-    function setupAddButtons() {{
-        addEntityBtn.addEventListener('click', addEntity);
-        addRelBtn.addEventListener('click', addRelationship);
-    }}
-
     // Notify state change to parent
     function notifyStateChange() {{
         window.parent.postMessage({{
@@ -1497,11 +1509,96 @@ class DataArchitectureGenerator:
         }}, '*');
     }}
 
+    // Render entities from state (for restoration)
+    function renderEntitiesFromState() {{
+        // Clear existing entities
+        entitiesLayer.innerHTML = '';
+
+        entities.forEach(function(entity) {{
+            const typeColor = {{
+                'table': '#3B82F6',
+                'view': '#8B5CF6',
+                'enum': '#F59E0B',
+                'junction': '#10B981'
+            }}[entity.type] || '#3B82F6';
+
+            const typeBadge = entity.type !== 'table' ? '<span class="entity-type-badge">' + entity.type.toUpperCase() + '</span>' : '';
+
+            const fieldsHtml = entity.fields.map(function(f) {{
+                let cls = '';
+                let icon = '';
+                if (f.is_primary_key) {{
+                    cls = 'pk';
+                    icon = '<span class="field-icon pk-icon">🔑</span>';
+                }} else if (f.is_foreign_key) {{
+                    cls = 'fk';
+                    icon = '<span class="field-icon fk-icon">🔗</span>';
+                }}
+                return '<div class="field ' + cls + '">' +
+                    icon +
+                    '<span class="field-name">' + f.name + '</span>' +
+                    '<span class="field-type">' + f.data_type + '</span>' +
+                '</div>';
+            }}).join('');
+
+            const el = document.createElement('div');
+            el.className = 'data-entity entity-' + entity.type;
+            el.dataset.entityId = entity.id;
+            el.dataset.entityType = entity.type;
+            el.style.left = entity.x_position + '%';
+            el.style.top = entity.y_position + '%';
+            el.style.setProperty('--entity-color', typeColor);
+            el.innerHTML = '<div class="entity-header">' +
+                '<span class="entity-name">' + entity.name + '</span>' +
+                typeBadge +
+            '</div>' +
+            '<div class="entity-fields">' + fieldsHtml + '</div>';
+
+            entitiesLayer.appendChild(el);
+            el.addEventListener('mousedown', startDrag);
+            el.addEventListener('click', function(e) {{
+                if (!isDragging) openEntityPanel(entity.id);
+            }});
+        }});
+    }}
+
+    // Listen for initialization from parent (Layout Service)
+    window.addEventListener('message', function(e) {{
+        if (!e.data || e.data.type !== 'dataarch-init') return;
+        console.log('[DataArch] Received init from parent');
+
+        presentationId = e.data.presentation_id || '';
+
+        if (e.data.saved_state) {{
+            // Restore saved state
+            entities = e.data.saved_state.entities || entities;
+            relationships = e.data.saved_state.relationships || relationships;
+
+            // Re-render with restored state
+            renderEntitiesFromState();
+            setTimeout(renderRelationships, 200);
+            console.log('[DataArch] State restored:', entities.length, 'entities,', relationships.length, 'relationships');
+        }}
+    }});
+
+    // v1.0.0: Register namespace for external access (CRITICAL for button onclick handlers)
+    window.dataArchs = window.dataArchs || {{}};
+    window.dataArchs[containerId] = {{
+        addEntity: addEntity,
+        addRelationship: addRelationship,
+        openEntityPanel: openEntityPanel,
+        openRelationshipPanel: openRelationshipPanel,
+        closePanel: closePanel,
+        saveEntity: saveEntity,
+        deleteEntity: deleteEntity,
+        saveRelationship: saveRelationship,
+        deleteRelationship: deleteRelationship,
+        renderRelationships: renderRelationships,
+        notifyStateChange: notifyStateChange
+    }};
+
     // Initialize on load
     init();
-
-    // Delay relationship rendering to ensure DOM is ready
-    setTimeout(renderRelationships, 100);
 }})();
 </script>
 '''
