@@ -12,7 +12,7 @@ from functools import lru_cache
 import time
 
 from utils.logger import setup_logger
-from config import configure_gemini, is_gemini_configured, is_using_vertex_ai
+from config import configure_gemini, is_using_vertex_ai
 
 logger = setup_logger(__name__)
 
@@ -290,12 +290,11 @@ async def optimized_generate(
     """
     
     service = get_gemini_service()
-    
-    # Initialize if needed
-    if not is_gemini_configured():
-        from config import get_settings
-        settings = get_settings()
-        if not service.initialize(settings.google_api_key):
+
+    # Initialize if needed - check service's own _initialized flag
+    # This works for both Vertex AI and API key auth modes
+    if not service._initialized or (not service._use_vertex_ai and not service._models):
+        if not service.initialize():
             return None
     
     # Optimize prompt
