@@ -7,11 +7,6 @@
 # Slides 1-3: LLM-generated (prompt only, no components) - tests prompt-aware fallback
 # Slides 4-6: Explicit components (no LLM call) - tests pure visualization
 #
-# This helps verify:
-# 1. LLM generation is being called (check logs for [LOGICAL_PLANNER])
-# 2. Prompt-aware fallback works correctly when LLM fails
-# 3. Explicit components bypass LLM entirely
-#
 
 set -e
 
@@ -65,46 +60,10 @@ fi
 echo ""
 
 # ============================================
-# Arrays to track slides
+# Arrays to collect slide data
 # ============================================
-declare -a ALL_POSITIONED_SLIDES
-declare -a ALL_POSITIONED_HTML
-
-# ============================================
-# Function: Add positioned element via Layout Service Diagram API
-# ============================================
-add_positioned_element() {
-    local pres_id=$1
-    local slide_idx=$2
-    local html=$3
-    local start_col=$4
-    local width=$5
-    local start_row=$6
-    local height=$7
-
-    local escaped_html
-    escaped_html=$(echo "$html" | jq -Rs .)
-
-    local payload=$(cat <<EOF
-{
-    "html": $escaped_html,
-    "position": {
-        "startCol": $start_col,
-        "width": $width,
-        "startRow": $start_row,
-        "height": $height
-    }
-}
-EOF
-)
-
-    local response
-    response=$(curl -s -X POST "$LAYOUT_URL/api/presentations/$pres_id/slides/$slide_idx/diagrams" \
-        -H "Content-Type: application/json" \
-        -d "$payload")
-
-    echo "$response"
-}
+declare -a SLIDE_HTMLS
+declare -a SLIDE_TITLES
 
 # ============================================
 # SLIDE 1: LLM-GENERATED - E-commerce Prompt
@@ -137,8 +96,8 @@ SLIDE1_GROUPS=$(echo "$SLIDE1_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE1_HTML" ]; then
     echo -e "${GREEN}✓ Slide 1 generated: $SLIDE1_COMPONENTS components, $SLIDE1_GROUPS groups${NC}"
     echo "$SLIDE1_HTML" > "$OUTPUT_DIR/slide1_ecommerce_llm.html"
-    ALL_POSITIONED_SLIDES+=("E-commerce (LLM)")
-    ALL_POSITIONED_HTML+=("$SLIDE1_HTML")
+    SLIDE_HTMLS+=("$SLIDE1_HTML")
+    SLIDE_TITLES+=("E-commerce (LLM)")
 else
     echo -e "${RED}✗ Slide 1 failed${NC}"
     echo "$SLIDE1_RESPONSE" | jq . > "$OUTPUT_DIR/slide1_error.json"
@@ -175,8 +134,8 @@ SLIDE2_GROUPS=$(echo "$SLIDE2_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE2_HTML" ]; then
     echo -e "${GREEN}✓ Slide 2 generated: $SLIDE2_COMPONENTS components, $SLIDE2_GROUPS groups${NC}"
     echo "$SLIDE2_HTML" > "$OUTPUT_DIR/slide2_chat_llm.html"
-    ALL_POSITIONED_SLIDES+=("Chat (LLM)")
-    ALL_POSITIONED_HTML+=("$SLIDE2_HTML")
+    SLIDE_HTMLS+=("$SLIDE2_HTML")
+    SLIDE_TITLES+=("Real-time Chat (LLM)")
 else
     echo -e "${RED}✗ Slide 2 failed${NC}"
     echo "$SLIDE2_RESPONSE" | jq . > "$OUTPUT_DIR/slide2_error.json"
@@ -213,8 +172,8 @@ SLIDE3_GROUPS=$(echo "$SLIDE3_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE3_HTML" ]; then
     echo -e "${GREEN}✓ Slide 3 generated: $SLIDE3_COMPONENTS components, $SLIDE3_GROUPS groups${NC}"
     echo "$SLIDE3_HTML" > "$OUTPUT_DIR/slide3_analytics_llm.html"
-    ALL_POSITIONED_SLIDES+=("Analytics (LLM)")
-    ALL_POSITIONED_HTML+=("$SLIDE3_HTML")
+    SLIDE_HTMLS+=("$SLIDE3_HTML")
+    SLIDE_TITLES+=("Analytics Dashboard (LLM)")
 else
     echo -e "${RED}✗ Slide 3 failed${NC}"
     echo "$SLIDE3_RESPONSE" | jq . > "$OUTPUT_DIR/slide3_error.json"
@@ -272,8 +231,8 @@ SLIDE4_GROUPS=$(echo "$SLIDE4_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE4_HTML" ]; then
     echo -e "${GREEN}✓ Slide 4 generated: $SLIDE4_COMPONENTS components, $SLIDE4_GROUPS groups${NC}"
     echo "$SLIDE4_HTML" > "$OUTPUT_DIR/slide4_microservices_explicit.html"
-    ALL_POSITIONED_SLIDES+=("Microservices (Explicit)")
-    ALL_POSITIONED_HTML+=("$SLIDE4_HTML")
+    SLIDE_HTMLS+=("$SLIDE4_HTML")
+    SLIDE_TITLES+=("Microservices (Explicit)")
 else
     echo -e "${RED}✗ Slide 4 failed${NC}"
     echo "$SLIDE4_RESPONSE" | jq . > "$OUTPUT_DIR/slide4_error.json"
@@ -329,8 +288,8 @@ SLIDE5_GROUPS=$(echo "$SLIDE5_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE5_HTML" ]; then
     echo -e "${GREEN}✓ Slide 5 generated: $SLIDE5_COMPONENTS components, $SLIDE5_GROUPS groups${NC}"
     echo "$SLIDE5_HTML" > "$OUTPUT_DIR/slide5_datapipeline_explicit.html"
-    ALL_POSITIONED_SLIDES+=("Data Pipeline (Explicit)")
-    ALL_POSITIONED_HTML+=("$SLIDE5_HTML")
+    SLIDE_HTMLS+=("$SLIDE5_HTML")
+    SLIDE_TITLES+=("Data Pipeline (Explicit)")
 else
     echo -e "${RED}✗ Slide 5 failed${NC}"
     echo "$SLIDE5_RESPONSE" | jq . > "$OUTPUT_DIR/slide5_error.json"
@@ -385,56 +344,79 @@ SLIDE6_GROUPS=$(echo "$SLIDE6_RESPONSE" | jq -r '.group_count // 0')
 if [ -n "$SLIDE6_HTML" ]; then
     echo -e "${GREEN}✓ Slide 6 generated: $SLIDE6_COMPONENTS components, $SLIDE6_GROUPS groups${NC}"
     echo "$SLIDE6_HTML" > "$OUTPUT_DIR/slide6_auth_explicit.html"
-    ALL_POSITIONED_SLIDES+=("Auth System (Explicit)")
-    ALL_POSITIONED_HTML+=("$SLIDE6_HTML")
+    SLIDE_HTMLS+=("$SLIDE6_HTML")
+    SLIDE_TITLES+=("Auth System (Explicit)")
 else
     echo -e "${RED}✗ Slide 6 failed${NC}"
     echo "$SLIDE6_RESPONSE" | jq . > "$OUTPUT_DIR/slide6_error.json"
 fi
 
 # ============================================
-# Create presentation with all slides
+# Create presentation with all slides using correct API format
 # ============================================
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${MAGENTA}Creating Presentation with All Slides${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
+# Build slides array for the API
+# Using C5-diagram layout which accepts diagram_html
+build_slides_json() {
+    local slides_json="["
+    local first=true
+
+    for i in "${!SLIDE_HTMLS[@]}"; do
+        local title="${SLIDE_TITLES[$i]}"
+        local html="${SLIDE_HTMLS[$i]}"
+
+        # Escape the HTML for JSON
+        local escaped_html=$(echo "$html" | jq -Rs .)
+
+        if [ "$first" = true ]; then
+            first=false
+        else
+            slides_json+=","
+        fi
+
+        slides_json+="{\"layout\": \"C5-diagram\", \"content\": {\"slide_title\": \"$title\", \"subtitle\": \"LOGICAL_ARCHITECTURE Test\", \"diagram_html\": $escaped_html}}"
+    done
+
+    slides_json+="]"
+    echo "$slides_json"
+}
+
+SLIDES_JSON=$(build_slides_json)
+
+# Create the presentation payload
+PRES_PAYLOAD=$(cat <<EOF
+{
+    "title": "LOGICAL_ARCHITECTURE: LLM vs Explicit Test",
+    "template_id": "L25",
+    "slides": $SLIDES_JSON
+}
+EOF
+)
+
+# Save for debugging
+echo "$PRES_PAYLOAD" > "$OUTPUT_DIR/presentation_payload.json"
+
 # Create presentation
 PRES_RESPONSE=$(curl -s -X POST "$LAYOUT_URL/api/presentations" \
     -H "Content-Type: application/json" \
-    -d '{"title": "LOGICAL_ARCHITECTURE: LLM vs Explicit Test", "theme": "modern-dark"}')
+    -d "$PRES_PAYLOAD")
 
 PRES_ID=$(echo "$PRES_RESPONSE" | jq -r '.id // empty')
 
 if [ -z "$PRES_ID" ]; then
     echo -e "${RED}Failed to create presentation${NC}"
-    echo "$PRES_RESPONSE"
+    echo "$PRES_RESPONSE" | jq .
+    echo ""
+    echo "Payload saved to: $OUTPUT_DIR/presentation_payload.json"
     exit 1
 fi
 
 echo -e "${GREEN}✓ Presentation created: $PRES_ID${NC}"
-
-# Add slides
-SLIDE_TITLES=("E-commerce (LLM)" "Real-time Chat (LLM)" "Analytics (LLM)" "Microservices (Explicit)" "Data Pipeline (Explicit)" "Auth System (Explicit)")
-
-for i in {0..5}; do
-    SLIDE_IDX=$((i + 1))
-    TITLE="${SLIDE_TITLES[$i]}"
-
-    # Add slide
-    curl -s -X POST "$LAYOUT_URL/api/presentations/$PRES_ID/slides" \
-        -H "Content-Type: application/json" \
-        -d "{\"title\": \"$TITLE\", \"layout\": \"content-only\"}" > /dev/null
-
-    # Add diagram element if HTML exists
-    if [ -n "${ALL_POSITIONED_HTML[$i]}" ]; then
-        add_positioned_element "$PRES_ID" "$SLIDE_IDX" "${ALL_POSITIONED_HTML[$i]}" 2 14 3 8 > /dev/null
-        echo -e "${GREEN}  ✓ Slide $SLIDE_IDX: $TITLE${NC}"
-    else
-        echo -e "${YELLOW}  ⚠ Slide $SLIDE_IDX: $TITLE (no HTML)${NC}"
-    fi
-done
+echo -e "${GREEN}  Slides: ${#SLIDE_HTMLS[@]}${NC}"
 
 # ============================================
 # Summary
@@ -446,9 +428,6 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "Presentation URL:"
 echo -e "  ${BLUE}$LAYOUT_URL/p/$PRES_ID${NC}"
-echo ""
-echo "Edit URL:"
-echo -e "  ${BLUE}$LAYOUT_URL/e/$PRES_ID${NC}"
 echo ""
 echo "Output files: $OUTPUT_DIR"
 echo ""
