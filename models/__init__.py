@@ -52,6 +52,18 @@ from .logical_architecture_atomic_models import (
     GROUP_COLORS
 )
 
+from .data_architecture_atomic_models import (
+    DataEntity,
+    DataField,
+    DataRelationship,
+    DataArchitectureAtomicRequest,
+    DataArchitectureAtomicResponse,
+    DATA_ARCH_POSITION_PRESETS,
+    DATA_ARCH_THEMES,
+    ENTITY_TYPE_COLORS,
+    FIELD_INDICATOR_COLORS
+)
+
 from .diagram_models import (
     DiagramSpec,
     DiagramType,
@@ -137,6 +149,16 @@ __all__ = [
     "LOGICAL_ARCH_THEMES",
     "LOGICAL_COMPONENT_COLORS",
     "GROUP_COLORS",
+    # Data Architecture models
+    "DataEntity",
+    "DataField",
+    "DataRelationship",
+    "DataArchitectureAtomicRequest",
+    "DataArchitectureAtomicResponse",
+    "DATA_ARCH_POSITION_PRESETS",
+    "DATA_ARCH_THEMES",
+    "ENTITY_TYPE_COLORS",
+    "FIELD_INDICATOR_COLORS",
     # Existing exports
     "DiagramRequest",
     "DiagramSpec",

@@ -138,6 +138,11 @@ from models.logical_architecture_atomic_models import (
     LogicalArchitectureAtomicResponse,
     LOGICAL_ARCH_POSITION_PRESETS
 )
+from models.data_architecture_atomic_models import (
+    DataArchitectureAtomicRequest,
+    DataArchitectureAtomicResponse,
+    DATA_ARCH_POSITION_PRESETS
+)
 from services.code_display_service import CodeDisplayGenerator
 from services.kanban_atomic_service import KanbanAtomicGenerator
 from services.gantt_atomic_service import GanttAtomicGenerator
@@ -145,6 +150,7 @@ from services.chevron_atomic_service import ChevronAtomicGenerator
 from services.idea_board_atomic_service import IdeaBoardGenerator
 from services.cloud_architecture_atomic_service import CloudArchitectureGenerator
 from services.logical_architecture_atomic_service import LogicalArchitectureGenerator
+from services.data_architecture_atomic_service import DataArchitectureGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -159,6 +165,7 @@ _chevron_generator: ChevronAtomicGenerator = None
 _ideaboard_generator: IdeaBoardGenerator = None
 _cloudarch_generator: CloudArchitectureGenerator = None
 _logicalarch_generator: LogicalArchitectureGenerator = None
+_dataarch_generator: DataArchitectureGenerator = None
 
 
 def get_code_generator() -> CodeDisplayGenerator:
@@ -215,6 +222,14 @@ def get_logicalarch_generator() -> LogicalArchitectureGenerator:
     if _logicalarch_generator is None:
         _logicalarch_generator = LogicalArchitectureGenerator()
     return _logicalarch_generator
+
+
+def get_dataarch_generator() -> DataArchitectureGenerator:
+    """Get or create the DataArchitectureGenerator singleton."""
+    global _dataarch_generator
+    if _dataarch_generator is None:
+        _dataarch_generator = DataArchitectureGenerator()
+    return _dataarch_generator
 
 
 # =============================================================================
@@ -899,6 +914,70 @@ async def generate_logical_architecture(
 
 
 # =============================================================================
+# POST /v1.2/atomic/DATA_ARCHITECTURE
+# =============================================================================
+
+@router.post("/DATA_ARCHITECTURE", response_model=DataArchitectureAtomicResponse)
+async def generate_data_architecture(
+    request: DataArchitectureAtomicRequest
+) -> DataArchitectureAtomicResponse:
+    """
+    Generate DATA_ARCHITECTURE atomic component (interactive ER diagram).
+
+    The ER diagram includes:
+    - Draggable entity (table) cards with field definitions
+    - Primary key (PK) and foreign key (FK) indicators
+    - Crow's foot notation for relationship cardinality
+    - SVG bezier connection paths
+    - Add/edit/delete entities and relationships via panels
+    - Light/dark mode theming with CSS variables
+    - State persistence via postMessage
+
+    **Request Body**:
+    - title: Diagram title (optional)
+    - entities: List of entity (table) definitions
+    - relationships: List of relationships between entities
+    - prompt: Natural language prompt to generate schema (requires LLM)
+    - position_preset: Position preset (full_content, left_four_fifths)
+    - theme_mode: Light or dark mode (default: light)
+    - gridWidth/gridHeight: Grid dimensions
+    - external_margin: Margin in pixels
+    - show_data_types: Show data types next to field names (default: True)
+    - show_nullable: Show nullable indicator (default: True)
+    - placeholder_mode: If true, use sample placeholder data
+
+    **Position Presets**:
+    - full_content: Full content area (col 2, width 30, height 14)
+    - left_four_fifths: Left 4/5 (col 2, width 24, height 14)
+
+    **Entity Types**:
+    table, view, enum, junction
+
+    **Cardinality Types (Crow's Foot)**:
+    one_to_one, one_to_many, many_to_one, many_to_many, zero_or_one, zero_or_many
+    """
+    try:
+        generator = get_dataarch_generator()
+        result = await generator.generate(request)
+
+        if not result.success:
+            logger.error(f"[ATOMIC-DATA_ARCHITECTURE-ERROR] {result.error}")
+            raise HTTPException(status_code=500, detail=result.error)
+
+        return result
+
+    except asyncio.TimeoutError:
+        raise HTTPException(status_code=504, detail="Generation timed out")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"[ATOMIC-DATA_ARCHITECTURE-ERROR] {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
 # GET /v1.2/atomic/health
 # =============================================================================
 
@@ -912,7 +991,7 @@ async def atomic_health():
     return {
         "status": "healthy",
         "service": "atomic-components",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "endpoints": {
             "CODE_DISPLAY": {
                 "path": "/v1.2/atomic/CODE_DISPLAY",
@@ -1152,6 +1231,46 @@ async def atomic_health():
                 },
                 "defaults": {
                     "theme_mode": "light",
+                    "external_margin": 10
+                }
+            },
+            "DATA_ARCHITECTURE": {
+                "path": "/v1.2/atomic/DATA_ARCHITECTURE",
+                "component_id": "data_architecture",
+                "count_range": "1 (single diagram)",
+                "flexible_items": True,
+                "entity_types": ["table", "view", "enum", "junction"],
+                "cardinality_types": [
+                    "one_to_one", "one_to_many", "many_to_one",
+                    "many_to_many", "zero_or_one", "zero_or_many"
+                ],
+                "position_presets": [
+                    "full_content", "left_four_fifths"
+                ],
+                "features": {
+                    "drag_and_drop": True,
+                    "add_entity": True,
+                    "edit_entity": True,
+                    "delete_entity": True,
+                    "add_relationship": True,
+                    "edit_relationship": True,
+                    "delete_relationship": True,
+                    "crows_foot_notation": True,
+                    "svg_connections": True,
+                    "bezier_paths": True,
+                    "pk_fk_indicators": True,
+                    "placeholder_mode": True,
+                    "prompt_generation": True,
+                    "configurable_margin": True,
+                    "light_dark_mode": True,
+                    "inline_styles": True,
+                    "interactive_view_mode": True,
+                    "state_persistence": True
+                },
+                "defaults": {
+                    "theme_mode": "light",
+                    "show_data_types": True,
+                    "show_nullable": True,
                     "external_margin": 10
                 }
             }

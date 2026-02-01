@@ -13,6 +13,7 @@ Atomic component generators:
 - GanttAtomicGenerator: Atomic GANTT_CHART endpoint generator
 - CloudArchitectureGenerator: Atomic CLOUD_ARCHITECTURE endpoint generator
 - LogicalArchitectureGenerator: Atomic LOGICAL_ARCHITECTURE endpoint generator
+- DataArchitectureGenerator: Atomic DATA_ARCHITECTURE endpoint generator (ER diagrams)
 """
 
 from .gantt_generator import GanttGenerator
@@ -24,6 +25,7 @@ from .kanban_atomic_service import KanbanAtomicGenerator
 from .gantt_atomic_service import GanttAtomicGenerator
 from .cloud_architecture_atomic_service import CloudArchitectureGenerator
 from .logical_architecture_atomic_service import LogicalArchitectureGenerator
+from .data_architecture_atomic_service import DataArchitectureGenerator
 
 __all__ = [
     "GanttGenerator",
@@ -35,4 +37,5 @@ __all__ = [
     "GanttAtomicGenerator",
     "CloudArchitectureGenerator",
     "LogicalArchitectureGenerator",
+    "DataArchitectureGenerator",
 ]
