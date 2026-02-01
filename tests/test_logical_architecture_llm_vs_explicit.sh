@@ -445,10 +445,10 @@ echo -e "${GREEN}TEST COMPLETE${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo "Presentation URL:"
-echo -e "  ${BLUE}$LAYOUT_URL/present/$PRES_ID${NC}"
+echo -e "  ${BLUE}$LAYOUT_URL/p/$PRES_ID${NC}"
 echo ""
 echo "Edit URL:"
-echo -e "  ${BLUE}$LAYOUT_URL/edit/$PRES_ID${NC}"
+echo -e "  ${BLUE}$LAYOUT_URL/e/$PRES_ID${NC}"
 echo ""
 echo "Output files: $OUTPUT_DIR"
 echo ""
@@ -462,5 +462,5 @@ echo ""
 
 # Open in browser if on macOS
 if [[ "$OSTYPE" == "darwin"* ]]; then
-    open "$LAYOUT_URL/present/$PRES_ID"
+    open "$LAYOUT_URL/p/$PRES_ID"
 fi
