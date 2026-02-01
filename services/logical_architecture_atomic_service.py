@@ -578,11 +578,11 @@ class LogicalArchitectureGenerator:
 .group-drag-handle {{
     position: absolute;
     top: 6px;
-    left: 6px;
+    right: 6px;
     width: 16px;
     height: 16px;
     cursor: move;
-    opacity: 0.4;
+    opacity: 0.6;
     transition: opacity 0.2s ease;
     display: flex;
     align-items: center;
