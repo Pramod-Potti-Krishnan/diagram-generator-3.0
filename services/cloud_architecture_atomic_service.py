@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.3.1
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.2
 
 Generates self-contained HTML for cloud architecture diagrams.
 
@@ -729,7 +729,7 @@ class CloudArchitectureGenerator:
     background: var(--arch-text-primary);
 }}
 
-/* v1.3.1: Slide-in Panel (replaces centered modal) */
+/* v1.3.2: Slide-in Panel - shadow only when open */
 .detail-panel {{
     position: absolute;
     right: 0;
@@ -738,9 +738,8 @@ class CloudArchitectureGenerator:
     width: 350px;
     background: var(--arch-modal-bg);
     border-left: 1px solid var(--arch-modal-border);
-    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     z-index: 100;
     overflow-y: auto;
     padding: 20px;
@@ -748,6 +747,7 @@ class CloudArchitectureGenerator:
 
 .detail-panel.open {{
     transform: translateX(0);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
 }}
 
 .panel-close {{

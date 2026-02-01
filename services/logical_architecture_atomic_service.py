@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.4
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.5
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -787,7 +787,7 @@ class LogicalArchitectureGenerator:
     background: var(--larch-text-primary);
 }}
 
-/* v1.3.4: Slide-in Panel (replaces centered modal) */
+/* v1.3.5: Slide-in Panel - shadow only when open */
 .detail-panel {{
     position: absolute;
     right: 0;
@@ -796,9 +796,8 @@ class LogicalArchitectureGenerator:
     width: 350px;
     background: var(--larch-modal-bg);
     border-left: 1px solid var(--larch-modal-border);
-    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
     z-index: 100;
     overflow-y: auto;
     padding: 20px;
@@ -806,6 +805,7 @@ class LogicalArchitectureGenerator:
 
 .detail-panel.open {{
     transform: translateX(0);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
 }}
 
 .panel-close {{
