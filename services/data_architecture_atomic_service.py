@@ -1176,7 +1176,6 @@ window.dataArchs = window.dataArchs || {{}};
             </div>
         `;
 
-        document.getElementById(containerId + "-panel-title")?.textContent = "Edit Entity";
         editPanel.querySelector('.edit-panel-title').textContent = "Edit Entity";
         editPanel.classList.add('open');
 
