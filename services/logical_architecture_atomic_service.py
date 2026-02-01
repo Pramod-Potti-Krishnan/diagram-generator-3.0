@@ -1,5 +1,5 @@
 """
-LOGICAL_ARCHITECTURE HTML Generation Service v1.3.3
+LOGICAL_ARCHITECTURE HTML Generation Service v1.3.4
 
 Generates self-contained HTML for logical/system architecture diagrams.
 
@@ -16,6 +16,13 @@ Includes embedded CSS and JavaScript for:
 - Dynamic group management UI
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.4 UI Enhancements:
+- CHANGE: Container background now transparent (no grey box)
+- CHANGE: Centered modal replaced with slide-in panel from right
+- ADD: Panel slides in with 300ms ease animation
+- ADD: Click-outside-to-close behavior on detail panels
+- STYLE: Modern panel styling matching IDEA_BOARD pattern
 
 v1.3.3 Fixes:
 - FIX: Group dragging not working due to components blocking group header
@@ -520,7 +527,7 @@ class LogicalArchitectureGenerator:
     min-width: {pixel_width}px;
     min-height: {pixel_height}px;
     position: relative;
-    background: var(--larch-container-bg);
+    background: transparent;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     padding: {request.external_margin}px;
@@ -780,62 +787,96 @@ class LogicalArchitectureGenerator:
     background: var(--larch-text-primary);
 }}
 
-/* Modal Overlay */
-.modal-overlay {{
-    display: none;
-    position: fixed;
+/* v1.3.4: Slide-in Panel (replaces centered modal) */
+.detail-panel {{
+    position: absolute;
+    right: 0;
     top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-}}
-
-.modal-overlay.open {{
-    display: flex;
-}}
-
-.modal-dialog {{
+    height: 100%;
+    width: 350px;
     background: var(--larch-modal-bg);
-    border: 1px solid var(--larch-modal-border);
-    border-radius: 12px;
-    padding: 24px;
-    width: 400px;
-    max-width: 90vw;
-    max-height: 90vh;
+    border-left: 1px solid var(--larch-modal-border);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 100;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 20px;
 }}
 
-.modal-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.detail-panel.open {{
+    transform: translateX(0);
+}}
+
+.panel-close {{
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--larch-text-secondary);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}}
+
+.panel-close:hover {{
+    color: var(--larch-text-primary);
+}}
+
+.panel-header {{
     margin-bottom: 20px;
+    padding-right: 30px;
 }}
 
-.modal-header h3 {{
+.panel-title {{
     font-size: 18px;
     font-weight: 700;
     color: var(--larch-text-primary);
     margin: 0;
 }}
 
-.modal-close {{
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--larch-text-secondary);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
+.panel-section {{
+    margin-bottom: 16px;
 }}
 
-.modal-close:hover {{
+.panel-label {{
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--larch-text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}}
+
+.panel-input {{
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--larch-input-border);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--larch-input-bg);
     color: var(--larch-text-primary);
+}}
+
+.panel-input:focus {{
+    outline: none;
+    border-color: var(--larch-button-primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}}
+
+.panel-input.textarea {{
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}}
+
+.panel-actions {{
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
 }}
 
 .form-group {{
@@ -943,83 +984,79 @@ class LogicalArchitectureGenerator:
         <button class="add-component-btn" onclick="logArchs['{element_id}'].openAddModal()">+ Component</button>
     </div>
 
-    <!-- Component Modal -->
-    <div class="modal-overlay" id="modal-{element_id}">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3 id="modal-title-{element_id}">Add Component</h3>
-                <button class="modal-close" onclick="logArchs['{element_id}'].closeModal()">&times;</button>
-            </div>
-            <div class="form-group">
-                <label for="modal-name-{element_id}">Component Name</label>
-                <input type="text" id="modal-name-{element_id}" maxlength="40" placeholder="Enter component name...">
-            </div>
-            <div class="form-group">
-                <label for="modal-type-{element_id}">Component Type</label>
-                <select id="modal-type-{element_id}">
-                    <option value="service">Service</option>
-                    <option value="module">Module</option>
-                    <option value="interface">Interface</option>
-                    <option value="database">Database</option>
-                    <option value="api">API</option>
-                    <option value="gateway">Gateway</option>
-                    <option value="queue">Queue</option>
-                    <option value="cache">Cache</option>
-                    <option value="worker">Worker</option>
-                    <option value="external">External</option>
-                    <option value="client">Client</option>
-                    <option value="auth">Auth</option>
-                    <option value="storage">Storage</option>
-                    <option value="generic">Generic</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="modal-stereotype-{element_id}">Stereotype (optional)</label>
-                <input type="text" id="modal-stereotype-{element_id}" maxlength="30" placeholder="e.g., <<controller>>">
-            </div>
-            <div class="form-group">
-                <label for="modal-desc-{element_id}">Description (optional)</label>
-                <textarea id="modal-desc-{element_id}" rows="2" placeholder="Brief description..."></textarea>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="logArchs['{element_id}'].deleteComponent()" style="display:none;">Delete</button>
-                <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveComponent()">Save</button>
-            </div>
+    <!-- v1.3.4: Component Panel (slide-in from right) -->
+    <div class="detail-panel" id="component-panel-{element_id}">
+        <button class="panel-close" onclick="logArchs['{element_id}'].closeModal()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="panel-title-{element_id}">Add Component</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-name-{element_id}">Component Name</label>
+            <input type="text" id="panel-name-{element_id}" class="panel-input" maxlength="40" placeholder="Enter component name...">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-type-{element_id}">Component Type</label>
+            <select id="panel-type-{element_id}" class="panel-input">
+                <option value="service">Service</option>
+                <option value="module">Module</option>
+                <option value="interface">Interface</option>
+                <option value="database">Database</option>
+                <option value="api">API</option>
+                <option value="gateway">Gateway</option>
+                <option value="queue">Queue</option>
+                <option value="cache">Cache</option>
+                <option value="worker">Worker</option>
+                <option value="external">External</option>
+                <option value="client">Client</option>
+                <option value="auth">Auth</option>
+                <option value="storage">Storage</option>
+                <option value="generic">Generic</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-stereotype-{element_id}">Stereotype (optional)</label>
+            <input type="text" id="panel-stereotype-{element_id}" class="panel-input" maxlength="30" placeholder="e.g., <<controller>>">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-desc-{element_id}">Description (optional)</label>
+            <textarea id="panel-desc-{element_id}" class="panel-input textarea" rows="2" placeholder="Brief description..."></textarea>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" id="panel-delete-{element_id}" onclick="logArchs['{element_id}'].deleteComponent()" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveComponent()">Save</button>
         </div>
     </div>
 
-    <!-- Group Modal -->
-    <div class="modal-overlay" id="group-modal-{element_id}">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3 id="group-modal-title-{element_id}">Add Group</h3>
-                <button class="modal-close" onclick="logArchs['{element_id}'].closeGroupModal()">&times;</button>
-            </div>
-            <div class="form-group">
-                <label for="group-name-{element_id}">Group Name</label>
-                <input type="text" id="group-name-{element_id}" maxlength="50" placeholder="e.g., Core Services">
-            </div>
-            <div class="form-group">
-                <label for="group-type-{element_id}">Group Type</label>
-                <select id="group-type-{element_id}">
-                    <option value="boundary">Boundary</option>
-                    <option value="subsystem">Subsystem</option>
-                    <option value="layer">Layer</option>
-                    <option value="domain">Domain</option>
-                    <option value="zone">Zone</option>
-                    <option value="cluster">Cluster</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="group-desc-{element_id}">Description (optional)</label>
-                <textarea id="group-desc-{element_id}" rows="2" placeholder="Brief description..."></textarea>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-danger" id="group-delete-{element_id}" onclick="logArchs['{element_id}'].deleteGroup()" style="display:none;">Delete</button>
-                <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeGroupModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveGroup()">Save</button>
-            </div>
+    <!-- v1.3.4: Group Panel (slide-in from right) -->
+    <div class="detail-panel" id="group-panel-{element_id}">
+        <button class="panel-close" onclick="logArchs['{element_id}'].closeGroupModal()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="group-panel-title-{element_id}">Add Group</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="group-name-{element_id}">Group Name</label>
+            <input type="text" id="group-name-{element_id}" class="panel-input" maxlength="50" placeholder="e.g., Core Services">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="group-type-{element_id}">Group Type</label>
+            <select id="group-type-{element_id}" class="panel-input">
+                <option value="boundary">Boundary</option>
+                <option value="subsystem">Subsystem</option>
+                <option value="layer">Layer</option>
+                <option value="domain">Domain</option>
+                <option value="zone">Zone</option>
+                <option value="cluster">Cluster</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="group-desc-{element_id}">Description (optional)</label>
+            <textarea id="group-desc-{element_id}" class="panel-input textarea" rows="2" placeholder="Brief description..."></textarea>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" id="group-delete-{element_id}" onclick="logArchs['{element_id}'].deleteGroup()" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" onclick="logArchs['{element_id}'].closeGroupModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="logArchs['{element_id}'].saveGroup()">Save</button>
         </div>
     </div>
 
@@ -1040,7 +1077,7 @@ class LogicalArchitectureGenerator:
         var currentEditingGroup = null;
 
         // DOM elements
-        var componentsLayer, groupsLayer, connectionsLayer, modal, groupModal;
+        var componentsLayer, groupsLayer, connectionsLayer, componentPanel, groupPanel;
 
         // State
         var componentsState = {components_json};
@@ -1064,27 +1101,46 @@ class LogicalArchitectureGenerator:
             componentsLayer = container.querySelector('.components-layer');
             groupsLayer = container.querySelector('.groups-layer');
             connectionsLayer = container.querySelector('.connections-layer');
-            modal = container.querySelector('#modal-' + containerId);
-            groupModal = container.querySelector('#group-modal-' + containerId);
+            componentPanel = container.querySelector('#component-panel-' + containerId);
+            groupPanel = container.querySelector('#group-panel-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[LogArch v1.2] Required elements not found');
+                console.error('[LogArch v1.3.4] Required elements not found');
                 return;
             }}
 
             initDragDrop();
             initGroupResize();
             initGroupDrag();
+            initClickOutsideClose();
             listenForParentMessages();
 
             // v1.2.0: Delay initial connection rendering to ensure DOM is laid out
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.2] Initial connections rendered');
+                console.log('[LogArch v1.3.4] Initial connections rendered');
             }}, 100);
 
-            console.log('[LogArch v1.2] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[LogArch v1.3.4] Initialized:', containerId, 'with', componentsState.length, 'components');
+        }}
+
+        // v1.3.4: Click outside panel to close
+        function initClickOutsideClose() {{
+            document.addEventListener('click', function(e) {{
+                // Check if component panel is open and click is outside
+                if (componentPanel && componentPanel.classList.contains('open')) {{
+                    if (!componentPanel.contains(e.target) && !e.target.closest('.add-component-btn') && !e.target.closest('.logical-component')) {{
+                        closeModal();
+                    }}
+                }}
+                // Check if group panel is open and click is outside
+                if (groupPanel && groupPanel.classList.contains('open')) {{
+                    if (!groupPanel.contains(e.target) && !e.target.closest('.add-group-btn') && !e.target.closest('.logical-group')) {{
+                        closeGroupModal();
+                    }}
+                }}
+            }});
         }}
 
         // ============================================
@@ -1256,10 +1312,10 @@ class LogicalArchitectureGenerator:
                 draggedGroup.style.zIndex = '';
                 renderConnections();
                 notifyStateChange('group-move');
-                console.log('[LogArch v1.2.1] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
+                console.log('[LogArch v1.3.4] Group dragged to:', group ? group.x_position + '%, ' + group.y_position + '%' : 'unknown');
             }} else {{
                 // This was a click (no significant movement) - open edit modal
-                console.log('[LogArch v1.2.1] Group clicked, opening modal for:', headerGroupId);
+                console.log('[LogArch v1.3.4] Group clicked, opening modal for:', headerGroupId);
                 openEditGroupModal(headerGroupId);
             }}
 
@@ -1273,12 +1329,12 @@ class LogicalArchitectureGenerator:
 
         function openAddGroupModal() {{
             currentEditingGroup = null;
-            container.querySelector('#group-modal-title-' + containerId).textContent = 'Add Group';
+            container.querySelector('#group-panel-title-' + containerId).textContent = 'Add Group';
             container.querySelector('#group-delete-' + containerId).style.display = 'none';
             container.querySelector('#group-name-' + containerId).value = '';
             container.querySelector('#group-type-' + containerId).value = 'boundary';
             container.querySelector('#group-desc-' + containerId).value = '';
-            groupModal.classList.add('open');
+            groupPanel.classList.add('open');
         }}
 
         function openEditGroupModal(groupId) {{
@@ -1286,16 +1342,16 @@ class LogicalArchitectureGenerator:
             if (!grp) return;
 
             currentEditingGroup = grp;
-            container.querySelector('#group-modal-title-' + containerId).textContent = 'Edit Group';
+            container.querySelector('#group-panel-title-' + containerId).textContent = 'Edit Group';
             container.querySelector('#group-delete-' + containerId).style.display = 'block';
             container.querySelector('#group-name-' + containerId).value = grp.name;
             container.querySelector('#group-type-' + containerId).value = grp.type;
             container.querySelector('#group-desc-' + containerId).value = grp.description || '';
-            groupModal.classList.add('open');
+            groupPanel.classList.add('open');
         }}
 
         function closeGroupModal() {{
-            groupModal.classList.remove('open');
+            groupPanel.classList.remove('open');
             currentEditingGroup = null;
         }}
 
@@ -1649,10 +1705,10 @@ class LogicalArchitectureGenerator:
 
         function openAddModal() {{
             currentEditingComponent = null;
-            container.querySelector('#modal-title-' + containerId).textContent = 'Add Component';
-            container.querySelector('#modal-delete-' + containerId).style.display = 'none';
+            container.querySelector('#panel-title-' + containerId).textContent = 'Add Component';
+            container.querySelector('#panel-delete-' + containerId).style.display = 'none';
             clearModalFields();
-            modal.classList.add('open');
+            componentPanel.classList.add('open');
         }}
 
         function openEditModal(compId) {{
@@ -1660,33 +1716,33 @@ class LogicalArchitectureGenerator:
             if (!comp) return;
 
             currentEditingComponent = comp;
-            container.querySelector('#modal-title-' + containerId).textContent = 'Edit Component';
-            container.querySelector('#modal-delete-' + containerId).style.display = 'block';
+            container.querySelector('#panel-title-' + containerId).textContent = 'Edit Component';
+            container.querySelector('#panel-delete-' + containerId).style.display = 'block';
             populateModalFields(comp);
-            modal.classList.add('open');
+            componentPanel.classList.add('open');
         }}
 
         function closeModal() {{
-            modal.classList.remove('open');
+            componentPanel.classList.remove('open');
             currentEditingComponent = null;
         }}
 
         function clearModalFields() {{
-            container.querySelector('#modal-name-' + containerId).value = '';
-            container.querySelector('#modal-type-' + containerId).value = 'service';
-            container.querySelector('#modal-stereotype-' + containerId).value = '';
-            container.querySelector('#modal-desc-' + containerId).value = '';
+            container.querySelector('#panel-name-' + containerId).value = '';
+            container.querySelector('#panel-type-' + containerId).value = 'service';
+            container.querySelector('#panel-stereotype-' + containerId).value = '';
+            container.querySelector('#panel-desc-' + containerId).value = '';
         }}
 
         function populateModalFields(comp) {{
-            container.querySelector('#modal-name-' + containerId).value = comp.name;
-            container.querySelector('#modal-type-' + containerId).value = comp.type;
-            container.querySelector('#modal-stereotype-' + containerId).value = comp.stereotype || '';
-            container.querySelector('#modal-desc-' + containerId).value = comp.description || '';
+            container.querySelector('#panel-name-' + containerId).value = comp.name;
+            container.querySelector('#panel-type-' + containerId).value = comp.type;
+            container.querySelector('#panel-stereotype-' + containerId).value = comp.stereotype || '';
+            container.querySelector('#panel-desc-' + containerId).value = comp.description || '';
         }}
 
         function saveComponent() {{
-            var name = container.querySelector('#modal-name-' + containerId).value.trim();
+            var name = container.querySelector('#panel-name-' + containerId).value.trim();
             if (!name) {{
                 alert('Please enter a component name');
                 return;
@@ -1694,9 +1750,9 @@ class LogicalArchitectureGenerator:
 
             var compData = {{
                 name: name,
-                type: container.querySelector('#modal-type-' + containerId).value,
-                stereotype: container.querySelector('#modal-stereotype-' + containerId).value.trim(),
-                description: container.querySelector('#modal-desc-' + containerId).value.trim()
+                type: container.querySelector('#panel-type-' + containerId).value,
+                stereotype: container.querySelector('#panel-stereotype-' + containerId).value.trim(),
+                description: container.querySelector('#panel-desc-' + containerId).value.trim()
             }};
 
             if (currentEditingComponent) {{
@@ -1830,7 +1886,7 @@ class LogicalArchitectureGenerator:
                     logArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[LogArch v1.1] State change notified:', action);
+                console.log('[LogArch v1.3.4] State change notified:', action);
             }} catch (e) {{
                 console.warn('[LogArch] Failed to notify parent:', e);
             }}
@@ -1846,7 +1902,7 @@ class LogicalArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[LogArch v1.1] Received init from parent');
+                console.log('[LogArch v1.3.4] Received init from parent');
             }});
         }}
 
@@ -1882,10 +1938,10 @@ class LogicalArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[LogArch v1.2] Connections rendered after state restoration');
+                console.log('[LogArch v1.3.4] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[LogArch v1.2] Restored state');
+            console.log('[LogArch v1.3.4] Restored state');
         }}
 
         // ============================================
@@ -1909,7 +1965,7 @@ class LogicalArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[LogArch v1.1] Registered namespace:', containerId);
+        console.log('[LogArch v1.3.4] Registered namespace:', containerId);
 
     }})();
     </script>

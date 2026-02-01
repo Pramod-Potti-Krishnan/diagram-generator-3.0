@@ -1,5 +1,5 @@
 """
-CLOUD_ARCHITECTURE HTML Generation Service v1.3.0
+CLOUD_ARCHITECTURE HTML Generation Service v1.3.1
 
 Generates self-contained HTML for cloud architecture diagrams.
 
@@ -17,6 +17,13 @@ Includes embedded CSS and JavaScript for:
 - Connection drawing between components
 - postMessage persistence protocol
 - Light/dark theme support with live switching
+
+v1.3.1 UI Enhancements:
+- CHANGE: Container background now transparent (no grey box)
+- CHANGE: Centered modal replaced with slide-in panel from right
+- ADD: Panel slides in with 300ms ease animation
+- ADD: Click-outside-to-close behavior on detail panels
+- STYLE: Modern panel styling matching IDEA_BOARD pattern
 
 v1.3.0 Architecture Separation:
 - MOVED: LLM generation logic to cloud_architecture_planner.py
@@ -535,7 +542,7 @@ class CloudArchitectureGenerator:
     min-width: {pixel_width}px;
     min-height: {pixel_height}px;
     position: relative;
-    background: var(--arch-container-bg);
+    background: transparent;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     overflow: hidden;
     padding: {request.external_margin}px;
@@ -722,62 +729,96 @@ class CloudArchitectureGenerator:
     background: var(--arch-text-primary);
 }}
 
-/* Modal Overlay */
-.modal-overlay {{
-    display: none;
-    position: fixed;
+/* v1.3.1: Slide-in Panel (replaces centered modal) */
+.detail-panel {{
+    position: absolute;
+    right: 0;
     top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-}}
-
-.modal-overlay.open {{
-    display: flex;
-}}
-
-.modal-dialog {{
+    height: 100%;
+    width: 350px;
     background: var(--arch-modal-bg);
-    border: 1px solid var(--arch-modal-border);
-    border-radius: 12px;
-    padding: 24px;
-    width: 400px;
-    max-width: 90vw;
-    max-height: 90vh;
+    border-left: 1px solid var(--arch-modal-border);
+    box-shadow: -4px 0 12px rgba(0,0,0,0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 100;
     overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    padding: 20px;
 }}
 
-.modal-header {{
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.detail-panel.open {{
+    transform: translateX(0);
+}}
+
+.panel-close {{
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--arch-text-secondary);
+    cursor: pointer;
+    line-height: 1;
+    padding: 0;
+}}
+
+.panel-close:hover {{
+    color: var(--arch-text-primary);
+}}
+
+.panel-header {{
     margin-bottom: 20px;
+    padding-right: 30px;
 }}
 
-.modal-header h3 {{
+.panel-title {{
     font-size: 18px;
     font-weight: 700;
     color: var(--arch-text-primary);
     margin: 0;
 }}
 
-.modal-close {{
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--arch-text-secondary);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
+.panel-section {{
+    margin-bottom: 16px;
 }}
 
-.modal-close:hover {{
+.panel-label {{
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--arch-text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}}
+
+.panel-input {{
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--arch-input-border);
+    border-radius: 6px;
+    font-size: 14px;
+    background: var(--arch-input-bg);
     color: var(--arch-text-primary);
+}}
+
+.panel-input:focus {{
+    outline: none;
+    border-color: var(--arch-button-primary);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}}
+
+.panel-input.textarea {{
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+}}
+
+.panel-actions {{
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
 }}
 
 .form-group {{
@@ -921,101 +962,97 @@ class CloudArchitectureGenerator:
         <button class="add-component-btn" onclick="cloudArchs['{element_id}'].openAddModal()">+ Component</button>
     </div>
 
-    <!-- Component Modal -->
-    <div class="modal-overlay" id="modal-{element_id}">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3 id="modal-title-{element_id}">Add Component</h3>
-                <button class="modal-close" onclick="cloudArchs['{element_id}'].closeModal()">&times;</button>
-            </div>
-            <div class="form-group">
-                <label for="modal-name-{element_id}">Component Name</label>
-                <input type="text" id="modal-name-{element_id}" maxlength="40" placeholder="Enter component name...">
-            </div>
-            <div class="form-group">
-                <label for="modal-type-{element_id}">Component Type</label>
-                <select id="modal-type-{element_id}">
-                    <option value="service">Service</option>
-                    <option value="compute">Compute</option>
-                    <option value="lambda">Lambda/Function</option>
-                    <option value="container">Container</option>
-                    <option value="database">Database</option>
-                    <option value="cache">Cache</option>
-                    <option value="storage">Storage</option>
-                    <option value="queue">Queue</option>
-                    <option value="api_gateway">API Gateway</option>
-                    <option value="load_balancer">Load Balancer</option>
-                    <option value="cdn">CDN</option>
-                    <option value="auth">Auth/IAM</option>
-                    <option value="analytics">Analytics</option>
-                    <option value="external">External</option>
-                    <option value="user">User/Client</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="modal-layer-{element_id}">Layer</label>
-                <select id="modal-layer-{element_id}">
-                    <option value="">No Layer</option>
-                    <option value="presentation">Presentation</option>
-                    <option value="application">Application</option>
-                    <option value="data">Data</option>
-                    <option value="infrastructure">Infrastructure</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="modal-desc-{element_id}">Description (optional)</label>
-                <textarea id="modal-desc-{element_id}" rows="2" placeholder="Brief description..."></textarea>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-danger" id="modal-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteComponent()" style="display:none;">Delete</button>
-                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveComponent()">Save</button>
-            </div>
+    <!-- v1.3.1: Component Panel (slide-in from right) -->
+    <div class="detail-panel" id="component-panel-{element_id}">
+        <button class="panel-close" onclick="cloudArchs['{element_id}'].closeModal()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="panel-title-{element_id}">Add Component</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-name-{element_id}">Component Name</label>
+            <input type="text" id="panel-name-{element_id}" class="panel-input" maxlength="40" placeholder="Enter component name...">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-type-{element_id}">Component Type</label>
+            <select id="panel-type-{element_id}" class="panel-input">
+                <option value="service">Service</option>
+                <option value="compute">Compute</option>
+                <option value="lambda">Lambda/Function</option>
+                <option value="container">Container</option>
+                <option value="database">Database</option>
+                <option value="cache">Cache</option>
+                <option value="storage">Storage</option>
+                <option value="queue">Queue</option>
+                <option value="api_gateway">API Gateway</option>
+                <option value="load_balancer">Load Balancer</option>
+                <option value="cdn">CDN</option>
+                <option value="auth">Auth/IAM</option>
+                <option value="analytics">Analytics</option>
+                <option value="external">External</option>
+                <option value="user">User/Client</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-layer-{element_id}">Layer</label>
+            <select id="panel-layer-{element_id}" class="panel-input">
+                <option value="">No Layer</option>
+                <option value="presentation">Presentation</option>
+                <option value="application">Application</option>
+                <option value="data">Data</option>
+                <option value="infrastructure">Infrastructure</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="panel-desc-{element_id}">Description (optional)</label>
+            <textarea id="panel-desc-{element_id}" class="panel-input textarea" rows="2" placeholder="Brief description..."></textarea>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" id="panel-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteComponent()" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveComponent()">Save</button>
         </div>
     </div>
 
-    <!-- Layer Modal -->
-    <div class="modal-overlay" id="layer-modal-{element_id}">
-        <div class="modal-dialog">
-            <div class="modal-header">
-                <h3 id="layer-modal-title-{element_id}">Add Layer</h3>
-                <button class="modal-close" onclick="cloudArchs['{element_id}'].closeLayerModal()">&times;</button>
+    <!-- v1.3.1: Layer Panel (slide-in from right) -->
+    <div class="detail-panel" id="layer-panel-{element_id}">
+        <button class="panel-close" onclick="cloudArchs['{element_id}'].closeLayerModal()">&times;</button>
+        <div class="panel-header">
+            <h4 class="panel-title" id="layer-panel-title-{element_id}">Add Layer</h4>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="layer-name-{element_id}">Layer Name</label>
+            <input type="text" id="layer-name-{element_id}" class="panel-input" maxlength="30" placeholder="e.g., Security, Network...">
+        </div>
+        <div class="panel-section">
+            <label class="panel-label" for="layer-position-{element_id}">Position</label>
+            <select id="layer-position-{element_id}" class="panel-input">
+                <option value="top">Add at Top</option>
+                <option value="bottom">Add at Bottom</option>
+            </select>
+        </div>
+        <div class="panel-section">
+            <label class="panel-label">Layer Color</label>
+            <div class="color-presets" id="layer-color-presets-{element_id}">
+                <button type="button" class="color-btn" data-color="#DBEAFE" style="background:#DBEAFE;" title="Blue"></button>
+                <button type="button" class="color-btn" data-color="#DCFCE7" style="background:#DCFCE7;" title="Green"></button>
+                <button type="button" class="color-btn" data-color="#FED7AA" style="background:#FED7AA;" title="Orange"></button>
+                <button type="button" class="color-btn" data-color="#E9D5FF" style="background:#E9D5FF;" title="Purple"></button>
+                <button type="button" class="color-btn" data-color="#E5E7EB" style="background:#E5E7EB;" title="Gray"></button>
+                <button type="button" class="color-btn" data-color="#CFFAFE" style="background:#CFFAFE;" title="Cyan"></button>
             </div>
-            <div class="form-group">
-                <label for="layer-name-{element_id}">Layer Name</label>
-                <input type="text" id="layer-name-{element_id}" maxlength="30" placeholder="e.g., Security, Network...">
+            <input type="hidden" id="layer-color-{element_id}" value="#DBEAFE">
+        </div>
+        <div class="panel-section" id="layer-reorder-{element_id}" style="display:none;">
+            <label class="panel-label">Reorder Layer</label>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerUp()" style="flex:1;">&#8593; Move Up</button>
+                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerDown()" style="flex:1;">&#8595; Move Down</button>
             </div>
-            <div class="form-group">
-                <label for="layer-position-{element_id}">Position</label>
-                <select id="layer-position-{element_id}">
-                    <option value="top">Add at Top</option>
-                    <option value="bottom">Add at Bottom</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Layer Color</label>
-                <div class="color-presets" id="layer-color-presets-{element_id}">
-                    <button type="button" class="color-btn" data-color="#DBEAFE" style="background:#DBEAFE;" title="Blue"></button>
-                    <button type="button" class="color-btn" data-color="#DCFCE7" style="background:#DCFCE7;" title="Green"></button>
-                    <button type="button" class="color-btn" data-color="#FED7AA" style="background:#FED7AA;" title="Orange"></button>
-                    <button type="button" class="color-btn" data-color="#E9D5FF" style="background:#E9D5FF;" title="Purple"></button>
-                    <button type="button" class="color-btn" data-color="#E5E7EB" style="background:#E5E7EB;" title="Gray"></button>
-                    <button type="button" class="color-btn" data-color="#CFFAFE" style="background:#CFFAFE;" title="Cyan"></button>
-                </div>
-                <input type="hidden" id="layer-color-{element_id}" value="#DBEAFE">
-            </div>
-            <div class="form-group" id="layer-reorder-{element_id}" style="display:none;">
-                <label>Reorder Layer</label>
-                <div style="display:flex;gap:8px;">
-                    <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerUp()" style="flex:1;">&#8593; Move Up</button>
-                    <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].moveLayerDown()" style="flex:1;">&#8595; Move Down</button>
-                </div>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-danger" id="layer-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteLayer()" style="display:none;">Delete</button>
-                <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeLayerModal()">Cancel</button>
-                <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveLayer()">Save</button>
-            </div>
+        </div>
+        <div class="panel-actions">
+            <button class="btn btn-danger" id="layer-delete-{element_id}" onclick="cloudArchs['{element_id}'].deleteLayer()" style="display:none;">Delete</button>
+            <button class="btn btn-secondary" onclick="cloudArchs['{element_id}'].closeLayerModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="cloudArchs['{element_id}'].saveLayer()">Save</button>
         </div>
     </div>
 
@@ -1036,7 +1073,7 @@ class CloudArchitectureGenerator:
         var currentEditingLayer = null;
 
         // DOM elements
-        var componentsLayer, connectionsLayer, modal, layerModal, layersBackground;
+        var componentsLayer, connectionsLayer, componentPanel, layerPanel, layersBackground;
 
         // State
         var componentsState = {components_json};
@@ -1057,27 +1094,46 @@ class CloudArchitectureGenerator:
             componentsLayer = container.querySelector('.components-layer');
             connectionsLayer = container.querySelector('.connections-layer');
             layersBackground = container.querySelector('.layers-background');
-            modal = container.querySelector('#modal-' + containerId);
-            layerModal = container.querySelector('#layer-modal-' + containerId);
+            componentPanel = container.querySelector('#component-panel-' + containerId);
+            layerPanel = container.querySelector('#layer-panel-' + containerId);
 
             if (!componentsLayer || !connectionsLayer) {{
-                console.error('[CloudArch v1.2] Required elements not found');
+                console.error('[CloudArch v1.3.1] Required elements not found');
                 return;
             }}
 
             initDragDrop();
             initLayerClicks();
             initColorPresets();
+            initClickOutsideClose();
             listenForParentMessages();
 
             // v1.2.0: Delay initial connection rendering to ensure DOM is laid out
             // Components need getBoundingClientRect() to have valid values
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.2] Initial connections rendered');
+                console.log('[CloudArch v1.3.1] Initial connections rendered');
             }}, 100);
 
-            console.log('[CloudArch v1.2] Initialized:', containerId, 'with', componentsState.length, 'components');
+            console.log('[CloudArch v1.3.1] Initialized:', containerId, 'with', componentsState.length, 'components');
+        }}
+
+        // v1.3.1: Click outside panel to close
+        function initClickOutsideClose() {{
+            document.addEventListener('click', function(e) {{
+                // Check if component panel is open and click is outside
+                if (componentPanel && componentPanel.classList.contains('open')) {{
+                    if (!componentPanel.contains(e.target) && !e.target.closest('.add-component-btn') && !e.target.closest('.cloud-component')) {{
+                        closeModal();
+                    }}
+                }}
+                // Check if layer panel is open and click is outside
+                if (layerPanel && layerPanel.classList.contains('open')) {{
+                    if (!layerPanel.contains(e.target) && !e.target.closest('.add-layer-btn') && !e.target.closest('.layer-band')) {{
+                        closeLayerModal();
+                    }}
+                }}
+            }});
         }}
 
         // ============================================
@@ -1128,13 +1184,13 @@ class CloudArchitectureGenerator:
         function openLayerModal() {{
             currentEditingLayer = null;
             currentEditingLayerIndex = -1;
-            container.querySelector('#layer-modal-title-' + containerId).textContent = 'Add Layer';
+            container.querySelector('#layer-panel-title-' + containerId).textContent = 'Add Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'none';
             container.querySelector('#layer-reorder-' + containerId).style.display = 'none';
             container.querySelector('#layer-name-' + containerId).value = '';
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
             selectColorPreset('#DBEAFE'); // v1.2.1: Default to blue preset
-            layerModal.classList.add('open');
+            layerPanel.classList.add('open');
         }}
 
         function openEditLayerModal(layerId) {{
@@ -1151,13 +1207,13 @@ class CloudArchitectureGenerator:
             }}
 
             currentEditingLayer = layer;
-            container.querySelector('#layer-modal-title-' + containerId).textContent = 'Edit Layer';
+            container.querySelector('#layer-panel-title-' + containerId).textContent = 'Edit Layer';
             container.querySelector('#layer-delete-' + containerId).style.display = 'block';
             container.querySelector('#layer-reorder-' + containerId).style.display = 'block';
             container.querySelector('#layer-name-' + containerId).value = layer.name.replace(/_/g, ' ');
             container.querySelector('#layer-position-' + containerId).value = 'bottom';
             selectColorPreset(layer.color || '#DBEAFE'); // v1.2.1: Select current or default color preset
-            layerModal.classList.add('open');
+            layerPanel.classList.add('open');
         }}
 
         // v1.2.0: Move layer up in the stack (visually upward = earlier in array)
@@ -1177,7 +1233,7 @@ class CloudArchitectureGenerator:
             currentEditingLayerIndex--;
             renderLayers();
             notifyStateChange('reorder_layer');
-            console.log('[CloudArch v1.2] Layer moved up');
+            console.log('[CloudArch v1.3.1] Layer moved up');
         }}
 
         // v1.2.0: Move layer down in the stack (visually downward = later in array)
@@ -1197,11 +1253,11 @@ class CloudArchitectureGenerator:
             currentEditingLayerIndex++;
             renderLayers();
             notifyStateChange('reorder_layer');
-            console.log('[CloudArch v1.2] Layer moved down');
+            console.log('[CloudArch v1.3.1] Layer moved down');
         }}
 
         function closeLayerModal() {{
-            layerModal.classList.remove('open');
+            layerPanel.classList.remove('open');
             currentEditingLayer = null;
         }}
 
@@ -1507,10 +1563,10 @@ class CloudArchitectureGenerator:
 
         function openAddModal() {{
             currentEditingComponent = null;
-            container.querySelector('#modal-title-' + containerId).textContent = 'Add Component';
-            container.querySelector('#modal-delete-' + containerId).style.display = 'none';
+            container.querySelector('#panel-title-' + containerId).textContent = 'Add Component';
+            container.querySelector('#panel-delete-' + containerId).style.display = 'none';
             clearModalFields();
-            modal.classList.add('open');
+            componentPanel.classList.add('open');
         }}
 
         function openEditModal(compId) {{
@@ -1518,33 +1574,33 @@ class CloudArchitectureGenerator:
             if (!comp) return;
 
             currentEditingComponent = comp;
-            container.querySelector('#modal-title-' + containerId).textContent = 'Edit Component';
-            container.querySelector('#modal-delete-' + containerId).style.display = 'block';
+            container.querySelector('#panel-title-' + containerId).textContent = 'Edit Component';
+            container.querySelector('#panel-delete-' + containerId).style.display = 'block';
             populateModalFields(comp);
-            modal.classList.add('open');
+            componentPanel.classList.add('open');
         }}
 
         function closeModal() {{
-            modal.classList.remove('open');
+            componentPanel.classList.remove('open');
             currentEditingComponent = null;
         }}
 
         function clearModalFields() {{
-            container.querySelector('#modal-name-' + containerId).value = '';
-            container.querySelector('#modal-type-' + containerId).value = 'service';
-            container.querySelector('#modal-layer-' + containerId).value = '';
-            container.querySelector('#modal-desc-' + containerId).value = '';
+            container.querySelector('#panel-name-' + containerId).value = '';
+            container.querySelector('#panel-type-' + containerId).value = 'service';
+            container.querySelector('#panel-layer-' + containerId).value = '';
+            container.querySelector('#panel-desc-' + containerId).value = '';
         }}
 
         function populateModalFields(comp) {{
-            container.querySelector('#modal-name-' + containerId).value = comp.name;
-            container.querySelector('#modal-type-' + containerId).value = comp.type;
-            container.querySelector('#modal-layer-' + containerId).value = comp.layer || '';
-            container.querySelector('#modal-desc-' + containerId).value = comp.description || '';
+            container.querySelector('#panel-name-' + containerId).value = comp.name;
+            container.querySelector('#panel-type-' + containerId).value = comp.type;
+            container.querySelector('#panel-layer-' + containerId).value = comp.layer || '';
+            container.querySelector('#panel-desc-' + containerId).value = comp.description || '';
         }}
 
         function saveComponent() {{
-            var name = container.querySelector('#modal-name-' + containerId).value.trim();
+            var name = container.querySelector('#panel-name-' + containerId).value.trim();
             if (!name) {{
                 alert('Please enter a component name');
                 return;
@@ -1552,9 +1608,9 @@ class CloudArchitectureGenerator:
 
             var compData = {{
                 name: name,
-                type: container.querySelector('#modal-type-' + containerId).value,
-                layer: container.querySelector('#modal-layer-' + containerId).value,
-                description: container.querySelector('#modal-desc-' + containerId).value.trim()
+                type: container.querySelector('#panel-type-' + containerId).value,
+                layer: container.querySelector('#panel-layer-' + containerId).value,
+                description: container.querySelector('#panel-desc-' + containerId).value.trim()
             }};
 
             if (currentEditingComponent) {{
@@ -1670,7 +1726,7 @@ class CloudArchitectureGenerator:
                     cloudArchData: extractState(),
                     timestamp: Date.now()
                 }}, '*');
-                console.log('[CloudArch v1.1] State change notified:', action);
+                console.log('[CloudArch v1.3.1] State change notified:', action);
             }} catch (e) {{
                 console.warn('[CloudArch] Failed to notify parent:', e);
             }}
@@ -1686,7 +1742,7 @@ class CloudArchitectureGenerator:
                     restoreState(e.data.saved_state);
                 }}
 
-                console.log('[CloudArch v1.1] Received init from parent');
+                console.log('[CloudArch v1.3.1] Received init from parent');
             }});
         }}
 
@@ -1715,10 +1771,10 @@ class CloudArchitectureGenerator:
             // Components need time to be positioned before calculating connection paths
             setTimeout(function() {{
                 renderConnections();
-                console.log('[CloudArch v1.2] Connections rendered after state restoration');
+                console.log('[CloudArch v1.3.1] Connections rendered after state restoration');
             }}, 50);
 
-            console.log('[CloudArch v1.2] Restored state');
+            console.log('[CloudArch v1.3.1] Restored state');
         }}
 
         // ============================================
@@ -1743,7 +1799,7 @@ class CloudArchitectureGenerator:
         // ============================================
 
         init();
-        console.log('[CloudArch v1.1] Registered namespace:', containerId);
+        console.log('[CloudArch v1.3.1] Registered namespace:', containerId);
 
     }})();
     </script>
