@@ -1172,6 +1172,13 @@ window.dataArchs = window.dataArchs || {{}};
         console.log('[DataArch] Rendering', relationships.length, 'relationships');
 
         relationships.forEach(rel => {{
+            // Skip self-referential relationships (e.g., categories.parent_id → categories.id)
+            // The FK field already indicates the self-reference
+            if (rel.from_entity === rel.to_entity) {{
+                console.log('[DataArch] Skipping self-referential relationship:', rel.id);
+                return;
+            }}
+
             const fromEntity = entities.find(e => e.id === rel.from_entity);
             const toEntity = entities.find(e => e.id === rel.to_entity);
 
