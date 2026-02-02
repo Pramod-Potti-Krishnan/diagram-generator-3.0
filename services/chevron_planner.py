@@ -173,7 +173,7 @@ Generate a JSON response with:
    - id: unique row ID (e.g., "row_1", "row_2")
    - label: row name (max 50 chars, e.g., "Data Management", "Process Automation")
    - chevrons: array of maturity stage content with:
-     - bullets: array of 1-3 bullet points (each max 100 chars) describing the capability at that stage
+     - bullets: array of 1-3 SHORT bullet points (EACH MAX 30 CHARS - be very concise!) describing the capability at that stage
      - left_pct: optional left position percentage (0-100), defaults to even distribution
      - width_pct: optional width percentage (5-100), defaults to even distribution
 

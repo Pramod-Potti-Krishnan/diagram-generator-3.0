@@ -196,7 +196,7 @@ class ChevronContent(BaseModel):
     bullets: List[str] = Field(
         default_factory=list,
         max_length=3,
-        description="List of bullet points (max 3, each max 100 chars)"
+        description="List of bullet points (max 3, each max 30 chars)"
     )
     left_pct: Optional[float] = Field(
         default=None,

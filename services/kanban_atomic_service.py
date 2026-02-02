@@ -43,6 +43,8 @@ v1.7.0: Synced left border color with status indicator circle. Both now reflect 
         (green=on track, amber=at risk, red=blocked, gray=no status). Priority no longer affects left bar.
 v1.8.0: Modal UI redesign - solid dark background (#1F2937), uppercase headings matching column headers,
         cleaner input/dropdown styling, and delete card button visible only in edit mode.
+v1.8.1: Light mode color fix - saturated column colors from LLM/explicit data are now converted to
+        pastels in light mode using SATURATED_TO_PASTEL mapping.
 """
 
 import logging
@@ -139,6 +141,19 @@ STATUS_COLORS = {
     "amber": "#F59E0B",   # Amber - at risk
     "red": "#EF4444",     # Red - blocked/critical
     "": "transparent"     # No status
+}
+
+# v1.8.1: Saturated to pastel color mapping for light mode
+# When LLM or explicit columns provide saturated colors, convert to pastels in light mode
+SATURATED_TO_PASTEL = {
+    "#EF4444": "rgba(254, 226, 226, 0.8)",  # red → red pastel
+    "#F59E0B": "rgba(254, 243, 199, 0.8)",  # amber → amber pastel
+    "#3B82F6": "rgba(219, 234, 254, 0.8)",  # blue → blue pastel
+    "#10B981": "rgba(209, 250, 229, 0.8)",  # green → green pastel
+    "#8B5CF6": "rgba(237, 233, 254, 0.8)",  # purple → purple pastel
+    "#EC4899": "rgba(252, 231, 243, 0.8)",  # pink → pink pastel
+    "#6B7280": "rgba(243, 244, 246, 0.8)",  # gray → gray pastel
+    "#06B6D4": "rgba(207, 250, 254, 0.8)",  # cyan → cyan pastel
 }
 
 
@@ -365,6 +380,7 @@ class KanbanAtomicGenerator:
                 columns=columns,
                 theme=request.theme,
                 theme_colors=theme_colors,
+                theme_mode=theme_mode,
                 grid_width=request.gridWidth,
                 grid_height=request.gridHeight,
                 external_margin=request.external_margin
@@ -395,7 +411,7 @@ class KanbanAtomicGenerator:
                         "width": (request.gridWidth * 60) - (2 * request.external_margin),
                         "height": (request.gridHeight * 60) - (2 * request.external_margin)
                     },
-                    version="1.8.0"
+                    version="1.8.1"
                 ),
                 grid_position=position_data
             )
@@ -417,6 +433,7 @@ class KanbanAtomicGenerator:
         columns: List[KanbanColumn],
         theme: str,
         theme_colors: Dict[str, Any],
+        theme_mode: str,
         grid_width: int,
         grid_height: int,
         external_margin: int
@@ -430,6 +447,7 @@ class KanbanAtomicGenerator:
             columns: List of KanbanColumn objects
             theme: Theme name
             theme_colors: Theme color dictionary
+            theme_mode: Theme mode (light or dark)
             grid_width: Width in grid units
             grid_height: Height in grid units
             external_margin: External margin in pixels
@@ -442,7 +460,7 @@ class KanbanAtomicGenerator:
         element_height = (grid_height * 60) - (2 * external_margin)
 
         # Build columns HTML (headers inside columns, no outer wrapper)
-        columns_html = self._build_columns_html(columns, theme_colors, element_height)
+        columns_html = self._build_columns_html(columns, theme_colors, element_height, theme_mode)
 
         # Build interactive JavaScript
         interactive_js = self._generate_interactive_scripts(theme_colors)
@@ -493,7 +511,8 @@ class KanbanAtomicGenerator:
         self,
         columns: List[KanbanColumn],
         theme_colors: Dict[str, Any],
-        container_height: int
+        container_height: int,
+        theme_mode: str = "light"
     ) -> str:
         """Build HTML for all columns with headers inside the column area."""
         html_parts = []
@@ -501,7 +520,15 @@ class KanbanAtomicGenerator:
 
         for i, column in enumerate(columns):
             # Get column background color
-            col_bg = column.color if column.color else column_colors[i % len(column_colors)]
+            # v1.8.1: In light mode, convert saturated colors to pastels
+            if column.color:
+                if theme_mode == "light":
+                    # Convert saturated to pastel for light mode
+                    col_bg = SATURATED_TO_PASTEL.get(column.color.upper(), column.color)
+                else:
+                    col_bg = column.color
+            else:
+                col_bg = column_colors[i % len(column_colors)]
 
             # Build cards HTML
             cards_html = self._build_cards_html(column.items, theme_colors)
