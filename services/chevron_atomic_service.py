@@ -14,6 +14,11 @@ Service layer for generating interactive chevron maturity progression HTML with:
 - 3 color themes: default (blue), emerald (green), purple
 - State persistence via postMessage + auto-save
 
+v1.2.2: Row label wrapping + transparent chevron gaps
+- Row labels: 2-line word wrap with -webkit-line-clamp (max ~20 chars/line)
+- Removed chevron overlap: gaps now show transparent row background
+- Font size reduced to 14px for row labels to fit more text
+
 v1.2.1: Bug fixes for v1.2.0
 - Now line always visible with 25% default position (Fix #1)
 - Generic "Add Row" button text (Fix #2)
@@ -68,6 +73,7 @@ class ChevronAtomicGenerator:
     Generates interactive chevron maturity progression HTML with inline styles
     for Layout Service compatibility.
 
+    v1.2.2: Row label 2-line wrap, transparent chevron gaps (no overlap)
     v1.2.1: Bug fixes - now line default, generic Add button, constant angle, simple font color
     v1.2.0: Font contrast, timeline header, now line, push-resize
     v1.1.0: Variable width chevrons, taller rows, delete functionality, bullets only
@@ -374,7 +380,7 @@ class ChevronAtomicGenerator:
                     "time_unit": request.time_unit,
                     "time_labels": time_labels,
                     "now_line_pct": request.now_line_pct if request.now_line_pct is not None else 25.0,
-                    "version": "1.2.1"
+                    "version": "1.2.2"
                 },
                 grid_position=position_data
             )
@@ -622,7 +628,7 @@ class ChevronAtomicGenerator:
             # v1.1.0: Use relative positioning container for absolute-positioned chevrons
             rows_html += f'''
     <div class="maturity-row" style="display:flex;height:{row_height}px;background:{row_bg};border-bottom:1px solid var(--chevron-grid-line);" data-row-id="{row.id}">
-      <div class="row-label" style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">{row.label}</div>
+      <div class="row-label" style="flex:0 0 {row_label_width}px;display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;word-wrap:break-word;" onclick="editRowLabel(this.parentElement)">{row.label}</div>
       <div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">
         {chevrons_html}
       </div>
@@ -650,10 +656,9 @@ class ChevronAtomicGenerator:
         chevrons_html = ""
 
         # Calculate default widths if not specified
-        # Allow 2% overlap between chevrons for visual effect
-        overlap_pct = 2
-        total_overlap = overlap_pct * (num_stages - 1) if num_stages > 1 else 0
-        default_width_pct = (100 + total_overlap) / num_stages
+        # v1.2.2: No overlap - gaps between chevrons show transparent row background
+        overlap_pct = 0
+        default_width_pct = 100 / num_stages
 
         for stage_idx, chevron in enumerate(chevrons):
             opacity = opacity_levels[stage_idx] if stage_idx < len(opacity_levels) else 0.65
@@ -834,18 +839,18 @@ class ChevronAtomicGenerator:
     if (!e.data || e.data.type !== 'chevron-init') return;
     presentationId = e.data.presentation_id || '';
     chevronId = e.data.element_id || '';
-    console.log('[Chevron v1.2.1] Received IDs - presentation:', presentationId, 'element:', chevronId);
+    console.log('[Chevron v1.2.2] Received IDs - presentation:', presentationId, 'element:', chevronId);
 
     // v1.2.1: Enhanced debug logging for persistence troubleshooting
     if (!chevronId) {{
-      console.warn('[Chevron v1.2.1] WARNING: No element_id received. State persistence will not work.');
+      console.warn('[Chevron v1.2.2] WARNING: No element_id received. State persistence will not work.');
     }}
 
     if (e.data.saved_state && e.data.saved_state.rows) {{
-      console.log('[Chevron v1.2.1] Restoring saved state with', e.data.saved_state.rows.length, 'rows');
+      console.log('[Chevron v1.2.2] Restoring saved state with', e.data.saved_state.rows.length, 'rows');
       restoreChevronState(e.data.saved_state);
     }} else {{
-      console.log('[Chevron v1.2.1] No saved state to restore');
+      console.log('[Chevron v1.2.2] No saved state to restore');
     }}
   }});
 
@@ -971,11 +976,11 @@ class ChevronAtomicGenerator:
   // Notify parent of state change
   function notifyStateChange(action) {{
     if (!chevronId) {{
-      console.error('[Chevron v1.2.1] Cannot save - no element ID. Was chevron-init received?');
+      console.error('[Chevron v1.2.2] Cannot save - no element ID. Was chevron-init received?');
       return;
     }}
     var state = extractChevronState();
-    console.log('[Chevron v1.2.1] Sending state:', action, 'rows:', state.rows.length, 'now_line_pct:', state.now_line_pct);
+    console.log('[Chevron v1.2.2] Sending state:', action, 'rows:', state.rows.length, 'now_line_pct:', state.now_line_pct);
     window.parent.postMessage({{
       type: 'updateChevronState',
       elementId: chevronId,
@@ -988,7 +993,7 @@ class ChevronAtomicGenerator:
   // v1.2.1: Restore state from saved data (fixed notch, simplified text color)
   function restoreChevronState(state) {{
     if (!state || !state.rows) return;
-    console.log('[Chevron v1.2.1] Restoring state with', state.rows.length, 'rows');
+    console.log('[Chevron v1.2.2] Restoring state with', state.rows.length, 'rows');
 
     var body = container.querySelector('.chevron-body');
     if (!body) return;
@@ -1035,7 +1040,7 @@ class ChevronAtomicGenerator:
       }});
 
       var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + row.id + '">' +
-        '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">' + row.label + '</div>' +
+        '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;word-wrap:break-word;" onclick="editRowLabel(this.parentElement)">' + row.label + '</div>' +
         '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
       body.insertAdjacentHTML('beforeend', rowHtml);
@@ -1060,7 +1065,7 @@ class ChevronAtomicGenerator:
       }}
     }}
 
-    console.log('[Chevron v1.2.1] State restored successfully');
+    console.log('[Chevron v1.2.2] State restored successfully');
   }}
 
   // v1.2.0: Start resize operation (with push-resize support for right edge)
@@ -1161,7 +1166,7 @@ class ChevronAtomicGenerator:
     var count = chevrons.length;
     if (count === 0) return;
 
-    var overlap = 2;
+    var overlap = 0;
     var totalOverlap = overlap * (count - 1);
     var defaultWidth = (100 + totalOverlap) / count;
 
@@ -1252,7 +1257,7 @@ class ChevronAtomicGenerator:
     var opacities = opacityLevels[numStages] || opacityLevels[5];
 
     // v1.1.0: Calculate default widths
-    var overlap = 2;
+    var overlap = 0;
     var totalOverlap = overlap * (numStages - 1);
     var defaultWidth = (100 + totalOverlap) / numStages;
 
@@ -1277,7 +1282,7 @@ class ChevronAtomicGenerator:
 
     // v1.2.1: Generic "New Row" label instead of singularTerm
     var rowHtml = '<div class="maturity-row" style="display:flex;height:100px;background:' + rowBg + ';border-bottom:1px solid var(--chevron-grid-line);" data-row-id="' + newId + '">' +
-      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 16px;font-size:18px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" onclick="editRowLabel(this.parentElement)">New Row</div>' +
+      '<div class="row-label" style="flex:0 0 180px;display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600;color:var(--text-primary);border-right:1px solid var(--chevron-grid-line);cursor:pointer;background:var(--chevron-row-label-bg);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3;word-wrap:break-word;" onclick="editRowLabel(this.parentElement)">New Row</div>' +
       '<div class="chevrons-container" style="flex:1;position:relative;padding:0 12px;overflow:visible;">' + chevronsHtml + '</div></div>';
 
     body.insertAdjacentHTML('beforeend', rowHtml);
