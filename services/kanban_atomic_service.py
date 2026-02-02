@@ -43,8 +43,8 @@ v1.7.0: Synced left border color with status indicator circle. Both now reflect 
         (green=on track, amber=at risk, red=blocked, gray=no status). Priority no longer affects left bar.
 v1.8.0: Modal UI redesign - solid dark background (#1F2937), uppercase headings matching column headers,
         cleaner input/dropdown styling, and delete card button visible only in edit mode.
-v1.8.1: Light mode color fix - saturated column colors from LLM/explicit data are now converted to
-        pastels in light mode using SATURATED_TO_PASTEL mapping.
+v1.8.1: Live theme column colors - columns now store both light (pastel) and dark (saturated) colors
+        as data attributes. Theme sync script updates column backgrounds on theme change.
 """
 
 import logging
@@ -221,6 +221,7 @@ class KanbanAtomicGenerator:
 
         v1.4.0: Listens for 'deckster-theme-sync' messages and updates CSS variables
         to enable live dark/light mode switching without iframe regeneration.
+        v1.8.1: Also updates column backgrounds based on data-color-light/dark attributes.
 
         Returns:
             str: Script block with postMessage listener
@@ -234,6 +235,14 @@ class KanbanAtomicGenerator:
         for(var k in v)if(v.hasOwnProperty(k))r.style.setProperty(k,v[k]);
         r.classList.toggle('theme-dark',m==='dark');
         r.classList.toggle('theme-light',m==='light');
+        // v1.8.1: Update column backgrounds based on theme mode
+        document.querySelectorAll('.kanban-column').forEach(function(col){
+            var lightColor=col.getAttribute('data-color-light');
+            var darkColor=col.getAttribute('data-color-dark');
+            if(lightColor&&darkColor){
+                col.style.background=m==='dark'?darkColor:lightColor;
+            }
+        });
     });
 })();
 </script>'''
@@ -516,19 +525,23 @@ class KanbanAtomicGenerator:
     ) -> str:
         """Build HTML for all columns with headers inside the column area."""
         html_parts = []
-        column_colors = theme_colors.get("column_colors", [])
+        # Get both light and dark color arrays for fallback
+        light_colors = KANBAN_COLORS_LIGHT.get("column_colors", [])
+        dark_colors = KANBAN_COLORS_DARK.get("column_colors", [])
 
         for i, column in enumerate(columns):
-            # Get column background color
-            # v1.8.1: In light mode, convert saturated colors to pastels
+            # v1.8.1: Calculate BOTH light and dark colors for live theme switching
             if column.color:
-                if theme_mode == "light":
-                    # Convert saturated to pastel for light mode
-                    col_bg = SATURATED_TO_PASTEL.get(column.color.upper(), column.color)
-                else:
-                    col_bg = column.color
+                # Explicit color provided - convert to pastel for light, keep original for dark
+                color_light = SATURATED_TO_PASTEL.get(column.color.upper(), column.color)
+                color_dark = column.color  # Keep saturated for dark mode
             else:
-                col_bg = column_colors[i % len(column_colors)]
+                # Use fallback colors from theme arrays
+                color_light = light_colors[i % len(light_colors)]
+                color_dark = dark_colors[i % len(dark_colors)]
+
+            # Set initial background based on current theme_mode
+            col_bg = color_dark if theme_mode == "dark" else color_light
 
             # Build cards HTML
             cards_html = self._build_cards_html(column.items, theme_colors)
@@ -606,7 +619,7 @@ class KanbanAtomicGenerator:
             )
 
             html_parts.append(f'''
-<div class="kanban-column" style="{column_style}" data-column="{i}">
+<div class="kanban-column" style="{column_style}" data-column="{i}" data-color-light="{color_light}" data-color-dark="{color_dark}">
   <div style="{header_style}">
     <span style="{name_style}">{column.name}</span>
     <span class="kanban-count" style="{count_style}">{card_count}</span>
