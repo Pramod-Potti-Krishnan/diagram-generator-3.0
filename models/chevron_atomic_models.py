@@ -318,6 +318,11 @@ class ChevronAtomicRequest(BaseModel):
         None,
         description="Explicit row data (bypasses placeholder mode)"
     )
+    prompt: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="LLM generation prompt (e.g., 'DevOps maturity assessment for enterprise team')"
+    )
 
     # Placeholder mode
     placeholder_mode: bool = Field(
@@ -382,13 +387,14 @@ class ChevronAtomicRequest(BaseModel):
     )
 
     @model_validator(mode='after')
-    def validate_rows_or_placeholder(self) -> 'ChevronAtomicRequest':
-        """Validate that rows or placeholder mode is provided."""
+    def validate_rows_or_placeholder_or_prompt(self) -> 'ChevronAtomicRequest':
+        """Validate that rows, prompt, or placeholder mode is provided."""
         has_rows = self.rows and len(self.rows) > 0
+        has_prompt = self.prompt and self.prompt.strip()
 
-        if not self.placeholder_mode and not has_rows:
+        if not self.placeholder_mode and not has_rows and not has_prompt:
             raise ValueError(
-                "Must provide one of: rows data or placeholder_mode=True"
+                "Must provide one of: rows data, prompt for generation, or placeholder_mode=True"
             )
         return self
 

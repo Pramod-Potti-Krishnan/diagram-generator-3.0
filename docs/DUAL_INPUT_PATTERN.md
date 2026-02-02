@@ -1,8 +1,8 @@
 # Dual-Input Pattern Documentation
 
-**Version:** 1.0.0
+**Version:** 1.1.0
 **Date:** February 2026
-**Applies To:** LOGICAL_ARCHITECTURE, CLOUD_ARCHITECTURE atomic endpoints
+**Applies To:** LOGICAL_ARCHITECTURE, CLOUD_ARCHITECTURE, DATA_ARCHITECTURE, KANBAN_BOARD, GANTT_CHART, CHEVRON_MATURITY atomic endpoints
 **Service:** Diagram Generator v3.0
 
 ---
@@ -28,6 +28,10 @@ The **Dual-Input Pattern** provides flexible API endpoints that accept both:
 |----------|------|---------------|
 | LOGICAL_ARCHITECTURE | `POST /v1.2/atomic/LOGICAL_ARCHITECTURE` | Logical/system architecture diagrams |
 | CLOUD_ARCHITECTURE | `POST /v1.2/atomic/CLOUD_ARCHITECTURE` | Cloud provider architecture diagrams |
+| DATA_ARCHITECTURE | `POST /v1.2/atomic/DATA_ARCHITECTURE` | Entity-Relationship (ER) diagrams |
+| KANBAN_BOARD | `POST /v1.2/atomic/KANBAN_BOARD` | Interactive Kanban boards |
+| GANTT_CHART | `POST /v1.2/atomic/GANTT_CHART` | Project timeline Gantt charts |
+| CHEVRON_MATURITY | `POST /v1.2/atomic/CHEVRON_MATURITY` | Maturity progression charts |
 
 ---
 
@@ -63,7 +67,15 @@ services/
 ├── logical_architecture_atomic_service.py   # Visualization layer (no LLM)
 ├── logical_architecture_planner.py          # Planning layer (LLM)
 ├── cloud_architecture_atomic_service.py     # Visualization layer (no LLM)
-└── cloud_architecture_planner.py            # Planning layer (LLM)
+├── cloud_architecture_planner.py            # Planning layer (LLM)
+├── data_architecture_atomic_service.py      # Visualization layer (no LLM)
+├── data_architecture_planner.py             # Planning layer (LLM)
+├── kanban_atomic_service.py                 # Visualization layer (no LLM)
+├── kanban_planner.py                        # Planning layer (LLM)
+├── gantt_atomic_service.py                  # Visualization layer (no LLM)
+├── gantt_planner.py                         # Planning layer (LLM)
+├── chevron_atomic_service.py                # Visualization layer (no LLM)
+└── chevron_planner.py                       # Planning layer (LLM)
 ```
 
 ### Why This Separation?
@@ -539,6 +551,7 @@ This uses keyword detection to select the e-commerce template.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| v1.1.0 | Feb 2026 | Added KANBAN_BOARD, GANTT_CHART, CHEVRON_MATURITY planners |
 | v1.3.0 | Jan 2026 | Architecture separation - planning moved to separate files |
 | v1.2.2 | Jan 2026 | Added connection inference when IDs empty |
 | v1.2.0 | Jan 2026 | Initial dual-input pattern implementation |

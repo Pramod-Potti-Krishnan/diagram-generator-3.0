@@ -50,6 +50,12 @@ v1.2.16: Increased position preset heights by 1 row
         - All presets now use gridHeight=14 (was 13) for more content space
         - top_half/bottom_half use gridHeight=7 (was 6)
         - Footer protection updated to allow end_row=18
+v1.2.17: Added state persistence via postMessage
+        - extractCodeDisplayState(): Returns current text_size, font_size, scroll_position
+        - notifyCodeDisplayChange(): Sends updateCodeDisplayState postMessage to parent
+        - restoreCodeDisplayState(): Restores state from saved data
+        - Listens for code-display-init message to receive element_id and saved_state
+        - Text size button clicks now trigger persistence notification
 """
 
 import re
@@ -615,6 +621,7 @@ btn.style.borderColor=origBorder;
 }})();</script>'''
 
         # v1.2.14: Build text size button script
+        # v1.2.17: Added state persistence via postMessage
         size_script = ""
         if show_header:
             size_script = f'''<script>(function(){{
@@ -626,9 +633,65 @@ var origBg='{theme["btn_bg"]}';
 var activeBg='{theme["btn_hover_bg"]}';
 var origColor='{theme["btn_text"]}';
 var activeColor='{theme["btn_hover_text"]}';
+var codeDisplayId=null;
+var currentSize='medium';
+
+// v1.2.17: Extract current state for persistence
+function extractCodeDisplayState(){{
+var activeBtn=container.querySelector('[data-size-btn].active,[data-size-btn][style*="'+activeBg+'"]');
+return {{
+text_size:currentSize,
+font_size:parseInt(window.getComputedStyle(codeEl).fontSize),
+scroll_position:codeEl.parentElement?codeEl.parentElement.scrollTop:0
+}};
+}}
+
+// v1.2.17: Notify parent of state changes
+function notifyCodeDisplayChange(action){{
+if(!codeDisplayId)return;
+window.parent.postMessage({{
+type:'updateCodeDisplayState',
+elementId:codeDisplayId,
+action:action,
+codeDisplayData:extractCodeDisplayState(),
+timestamp:Date.now()
+}},'*');
+}}
+
+// v1.2.17: Restore state from saved data
+function restoreCodeDisplayState(state){{
+if(!state)return;
+if(state.font_size){{
+codeEl.style.fontSize=state.font_size+'px';
+}}
+if(state.text_size){{
+currentSize=state.text_size;
+sizeBtns.forEach(function(b){{
+var isActive=(b.getAttribute('data-size-btn')===state.text_size);
+b.style.background=isActive?activeBg:origBg;
+b.style.color=isActive?activeColor:origColor;
+}});
+}}
+if(state.scroll_position&&codeEl.parentElement){{
+codeEl.parentElement.scrollTop=state.scroll_position;
+}}
+}}
+
+// v1.2.17: Listen for init message from parent
+window.addEventListener('message',function(e){{
+if(!e.data)return;
+if(e.data.type==='code-display-init'){{
+codeDisplayId=e.data.element_id;
+if(e.data.saved_state){{
+restoreCodeDisplayState(e.data.saved_state);
+}}
+}}
+}});
+
 sizeBtns.forEach(function(btn){{
 btn.addEventListener('click',function(){{
 var size=btn.getAttribute('data-size-btn');
+currentSize=size;
 codeEl.style.fontSize=sizes[size]+'px';
 sizeBtns.forEach(function(b){{
 b.style.background=origBg;
@@ -636,6 +699,8 @@ b.style.color=origColor;
 }});
 btn.style.background=activeBg;
 btn.style.color=activeColor;
+// v1.2.17: Notify parent of change for persistence
+notifyCodeDisplayChange('resize_text');
 }});
 }});
 }})();</script>'''

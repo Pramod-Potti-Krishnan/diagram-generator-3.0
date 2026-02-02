@@ -56,6 +56,7 @@ from models.chevron_atomic_models import (
     CHEVRON_OPACITY_LEVELS,
     calculate_row_height
 )
+from services.chevron_planner import ChevronPlanner, ChevronPlanRequest
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,8 @@ class ChevronAtomicGenerator:
     """
 
     def __init__(self):
-        """Initialize the Chevron Maturity generator."""
-        pass
+        """Initialize the Chevron Maturity generator with planner."""
+        self._planner = ChevronPlanner()
 
     def _get_time_labels(self, time_unit: str, num_stages: int) -> list:
         """
@@ -245,27 +246,65 @@ class ChevronAtomicGenerator:
         start_time = time.time()
 
         try:
-            # Determine rows source priority:
-            # 1. Direct rows provided
-            # 2. Placeholder mode
+            # =================================================================
+            # AUTO-ROUTING: Planning vs Visualization
+            # =================================================================
+            # Priority: 1. Direct rows → 2. Prompt (LLM) → 3. Placeholder mode
+
+            rows = None
+            num_stages = request.num_stages
+            stage_labels = request.stage_labels
+            time_unit = request.time_unit
+            row_terminology = request.row_terminology
+
+            # Path A: Direct rows provided → skip to visualization
             if request.rows and len(request.rows) > 0:
                 rows = request.rows
+                logger.info(f"[CHEVRON] Direct rows provided - {len(rows)} rows")
+
+            # Path B: Prompt provided → use planner (LLM)
+            elif request.prompt and request.prompt.strip():
+                logger.info(f"[CHEVRON] No rows provided - routing to planner")
+                plan_result = await self._planner.plan(
+                    ChevronPlanRequest(
+                        prompt=request.prompt,
+                        num_rows=None,  # Let planner decide
+                        num_stages=num_stages
+                    )
+                )
+                rows = plan_result.rows
+                # Use planner's recommendations if not explicitly set
+                if not stage_labels:
+                    stage_labels = plan_result.stage_labels
+                    num_stages = len(stage_labels)
+                time_unit = plan_result.time_unit
+                row_terminology = plan_result.row_terminology
+                logger.info(f"[CHEVRON] Planner generated {len(rows)} rows, {num_stages} stages")
+
+            # Path C: Placeholder mode → use fallback data
             elif request.placeholder_mode:
-                rows = self._generate_placeholder_data(request.num_stages)
+                logger.info(f"[CHEVRON] Placeholder mode - using fallback data")
+                rows = self._generate_placeholder_data(num_stages)
+
+            # No valid input path
             else:
                 raise ValueError("No rows source provided")
+
+            # =================================================================
+            # VISUALIZATION PATH (pure rendering, no LLM)
+            # =================================================================
 
             # Auto-assign IDs if not provided
             for i, row in enumerate(rows):
                 if not row.id:
                     row.id = f"row_{i+1}"
                 # Ensure chevrons match num_stages
-                if len(row.chevrons) < request.num_stages:
+                if len(row.chevrons) < num_stages:
                     # Pad with empty chevrons
-                    for _ in range(request.num_stages - len(row.chevrons)):
+                    for _ in range(num_stages - len(row.chevrons)):
                         row.chevrons.append(ChevronContent(bullets=[]))
-                elif len(row.chevrons) > request.num_stages:
-                    row.chevrons = row.chevrons[:request.num_stages]
+                elif len(row.chevrons) > num_stages:
+                    row.chevrons = row.chevrons[:num_stages]
 
             # v1.1.0: Calculate responsive row height based on number of rows
             effective_row_height = calculate_row_height(len(rows), request.gridHeight * 60)
@@ -276,18 +315,18 @@ class ChevronAtomicGenerator:
             # v1.2.0: Get time labels (prioritize custom time_labels, then stage_labels, then auto-generate)
             if request.time_labels:
                 time_labels = request.time_labels
-            elif request.stage_labels:
-                time_labels = request.stage_labels
+            elif stage_labels:
+                time_labels = stage_labels
             else:
-                time_labels = self._get_time_labels(request.time_unit, request.num_stages)
+                time_labels = self._get_time_labels(time_unit, num_stages)
 
             # Ensure time_labels length matches num_stages
-            if len(time_labels) < request.num_stages:
+            if len(time_labels) < num_stages:
                 # Pad with auto-generated labels
-                auto_labels = self._get_time_labels(request.time_unit, request.num_stages)
+                auto_labels = self._get_time_labels(time_unit, num_stages)
                 time_labels = time_labels + auto_labels[len(time_labels):]
-            elif len(time_labels) > request.num_stages:
-                time_labels = time_labels[:request.num_stages]
+            elif len(time_labels) > num_stages:
+                time_labels = time_labels[:num_stages]
 
             # Get theme colors
             theme_config = CHEVRON_THEMES.get(request.theme, CHEVRON_THEMES["default"])
@@ -296,9 +335,9 @@ class ChevronAtomicGenerator:
             # Generate HTML with inline styles
             html_content = self._generate_html(
                 rows=rows,
-                num_stages=request.num_stages,
+                num_stages=num_stages,
                 stage_labels=time_labels,  # v1.2.0: renamed to time_labels internally
-                row_terminology=request.row_terminology,
+                row_terminology=row_terminology,
                 theme=request.theme,
                 theme_mode=request.theme_mode,
                 theme_colors=theme_colors,
@@ -306,7 +345,7 @@ class ChevronAtomicGenerator:
                 grid_height=request.gridHeight,
                 external_margin=request.external_margin,
                 row_height=effective_row_height,
-                time_unit=request.time_unit,
+                time_unit=time_unit,
                 now_line_pct=request.now_line_pct
             )
 
@@ -320,7 +359,7 @@ class ChevronAtomicGenerator:
                 html=html_content,
                 component_type="chevron_maturity",
                 row_count=len(rows),
-                stage_count=request.num_stages,
+                stage_count=num_stages,
                 theme_used=request.theme,
                 theme_mode_used=request.theme_mode,
                 preset_used=request.position_preset,

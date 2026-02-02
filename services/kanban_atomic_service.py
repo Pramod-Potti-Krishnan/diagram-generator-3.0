@@ -57,6 +57,7 @@ from models.atomic_models import (
     AtomicMetadata,
     KANBAN_POSITION_PRESETS
 )
+from services.kanban_planner import KanbanPlanner, KanbanPlanRequest
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +157,8 @@ class KanbanAtomicGenerator:
     """
 
     def __init__(self):
-        """Initialize the Kanban board generator."""
-        pass
+        """Initialize the Kanban board generator with planner."""
+        self._planner = KanbanPlanner()
 
     def _generate_theme_css(self) -> str:
         """
@@ -303,20 +304,50 @@ class KanbanAtomicGenerator:
                 # Two-thirds width: only 3 columns allowed
                 column_count = 3
 
-            # Determine columns source priority:
-            # 1. Direct columns provided
-            # 2. Placeholder mode
+            # =================================================================
+            # AUTO-ROUTING: Planning vs Visualization
+            # =================================================================
+            # Priority: 1. Direct columns → 2. Prompt (LLM) → 3. Placeholder mode
+
+            columns = None
+
+            # Path A: Direct columns provided → skip to visualization
             if request.columns and len(request.columns) > 0:
                 columns = request.columns
+                logger.info(f"[KANBAN] Direct columns provided - {len(columns)} columns")
                 # Adjust columns list if needed based on position restrictions
                 if preset == "full_content" and len(columns) < 4:
                     pass  # Keep provided columns
                 elif preset in ["left_two_thirds", "right_two_thirds"] and len(columns) > 3:
                     columns = columns[:3]  # Trim to 3 columns
+
+            # Path B: Prompt provided → use planner (LLM)
+            elif request.prompt and request.prompt.strip():
+                logger.info(f"[KANBAN] No columns provided - routing to planner")
+                plan_result = await self._planner.plan(
+                    KanbanPlanRequest(
+                        prompt=request.prompt,
+                        num_columns=column_count
+                    )
+                )
+                columns = plan_result.columns
+                logger.info(f"[KANBAN] Planner generated {len(columns)} columns")
+                # Adjust for position restrictions
+                if preset in ["left_two_thirds", "right_two_thirds"] and len(columns) > 3:
+                    columns = columns[:3]
+
+            # Path C: Placeholder mode → use fallback data
             elif request.placeholder_mode:
+                logger.info(f"[KANBAN] Placeholder mode - using fallback data")
                 columns = self._generate_placeholder_data(column_count)
+
+            # No valid input path
             else:
                 raise ValueError("No columns source provided")
+
+            # =================================================================
+            # VISUALIZATION PATH (pure rendering, no LLM)
+            # =================================================================
 
             # Get theme colors based on theme_mode (priority) or legacy theme
             theme_mode = getattr(request, 'theme_mode', 'light')

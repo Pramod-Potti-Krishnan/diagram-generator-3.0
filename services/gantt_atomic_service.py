@@ -46,6 +46,7 @@ from models.gantt_atomic_models import (
     GANTT_STATUS_COLORS
 )
 from models.atomic_models import AtomicMetadata
+from services.gantt_planner import GanttPlanner, GanttPlanRequest
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,8 @@ class GanttAtomicGenerator:
     """
 
     def __init__(self):
-        """Initialize the Gantt chart generator."""
-        pass
+        """Initialize the Gantt chart generator with planner."""
+        self._planner = GanttPlanner()
 
     def _generate_theme_css(self, theme: str, theme_mode: str) -> str:
         """
@@ -224,15 +225,41 @@ class GanttAtomicGenerator:
         start_time = time.time()
 
         try:
-            # Determine tasks source priority:
-            # 1. Direct tasks provided
-            # 2. Placeholder mode
+            # =================================================================
+            # AUTO-ROUTING: Planning vs Visualization
+            # =================================================================
+            # Priority: 1. Direct tasks → 2. Prompt (LLM) → 3. Placeholder mode
+
+            tasks = None
+            time_unit = request.time_unit
+
+            # Path A: Direct tasks provided → skip to visualization
             if request.tasks and len(request.tasks) > 0:
                 tasks = request.tasks
+                logger.info(f"[GANTT] Direct tasks provided - {len(tasks)} tasks")
+
+            # Path B: Prompt provided → use planner (LLM)
+            elif request.prompt and request.prompt.strip():
+                logger.info(f"[GANTT] No tasks provided - routing to planner")
+                plan_result = await self._planner.plan(
+                    GanttPlanRequest(prompt=request.prompt)
+                )
+                tasks = plan_result.tasks
+                time_unit = plan_result.time_unit  # Use planner's recommended time unit
+                logger.info(f"[GANTT] Planner generated {len(tasks)} tasks, time_unit={time_unit}")
+
+            # Path C: Placeholder mode → use fallback data
             elif request.placeholder_mode:
+                logger.info(f"[GANTT] Placeholder mode - using fallback data")
                 tasks = self._generate_placeholder_data()
+
+            # No valid input path
             else:
                 raise ValueError("No tasks source provided")
+
+            # =================================================================
+            # VISUALIZATION PATH (pure rendering, no LLM)
+            # =================================================================
 
             # Auto-assign IDs if not provided
             for i, task in enumerate(tasks):
@@ -244,7 +271,7 @@ class GanttAtomicGenerator:
                 tasks,
                 request.start_date,
                 request.end_date,
-                request.time_unit
+                time_unit
             )
 
             # Get theme colors
@@ -254,7 +281,7 @@ class GanttAtomicGenerator:
             # Generate HTML with inline styles
             html_content = self._generate_html(
                 tasks=tasks,
-                time_unit=request.time_unit,
+                time_unit=time_unit,
                 chart_start=chart_start,
                 chart_end=chart_end,
                 theme=request.theme,
@@ -276,7 +303,7 @@ class GanttAtomicGenerator:
                 html=html_content,
                 component_type="gantt_chart",
                 task_count=len(tasks),
-                time_unit_used=request.time_unit,
+                time_unit_used=time_unit,
                 theme_used=request.theme,
                 theme_mode_used=request.theme_mode,
                 preset_used=request.position_preset,

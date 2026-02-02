@@ -217,6 +217,11 @@ class GanttAtomicRequest(BaseModel):
         None,
         description="Explicit task data (bypasses placeholder mode)"
     )
+    prompt: Optional[str] = Field(
+        None,
+        max_length=500,
+        description="LLM generation prompt (e.g., 'Product launch timeline for a SaaS platform')"
+    )
     placeholder_mode: bool = Field(
         default=False,
         description="If true, use sample placeholder data"
@@ -296,13 +301,14 @@ class GanttAtomicRequest(BaseModel):
     # Note: AtomicContext imported where needed
 
     @model_validator(mode='after')
-    def validate_tasks_or_placeholder(self) -> 'GanttAtomicRequest':
-        """Validate that tasks or placeholder mode is provided."""
+    def validate_tasks_or_placeholder_or_prompt(self) -> 'GanttAtomicRequest':
+        """Validate that tasks, prompt, or placeholder mode is provided."""
         has_tasks = self.tasks and len(self.tasks) > 0
+        has_prompt = self.prompt and self.prompt.strip()
 
-        if not self.placeholder_mode and not has_tasks:
+        if not self.placeholder_mode and not has_tasks and not has_prompt:
             raise ValueError(
-                "Must provide one of: tasks data or placeholder_mode=True"
+                "Must provide one of: tasks data, prompt for generation, or placeholder_mode=True"
             )
         return self
 
